@@ -1,0 +1,14 @@
+# Golden-dataset tasks placeholder
+#
+# Target: 30 tasks (10 easy / 15 medium / 5 hard) materialized в Milestone C Phase 00.5
+# Coverage: 5 primary tasks × 6 variants each
+# Adversarial subset: >= 5 tasks designed for hallucination boundary testing (100% pass требуется)
+#
+# Task structure: per golden-dataset/README.md
+# Frontmatter contract: per DECISION-11 / ADR-026 §3
+#
+# File naming convention:
+#   - Regular: tasks/<id>-<slug>.md  (e.g., 001-listing-headphones.md)
+#   - Adversarial: tasks/adv-<id>-<slug>.md  (e.g., adv-001-medical-product-refusal.md)
+#
+# Status: empty placeholder. Population scheduled for Milestone C Phase 00.5.

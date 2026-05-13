@@ -1,0 +1,53 @@
+spec: cloudevents/1.0
+context: rbac
+description: |
+  Domain events emitted by the `rbac` bounded context. CloudEvents 1.0 envelope
+  per ADR-024 §3.
+
+defaults:
+  specversion: "1.0"
+  source: oriion://contexts/rbac
+  datacontenttype: application/json
+
+events:
+  - type: oriion.rbac.role_assigned.v1
+    description: A user was granted a system role within a scope.
+    data:
+      type: object
+      required: [assignment_id, user_id, scope_type, scope_id, role_slug, assigned_by, assigned_at]
+      properties:
+        assignment_id: { type: string, format: uuid }
+        user_id:       { type: string, format: uuid }
+        scope_type:    { type: string, enum: [organization, cell] }
+        scope_id:      { type: string, format: uuid }
+        role_slug:     { type: string, example: editor }
+        assigned_by:   { type: string, format: uuid, nullable: true }
+        assigned_at:   { type: string, format: date-time }
+        expires_at:    { type: string, format: date-time, nullable: true }
+
+  - type: oriion.rbac.role_revoked.v1
+    description: A role assignment was revoked explicitly.
+    data:
+      type: object
+      required: [assignment_id, user_id, scope_type, scope_id, role_slug, revoked_by, revoked_at]
+      properties:
+        assignment_id: { type: string, format: uuid }
+        user_id:       { type: string, format: uuid }
+        scope_type:    { type: string, enum: [organization, cell] }
+        scope_id:      { type: string, format: uuid }
+        role_slug:     { type: string }
+        revoked_by:    { type: string, format: uuid }
+        revoked_at:    { type: string, format: date-time }
+
+  - type: oriion.rbac.role_expired.v1
+    description: A time-boxed role assignment crossed its expires_at horizon.
+    data:
+      type: object
+      required: [assignment_id, user_id, scope_type, scope_id, role_slug, expired_at]
+      properties:
+        assignment_id: { type: string, format: uuid }
+        user_id:       { type: string, format: uuid }
+        scope_type:    { type: string, enum: [organization, cell] }
+        scope_id:      { type: string, format: uuid }
+        role_slug:     { type: string }
+        expired_at:    { type: string, format: date-time }

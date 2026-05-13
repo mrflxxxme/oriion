@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oriion.dev/schemas/gate.frontmatter.v1.json",
+  "title": "Oriion Wave-Transition Gate Frontmatter",
+  "description": "Schema for wave-N-to-N+1.md YAML frontmatter per ADR-025 section 1 and GRILL-DECISIONS-ORIION section 5.1 DECISION-9. Validates the machine-readable header that memory-curator auto-fills (80%) and founder hand-signs (20%).",
+  "type": "object",
+  "required": [
+    "gate",
+    "status",
+    "opened_at",
+    "hard_thresholds",
+    "deliverables",
+    "metrics_snapshot",
+    "adr_delta",
+    "risks_delta",
+    "capacity_snapshot"
+  ],
+  "properties": {
+    "gate": {
+      "type": "string",
+      "pattern": "^wave-[0-4]-to-[1-5]$",
+      "description": "Transition identifier in form wave-N-to-N+1 where N in [0..4]"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "PASSED", "BLOCKED", "WAIVED"],
+      "description": "PENDING = open and awaiting evaluation; PASSED = founder approved after thresholds met; BLOCKED = thresholds not met and remediation in progress; WAIVED = founder explicit override with justification in body"
+    },
+    "opened_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp when gate file was first created and status set to PENDING"
+    },
+    "closed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp when status transitioned away from PENDING; null while PENDING"
+    },
+    "founder_signature": {
+      "type": ["string", "null"],
+      "description": "Required when status in [PASSED, WAIVED]; null when PENDING or BLOCKED. Format: free-form founder identifier plus optional cryptographic signature (out of scope for v1)."
+    },
+    "hard_thresholds": {
+      "type": "object",
+      "description": "Wave-specific must-pass criteria per ADR-025 section 1. Keys are threshold identifiers; values describe target, actual reading, pass/fail, and evidence link.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["target", "actual", "passed"],
+        "properties": {
+          "target": {
+            "type": ["number", "string", "boolean"],
+            "description": "Required threshold value (numeric KPI, boolean flag, or string sentinel)"
+          },
+          "actual": {
+            "type": ["number", "string", "boolean", "null"],
+            "description": "Measured value at gate evaluation time; null while PENDING"
+          },
+          "passed": {
+            "type": ["boolean", "null"],
+            "description": "Computed pass/fail; null while PENDING"
+          },
+          "evidence_url": {
+            "type": ["string", "null"],
+            "description": "Pointer to evidence artifact (dashboard snapshot, recording, dataset)"
+          },
+          "measured_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable rationale for this threshold; preserved for audit"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "deliverables": {
+      "type": "array",
+      "description": "Wave deliverables tracked by memory-curator; status auto-synced from roadmap and phase artifacts",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "status"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^D[0-9]+$"
+          },
+          "name": {"type": "string"},
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "done", "deferred", "cancelled"]
+          },
+          "owner": {"type": "string"},
+          "notes": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "metrics_snapshot": {
+      "type": "object",
+      "description": "Auto-filled by memory-curator at gate evaluation time. Captures observability KPIs in effect when gate was scored.",
+      "required": ["snapshot_taken_at", "metrics"],
+      "properties": {
+        "snapshot_taken_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": {"type": ["number", "string"]}
+        }
+      },
+      "additionalProperties": false
+    },
+    "adr_delta": {
+      "type": "object",
+      "description": "ADRs created, revised, or superseded during this wave",
+      "required": ["created", "revised", "superseded"],
+      "properties": {
+        "created": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^ADR-[0-9]{3}$"}
+        },
+        "revised": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^ADR-[0-9]{3}$"}
+        },
+        "superseded": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^ADR-[0-9]{3}$"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "risks_delta": {
+      "type": "object",
+      "description": "Risk register changes during this wave; identifiers reference .planning/risks/",
+      "required": ["opened", "closed", "mitigated", "escalated"],
+      "properties": {
+        "opened": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^R-[0-9]+$"}
+        },
+        "closed": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^R-[0-9]+$"}
+        },
+        "mitigated": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^R-[0-9]+$"}
+        },
+        "escalated": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^R-[0-9]+$"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "capacity_snapshot": {
+      "type": "object",
+      "description": "Team-AI capacity state at gate evaluation; informs cost-budget review and staffing decisions for next wave",
+      "required": ["ai_team_roles_active"],
+      "properties": {
+        "ai_team_roles_active": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of distinct agent archetypes active during this wave"
+        },
+        "total_tasks_completed_this_wave": {"type": ["integer", "null"], "minimum": 0},
+        "total_cost_usd_this_wave": {"type": ["number", "null"], "minimum": 0},
+        "average_revision_cycles_per_phase": {"type": ["number", "null"], "minimum": 0},
+        "founder_overrides_count": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
