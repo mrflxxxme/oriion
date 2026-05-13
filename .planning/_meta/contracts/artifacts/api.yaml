@@ -1,0 +1,136 @@
+# SKELETON — Wave 1 deliverable (per ADR-024)
+# Detailed OpenAPI spec deferred to Milestone D, Wave 1 phase
+# Status: structural placeholder for cross-context references
+
+openapi: 3.1.0
+info:
+  title: Oriion Artifacts API (SKELETON)
+  version: 0.0.1-skeleton
+  description: |
+    Artifacts context — Y.js collaborative docs + S3 binary asset storage.
+    SKELETON ONLY — real-time sync semantics + presigned URL flow
+    defined in Milestone D, Wave 1.
+
+paths:
+  /artifacts/yjs/{document_id}:
+    get:
+      summary: "TODO: define в Milestone D — fetch current Y.js document snapshot"
+      operationId: getYjsDocument
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YjsDocument'
+    patch:
+      summary: "TODO: define в Milestone D — apply Y.js update (CRDT merge)"
+      operationId: patchYjsDocument
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YjsDocument'
+
+  /artifacts/yjs/{document_id}/snapshots:
+    get:
+      summary: "TODO: define в Milestone D — list document snapshots (history)"
+      operationId: listYjsSnapshots
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/YjsSnapshot'
+
+  /artifacts/s3/upload-url:
+    post:
+      summary: "TODO: define в Milestone D — request presigned upload URL"
+      operationId: createS3UploadUrl
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+
+  /artifacts/s3/{asset_id}:
+    get:
+      summary: "TODO: define в Milestone D — fetch asset metadata"
+      operationId: getS3Asset
+      parameters:
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/S3Asset'
+    delete:
+      summary: "TODO: define в Milestone D — delete asset (soft or hard, TBD)"
+      operationId: deleteS3Asset
+      parameters:
+        - name: asset_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: TODO
+
+components:
+  schemas:
+    YjsDocument:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    YjsSnapshot:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    S3Asset:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    UploadUrlResponse:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}

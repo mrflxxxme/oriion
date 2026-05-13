@@ -1,0 +1,34 @@
+# SKELETON — Wave 0 stub (per ADR-024)
+# Detailed event payload schemas deferred to Milestone D / Wave 2-3
+# Status: structural placeholder for cross-context references
+#
+# Format: CloudEvents 1.0 envelope (per Oriion eventing conventions)
+
+specversion: "1.0"
+context: billing
+status: skeleton
+
+events:
+  - type: oriion.billing.invoice.issued.v1
+    description: "Invoice issued for an organization for a billing period"
+    source: oriion.billing
+    dataschema: "TODO: link to JSON Schema in Milestone D"
+    data: {}
+
+  - type: oriion.billing.payment.received.v1
+    description: "Payment received and applied to credit balance"
+    source: oriion.billing
+    dataschema: "TODO"
+    data: {}
+
+  - type: oriion.billing.credit.consumed.v1
+    description: "Credit consumed by usage (LLM call, MCP invocation, task)"
+    source: oriion.billing
+    dataschema: "TODO"
+    data: {}
+
+  - type: oriion.billing.subscription.upgraded.v1
+    description: "Organization upgraded/downgraded tariff plan"
+    source: oriion.billing
+    dataschema: "TODO"
+    data: {}

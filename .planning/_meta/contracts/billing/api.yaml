@@ -1,0 +1,83 @@
+# SKELETON — Wave 0 stub (per ADR-024)
+# Detailed OpenAPI spec будет добавлен в Milestone D / Wave 2-3
+# Status: structural placeholder for cross-context references
+
+openapi: 3.1.0
+info:
+  title: Oriion Billing API (SKELETON)
+  version: 0.0.1-skeleton
+  description: |
+    Billing context — credits, transactions, tariffs, checkout.
+    SKELETON ONLY — paths and schemas are placeholders.
+    Real definition deferred to Milestone D.
+
+paths:
+  /billing/balance:
+    get:
+      summary: "TODO: define в Milestone D — get current credit balance"
+      operationId: getBillingBalance
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingBalance'
+
+  /billing/transactions:
+    get:
+      summary: "TODO: define в Milestone D — list credit transactions"
+      operationId: listBillingTransactions
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /billing/tariffs:
+    get:
+      summary: "TODO: define в Milestone D — list tariff plans"
+      operationId: listBillingTariffs
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tariff'
+
+  /billing/checkout:
+    post:
+      summary: "TODO: define в Milestone D — initiate checkout for tariff/topup"
+      operationId: createBillingCheckout
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                description: TODO
+
+components:
+  schemas:
+    BillingBalance:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    Transaction:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    Tariff:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}

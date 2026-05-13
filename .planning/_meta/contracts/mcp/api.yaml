@@ -1,0 +1,108 @@
+# SKELETON — Wave 0 stub (per ADR-024)
+# Detailed OpenAPI spec deferred to Milestone D / Wave 2
+# Status: structural placeholder for cross-context references
+
+openapi: 3.1.0
+info:
+  title: Oriion MCP API (SKELETON)
+  version: 0.0.1-skeleton
+  description: |
+    MCP (Model Context Protocol) context — connection registry,
+    tool discovery, health monitoring.
+    SKELETON ONLY — definitions deferred to Wave 2.
+
+paths:
+  /mcp/connections:
+    get:
+      summary: "TODO: define в Milestone D — list MCP connections"
+      operationId: listMcpConnections
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MCPConnection'
+    post:
+      summary: "TODO: define в Milestone D — register new MCP connection"
+      operationId: createMcpConnection
+      responses:
+        '201':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPConnection'
+
+  /mcp/connections/{id}/test:
+    post:
+      summary: "TODO: define в Milestone D — probe connection health"
+      operationId: testMcpConnection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MCPHealthStatus'
+
+  /mcp/connections/{id}/tools:
+    get:
+      summary: "TODO: define в Milestone D — list tools exposed by connection"
+      operationId: listMcpConnectionTools
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MCPTool'
+
+  /mcp/health:
+    get:
+      summary: "TODO: define в Milestone D — aggregate health across all connections"
+      operationId: getMcpHealth
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MCPHealthStatus'
+
+components:
+  schemas:
+    MCPConnection:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    MCPTool:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
+
+    MCPHealthStatus:
+      type: object
+      description: "TODO: define в Milestone D"
+      properties: {}
