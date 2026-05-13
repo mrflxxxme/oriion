@@ -1,0 +1,305 @@
+openapi: 3.1.0
+info:
+  title: Oriion IAM API
+  version: 0.1.0-draft
+  summary: Identity & Access Management — registration, login, sessions, OAuth, profile.
+  description: |
+    Authoritative API contract for the `iam` bounded context per ADR-024.
+    Phase-specs MUST import this file via cross-link; they MUST NOT duplicate
+    endpoint definitions.
+
+    All error responses follow RFC 7807 `application/problem+json`.
+
+servers:
+  - url: https://api.oriion.app
+    description: Production
+  - url: https://api.staging.oriion.app
+    description: Staging
+
+tags:
+  - name: auth
+    description: Registration, login, token rotation, logout.
+  - name: sessions
+    description: Session listing and revocation.
+  - name: oauth
+    description: External IdP callbacks (Yandex / Google / VK / GitLab).
+  - name: profile
+    description: Authenticated user profile.
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new user with email + password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              default:
+                value:
+                  email: founder@example.com
+                  password: correct-horse-battery-staple
+                  display_name: Анна
+                  locale: ru-RU
+      responses:
+        '201':
+          description: User created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '409':
+          description: Email already in use.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate with email + password, returns token pair.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Authenticated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '401':
+          description: Invalid credentials.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate refresh token and return new pair.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Rotated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '401':
+          description: Refresh token invalid / reused / expired (entire rotation chain revoked on reuse).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke current session and its refresh chain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '204':
+          description: Logged out.
+
+  /auth/oauth/{provider}/callback:
+    post:
+      tags: [oauth]
+      summary: Complete OAuth flow with an external IdP.
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [yandex, google, vk, gitlab]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OAuthCallback' }
+      responses:
+        '200':
+          description: Authenticated; user is auto-created or linked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/sessions:
+    get:
+      tags: [sessions]
+      summary: List active sessions for the authenticated user.
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Session' }
+
+  /auth/sessions/{session_id}:
+    delete:
+      tags: [sessions]
+      summary: Revoke a specific session.
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Revoked.
+        '404':
+          description: Session not found or not owned by caller.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /users/me:
+    get:
+      tags: [profile]
+      summary: Get the authenticated user's profile.
+      responses:
+        '200':
+          description: OK.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+    patch:
+      tags: [profile]
+      summary: Update the authenticated user's profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserPatch' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ValidationError:
+      description: Validation failed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    User:
+      type: object
+      required: [id, email, locale, timezone, created_at]
+      properties:
+        id:                 { type: string, format: uuid }
+        email:              { type: string, format: email }
+        email_verified_at:  { type: string, format: date-time, nullable: true }
+        display_name:       { type: string, nullable: true }
+        locale:             { type: string, example: ru-RU }
+        timezone:           { type: string, example: Europe/Moscow }
+        created_at:         { type: string, format: date-time }
+        updated_at:         { type: string, format: date-time }
+
+    UserPatch:
+      type: object
+      properties:
+        display_name: { type: string }
+        locale:       { type: string }
+        timezone:     { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:        { type: string, format: email }
+        password:     { type: string, minLength: 12 }
+        display_name: { type: string }
+        locale:       { type: string, default: ru-RU }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:    { type: string, format: email }
+        password: { type: string }
+
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, expires_in, token_type]
+      properties:
+        access_token:  { type: string }
+        refresh_token: { type: string }
+        expires_in:    { type: integer, description: Seconds until access_token expiry. }
+        token_type:    { type: string, enum: [Bearer] }
+
+    Session:
+      type: object
+      required: [id, user_id, expires_at, created_at]
+      properties:
+        id:           { type: string, format: uuid }
+        user_id:      { type: string, format: uuid }
+        ip_address:   { type: string, nullable: true }
+        user_agent:   { type: string, nullable: true }
+        last_seen_at: { type: string, format: date-time }
+        expires_at:   { type: string, format: date-time }
+        revoked_at:   { type: string, format: date-time, nullable: true }
+        created_at:   { type: string, format: date-time }
+
+    OAuthCallback:
+      type: object
+      required: [code, state]
+      properties:
+        code:  { type: string }
+        state: { type: string }
+
+    Error:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri, example: 'https://oriion.app/errors/invalid-credentials' }
+        title:    { type: string, example: 'Invalid credentials' }
+        status:   { type: integer, example: 401 }
+        detail:   { type: string }
+        instance: { type: string, format: uri }
+        code:     { type: string, example: iam.auth.invalid_credentials }

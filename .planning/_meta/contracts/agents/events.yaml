@@ -1,0 +1,74 @@
+specversion: "1.0"
+context: agents
+description: |
+  CloudEvents 1.0 emitted/consumed by the `agents` bounded context.
+  Naming: always `agent_archetype_id` (canonical per ADR-024 §2 / P-AUDIT-2).
+
+events:
+  - type: oriion.agents.archetype.published.v1
+    direction: emit
+    description: Archetype status transitioned (draft → reviewed → promoted → locked).
+    data_schema:
+      type: object
+      required: [archetype_id, vertical_slug, slug, prompt_version, status_from, status_to]
+      properties:
+        archetype_id:   { type: string, format: uuid }
+        vertical_slug:  { type: string }
+        slug:           { type: string }
+        prompt_version: { type: string }
+        status_from:    { type: string, enum: [draft, reviewed, promoted, locked] }
+        status_to:      { type: string, enum: [draft, reviewed, promoted, locked] }
+
+  - type: oriion.agents.archetype.deprecated.v1
+    direction: emit
+    description: Archetype marked deprecated; existing instances continue until cell-level migration.
+    data_schema:
+      type: object
+      required: [archetype_id, deprecated_at]
+      properties:
+        archetype_id:    { type: string, format: uuid }
+        deprecated_at:   { type: string, format: date-time }
+        superseded_by:   { type: string, format: uuid, nullable: true }
+
+  - type: oriion.agents.instance.spawned.v1
+    direction: emit
+    description: New agent_instance created in a cell.
+    data_schema:
+      type: object
+      required: [instance_id, cell_id, agent_archetype_id, archetype_slug, archetype_vertical_slug]
+      properties:
+        instance_id:               { type: string, format: uuid }
+        cell_id:                   { type: string, format: uuid }
+        agent_archetype_id:        { type: string, format: uuid }
+        archetype_slug:            { type: string }
+        archetype_vertical_slug:   { type: string }
+        custom_name:               { type: string, nullable: true }
+
+  - type: oriion.agents.instance.archived.v1
+    direction: emit
+    description: Agent_instance soft-archived; tasks history retained.
+    data_schema:
+      type: object
+      required: [instance_id, cell_id, archived_at]
+      properties:
+        instance_id: { type: string, format: uuid }
+        cell_id:     { type: string, format: uuid }
+        archived_at: { type: string, format: date-time }
+
+  - type: oriion.agents.team_preset.applied.v1
+    direction: emit
+    description: Bulk spawn from a preset completed.
+    data_schema:
+      type: object
+      required: [preset_id, cell_id, created_instance_ids]
+      properties:
+        preset_id:            { type: string, format: uuid }
+        cell_id:              { type: string, format: uuid }
+        created_instance_ids:
+          type: array
+          items: { type: string, format: uuid }
+
+  - type: oriion.multitenancy.cell.archived.v1
+    direction: consume
+    description: When a cell is archived, agent_instances within it must be archived too.
+    source_context: multitenancy

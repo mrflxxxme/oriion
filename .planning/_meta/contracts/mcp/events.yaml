@@ -1,0 +1,32 @@
+# SKELETON — Wave 0 stub (per ADR-024)
+# Detailed event payload schemas deferred to Milestone D / Wave 2
+# Status: structural placeholder for cross-context references
+
+specversion: "1.0"
+context: mcp
+status: skeleton
+
+events:
+  - type: oriion.mcp.connection.created.v1
+    description: "New MCP server connection registered in an organization"
+    source: oriion.mcp
+    dataschema: "TODO: link to JSON Schema in Milestone D"
+    data: {}
+
+  - type: oriion.mcp.connection.health_degraded.v1
+    description: "MCP connection moved from healthy/degraded to degraded/unreachable"
+    source: oriion.mcp
+    dataschema: "TODO"
+    data: {}
+
+  - type: oriion.mcp.tool.invoked.v1
+    description: "An MCP tool was invoked by an agent (audit + cost attribution signal)"
+    source: oriion.mcp
+    dataschema: "TODO"
+    data: {}
+
+  - type: oriion.mcp.tool.permission_denied.v1
+    description: "Agent attempted to invoke an MCP tool without sufficient RBAC scope"
+    source: oriion.mcp
+    dataschema: "TODO"
+    data: {}
