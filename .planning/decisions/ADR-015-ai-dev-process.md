@@ -37,10 +37,7 @@
 
 - Langfuse-инстанс для dev-agents (отдельно от prod)
 - Метрики per-agent: PR throughput, acceptance rate, average review iterations, token cost, bug introduction rate, test coverage delta, security findings
-- Cost caps:
-  - per-task: $5 Sonnet / $20 Opus
-  - per-day per-agent: $50
-  - per-month total: целевой $200-500 общий для всей команды (11 Opus-ролей + non-persistent), per `_shared/cost-budget.yaml` в [ADR-023](./ADR-023-ai-team-runtime.md). Hard cap см. [R-31](../risks/REGISTER.md)
+- **Cost cap policy** — конкретные пороги (per-task, per-day, per-team monthly, Sonnet fallback rules) задаются founder'ом в `.claude/agents/_shared/cost-budget.yaml` (см. [ADR-023](./ADR-023-ai-team-runtime.md)). Этот ADR фиксирует только operational guardrails — без числовых деталей. Mitigation owner — [R-31](../risks/REGISTER.md)
 - Kill-switch: 30 мин без прогресса → auto-abort
 
 ### 6. AI-роли
@@ -61,7 +58,7 @@
 
 - Скорость dev'а × 2-4 при сохранении качества
 - Защита от классов багов AI (галлюцинации, уязвимости)
-- Operational hygiene mandate чёткий: этот ADR — про «как не сжечь production / не утечь данные / не потратить $10K»; кто и как пишет код — в ADR-023; как код попадает в main — в ADR-027
+- Operational hygiene mandate чёткий: этот ADR — про «как не сжечь production, не утечь данные, не зависнуть в бесконечном loop'е»; кто и как пишет код — в ADR-023; как код попадает в main — в ADR-027
 
 ## Links
 

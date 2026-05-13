@@ -111,7 +111,7 @@ JIT-loading: каждый sub-файл загружается только ко�
 ## Consequences
 
 - **Reuse heavy:** 5-6 ролей реализуются как thin wrapper над GSD/Anthropic skill agents (~50-100 строк profile + system-prompt). 3-4 роли = полностью custom (memory-curator, evaluator, reviewer-security composite, architect deep layer) — ~200 строк каждая. Estimated effort на Milestone B: ~1 рабочий день.
-- **Cost под контролем:** Opus × 11 ролей × frequent invocations = ~$200-500/мес целевой budget. Mitigation owner — [R-31](../risks/REGISTER.md#r-31-ai-cost-overrun-under-11-opus-persistent-team). Конкретные cap'ы — в `_shared/cost-budget.yaml` (Milestone B).
+- **Cost под контролем:** 11 persistent Opus-ролей + non-persistent — потенциально high token-burn. Конкретные cap'ы (per-task / per-day / per-team monthly / Sonnet fallback rules) — в `.claude/agents/_shared/cost-budget.yaml` (Milestone B), задаются founder'ом, не зашиваются в ADR. Mitigation owner — [R-31](../risks/REGISTER.md).
 - **Routing tier-based:** routine задачи (tier 1-2 per ADR-027) могут fallback на Sonnet через `cost-budget.yaml`. High-stakes задачи (tier 3+) — всегда Opus.
 - **Memory persistence:** AgentDB обеспечивает cross-session continuity. При context-overflow роль возобновляется из своего namespace + STATUS.md без потери знаний.
 - **No merge prerogative для AI:** агенты возвращают artifact + approval status; финальный merge — за founder (см. ADR-027).
