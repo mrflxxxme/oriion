@@ -115,11 +115,12 @@ R-NN. <Название>
 - **Митигация:** [ADR-019](../decisions/ADR-019-vertical-autonomous-mode.md): explicit opt-in checkbox при включении autonomy; clear list of actions; юр.copy в оферте; deadman switch
 - **Monitoring:** opt-in conversion rate, complaint rate
 
-## R-20. РФ-API instability (WB / Ozon / 1С / Эльба breaking changes)
+## R-20. РФ-API instability (общий — SLA, latency, rate-limit, partial outages)
 
 - **Severity:** medium · **Likelihood:** medium · **Owner:** Tech Lead
-- **Митигация:** Health-check WB Партнёры / Ozon Seller / 1С REST / Эльба API каждые 5 минут; при >5% error rate → auto-pause связанных rituals + alert owner; graceful degradation
-- **Monitoring:** per-MCP-server availability, error rate
+- **Scope:** Верхнеуровневый риск надёжности всех РФ-API, на которых строится продукт (WB Партнёры, Ozon Seller, 1С REST, Эльба, ЮKassa, Yandex 360, Telegram Bot API, MCP-серверы партнёров). Покрывает SLA-degradation, latency-spikes, rate-limit изменения, региональные partial-outages, провайдерские maintenance windows. **Контрактные/schema breaking changes — см. R-30.**
+- **Митигация:** Health-check каждые 5 минут на per-API basis; при >5% error rate → auto-pause связанных rituals + alert owner; circuit-breakers (4 уровня Green/Yellow/Orange/Red); graceful degradation с user-visible status; per-API capacity baseline + retry-with-backoff. Status-page для пользователей.
+- **Monitoring:** per-MCP-server availability, error rate, p95 latency, rate-limit hit ratio
 
 ## R-21. Self-hosted auth security ownership
 
@@ -163,10 +164,26 @@ R-NN. <Название>
 - **Severity:** medium · **Likelihood:** medium · **Owner:** Senior Frontend
 - **Митигация:** [ADR-020](../decisions/ADR-020-pyodide-code-execution.md): detect device capabilities + UX «desktop recommended for heavy analysis»; opt-in server-side execution в Wave 3 для больших jobs
 
-## R-30. WB/Ozon/1С/Эльба API breaking changes
+## R-30. WB/Ozon API contract/schema breaking changes
 
 - **Severity:** medium · **Likelihood:** medium · **Owner:** Tech Lead
-- **Митигация:** [ADR-019](../decisions/ADR-019-vertical-autonomous-mode.md): dedicated MCP-server monitoring + auto-fallback to «degraded mode» + clear communication к клиентам; semantic-versioning для наших MCP-серверов
+- **Scope:** Узкий риск contract/schema breakage на vertical-критичных API маркетплейсов (WB Партнёры, Ozon Seller, 1С REST, Эльба): deprecated endpoints, новые required fields, изменения авторизации, удалённые ресурсы. Отличается от R-20 (operational instability) тем, что требует code change на стороне MCP-сервера. Касается ровно тех vertical-templates, которые на эти API завязаны (WB-Селлер, ИП-Бухгалтерия).
+- **Митигация:** [ADR-019](../decisions/ADR-019-vertical-autonomous-mode.md): dedicated MCP-server monitoring + auto-fallback to «degraded mode» с явным user-сообщением + semantic-versioning для наших MCP-серверов (мажорный bump провайдера → guarded rollout); contract-tests в CI на golden API-fixtures.
+- **Monitoring:** MCP-server health post-deploy, contract-test pass-rate, days-since-last-provider-changelog
+
+## R-29. Founder vertical expertise gap — claim vs reality для 5 vertical-templates
+
+- **Status:** `closed (resolved)` — 2026-05-13
+- **Severity (когда был open):** high · **Likelihood (когда был open):** medium · **Owner:** Founder
+- **Rationale закрытия:** Founder operates as real-world expert across all 5 vertical-templates (WB-Селлер, Marketing-Агентство, TG-Крейтор, ИП-Бухгалтерия, SMB-Sales). Vertical-template content validation gate handled через [ADR-026](../decisions/ADR-026-vertical-expertise-pipeline.md): founder-review checklist + evaluator gate (≥75% golden-dataset pass + 100% adversarial probes) + Wave 1+ friend-loop (3-5 ICP-friends × 5 задач) + 90-day re-verification cycle. См. [GRILL-DECISIONS-2026-05-13 DECISION-6](../_meta/GRILL-DECISIONS-2026-05-13.md).
+- **Monitoring (на случай re-opening):** evaluator pass-rate < 75% подряд 2 цикла на одной вертикали → перевести обратно в `open` + флаг founder.
+
+## R-31. AI-cost overrun under 11-Opus persistent team
+
+- **Severity:** high · **Likelihood:** high · **Owner:** Founder
+- **Митигация:** [ADR-023](../decisions/ADR-023-ai-team-runtime.md) Consequences + `.claude/agents/_shared/cost-budget.yaml` (Milestone B). Cap policy (per-task / per-day / per-team monthly limits + tier-1 Sonnet fallback rules) — задаётся founder'ом в `cost-budget.yaml`; конкретные числа не зашиваются в этот ADR/REGISTER. Operational guardrail — 30-min stagnation kill-switch ([ADR-015 §5](../decisions/ADR-015-ai-dev-process.md)). Cost telemetry — Langfuse dev-instance.
+- **Trigger re-evaluation:** sustained burn above founder-defined threshold → escalate founder, переоценить fallback policy в `cost-budget.yaml`.
+- **Monitoring:** monthly spend per role, ratio Opus/Sonnet invocations, kill-switch trigger count
 
 ---
 
