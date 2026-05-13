@@ -3,8 +3,8 @@ title: GRILL-DECISIONS-ORIION
 description: Registry of deep-grill sessions for project Oriion — each session locks fundamental architectural/strategic decisions through founder + Claude Opus long-form dialogue
 type: meta-registry
 status: living document
-last-updated: 2026-05-13
-last-session: 3
+last-updated: 2026-05-14
+last-session: 4
 ---
 
 # GRILL-DECISIONS — Oriion Registry
@@ -22,6 +22,7 @@ last-session: 3
 
 | # | Date | Type | Topic | Outcome | Commit |
 |---|---|---|---|---|---|
+| 4 | 2026-05-14 | Milestone C planning grill | UI-design policy shift (designer = DS-keeper, primary = ui-ux-pro-max) + Milestone C scope lock + execution plan (5 stacked PR + audit) | 10 grill-decisions C-D1..C-D10 locked + policy P-DESIGN-1 added + UI playbook rewrite + scope split C vs D | [PR #TBD](https://github.com/mrflxxxme/oriion/pulls) (C.1 in flight) |
 | 3 | 2026-05-13 | Post-Milestone-B audit | Cross-PR consistency + ADR compliance + strategic readiness | 2 critical issues fixed via B.5 + 4 grill-decisions locked + policy P-AUDIT-3 added | [PR #N TBD](https://github.com/mrflxxxme/oriion/pull/TBD) |
 | 2 | 2026-05-13 | Audit follow-up | Milestone A consistency check | Cost-policy cleanup, R-20/R-30 split, Phase 00.5 column rename | [PR #2 d1f41d3](https://github.com/mrflxxxme/oriion/pull/2) |
 | 1 | 2026-05-13 | Initial deep-grill | 11 fundamental decisions (team / contracts / gates / vertical-expertise / Git) | 10 ADR + R-29 closed + R-31 added + catalog update | [PR #2 c78c381](https://github.com/mrflxxxme/oriion/pull/2) |
@@ -29,6 +30,51 @@ last-session: 3
 ---
 
 ## §2 Session detail (newest first)
+
+### Session 4 — Milestone C planning grill (2026-05-14, post-Milestone-B-merged-PR-#10)
+
+**Trigger:** founder request post-Milestone-B-merge: «Прочти `.planning/_meta/GRILL-DECISIONS-ORIION.md`, составь план выполнения задач для проработки Milestone C, согласуй со мной, закрепи в сессии и давай сделаем это!» — invoked via `/anthropic-skills:grill-me`.
+
+**Method:** Founder + Claude Opus (grill-me skill) walked the decision tree branch-by-branch. 3 parallel Explore agents collected baseline state (Wave 0 phases readiness, 4 Light role current detail, contracts + tools + UI readiness). 9 questions resolved via AskUserQuestion. Plan written to plan-file + ExitPlanMode → approved.
+
+**Strategic decisions (C-D1..C-D10):**
+
+| Q | Topic | Decision | Rationale |
+|---|---|---|---|
+| **C-D1** | Milestone C scope | **Full Session 3 Q4 verbatim** — все 4 Light → Medium upgrade incl. `evaluator`. | Evaluator не в feature-pipeline templates, но должен быть ready без блокировки future vertical-prompts phase. |
+| **C-D2** | Phase 00.7 scope | **Functional skeleton end-to-end** (auth register/login + cell-list/create + task-submit form + SSE task-result view). Покрывает Wave 0→1 gate `internal_demo.passed=true`. | Shell-only недостаточен для demo; Full-Wave-0-UI пересоп ломает minimal-C принцип. |
+| **C-D3** | UI-design tool primacy | **Policy shift:** designer = DS-keeper, primary tool = **`ui-ux-pro-max` skill** invoked via Skill tool inside Claude Code. Claude Design = fallback для Wave 1+ high-fidelity polish (hero / marketing / illustration-heavy). | Founder direction — DS-ownership внутри Claude Code agent для consistency + tighter feedback loop, не external service dependency. |
+| **C-D4** | Policy formalization route | **Session 4 GRILL entry + UI playbook revision** (no ADR-revision yet). ADR-026 update — opt-in if future drift requires it. | Faster path; ADR revision не required если grill + playbook + memory cover the policy surface fully. |
+| **C-D5** | PR structure | **5 stacked PRs layered** + 1 audit: C.1 policy → C.2 roles → C.3 phases 00.1-00.3 → C.4 phases 00.4-00.6 → C.5 phase 00.7 → C.6 audit fixes. | Milestone B pattern (4 stacked PR + B.5) сработал — повторяем. Clean rollback granularity per layer; founder review per layer. |
+| **C-D6** | B-level inline depth | **Hybrid per P-INIT-1 + P-INIT-2:** cross-link к DRAFT-READY contracts (iam/multitenancy/rbac/agents/tasks/llm-gateway), inline только для phase-specific endpoints/tables не covered shared contracts, actual function signatures + actual pytest/vitest test snippets, ui-spec section обязательна для frontend phases. | Maximum-inline нарушает P-INIT-2 + drift risk. Minimum (pseudocode) не testable. Hybrid даёт detеrminacy без duplication. |
+| **C-D7** | Light → Medium role upgrade depth | **Full parity с Medium baseline** (~250 lines system-prompt + 3-5 workflows + 2-3 checklists per role). | Workable-minimum потребует second-pass, экономия мнимая. Ready для Phase 00.7 без блокировки. |
+| **C-D8** | Phase 00.7 placement | **∥ 00.6, оба после 00.5.** Frontend skeleton зависит от 00.2 (auth endpoints) + 00.5 (task SSE endpoints); 00.6 не блокирует frontend. | Параллелизация frontend ∥ observability экономит ~1 неделя на критическом пути. |
+| **C-D9** | UI policy artifact handling | **Rename** `_meta/ui/CLAUDE-DESIGN-PROMPTS.md` → **`UI-DESIGN-PLAYBOOK.md`** + full content rewrite. Git rename preservит history. | Имя должно отражать ui-ux-pro-max primacy; edit-in-place вводит в заблуждение. |
+| **C-D10** | Audit step finale | **C.6 = post-merge consistency audit + fixes** (3 parallel Explore agents → cross-PR consistency / policy compliance / strategic readiness). Findings → Session 5 GRILL entry + §4 inventory update. | Pattern B.5 нашёл 2 critical issues — risk-mitigation перед Phase 00.1 execution. |
+
+**Files modified в C.1 (commit TBD после push):**
+
+- `.planning/_meta/GRILL-DECISIONS-ORIION.md` — Session 4 entry + P-DESIGN-1 policy + §4 inventory update (this commit)
+- `.planning/_meta/ui/CLAUDE-DESIGN-PROMPTS.md` → renamed `UI-DESIGN-PLAYBOOK.md` (git rename) + full rewrite (Claude Design primary → ui-ux-pro-max primary, designer = DS-keeper mandate, fallback section §7)
+- `.planning/_meta/ui/component-inventory.md` — references update (line 455)
+- `.planning/_meta/ui/REVIEW-CHECKLIST.md` — references update (line 251)
+
+**Verified correct (no changes needed):**
+
+- `.planning/_meta/ui/design-tokens.md` — нет references к CLAUDE-DESIGN-PROMPTS.md
+- 11 ролей в `.claude/agents/` — structure intact; designer/frontend-implementer/reviewer-frontend/evaluator placeholder readiness confirmed (~40-46 lines system-prompt vs Medium baseline ~175)
+- 6 DRAFT-READY contracts (iam/multitenancy/rbac/agents/tasks/llm-gateway) ready для cross-link в B-level phase-specs
+- 4 SKELETON contracts (billing/mcp/artifacts/memory) — inline-minimum policy zafiksirovaна
+
+**Forward-looking (Milestones C.2-C.6):**
+
+- C.2 (`feature/milestone-c-2-role-upgrade` base C.1): 4 role full-parity upgrade (~1440 LOC), pipeline-template `frontend-feature.yaml` + `full-stack-feature.yaml` updates per C-D3
+- C.3 (base C.2): phase-specs 00.1+00.2+00.3 B-level revision (~700 LOC)
+- C.4 (base C.3): phase-specs 00.4+00.5+00.6 B-level revision (~900 LOC)
+- C.5 (base C.4): NEW phase 00.7 frontend skeleton spec (~400 LOC) + PHASES.md + README.md updates
+- C.6 (base C.5 merged): audit fixes + Session 5 GRILL entry + §4 inventory move Milestone C → ✅ Done
+
+---
 
 ### Session 3 — Post-Milestone-B consistency audit (2026-05-13, post-PR-#4-#7-open)
 
@@ -165,6 +211,7 @@ last-session: 3
 | **P-AUDIT-2** | Session 2 | Когда ADR объявляет термин/column/API deprecated, phase-spec'ы с этим термином патчатся **в той же PR** где объявлена deprecation. Не deferred в follow-up milestone — иначе AI-агент материализует deprecated artifact. |
 | **P-AUDIT-3** | Session 3 | **Tool-naming registry-conformance.** Любой `.claude/agents/*/tools-allowlist.md` ИЛИ `_meta/verticals/<slug>/prompts/*.md` `tools_allowed:` field MUST reference только slugs из `_meta/tools/registry.md`. Reviewer-backend проверяет conformance перед PR approval. Новый tool = registry-PR-update с justification + role-allowlist + cross-link к contract OR MCP doc. CI check (future Phase 00.1 deliverable) автоматизирует validation. |
 | **P-AUDIT-4** | Session 3 | **Cost-budget structure separation.** `.claude/agents/_shared/cost-budget.yaml` MUST разделять `dev_team` (AI-team internal work) и `user_production` (user-cells через LLM gateway) с separate kill-switches, separate telemetry partitions, separate review thresholds. Founder задаёт `user_production.*` numbers перед wave-1-to-2 gate (когда friends start generating real user-traffic cost). dev_team baseline = $500/mo unless explicit override. |
+| **P-DESIGN-1** | Session 4 | **Designer-role = design-system keeper. Primary UI-generation tool = `ui-ux-pro-max` skill** (invoked via Skill tool inside Claude Code session). Claude Design (external) = **fallback only** для Wave 1+ high-fidelity hero / marketing / illustration-heavy surfaces, validated via §7 of `_meta/ui/UI-DESIGN-PLAYBOOK.md`. Designer owns `_meta/ui/design-tokens.md` + `_meta/ui/component-inventory.md` + `_meta/ui/UI-DESIGN-PLAYBOOK.md` + co-owns `_meta/ui/REVIEW-CHECKLIST.md` (with reviewer-frontend). Any DS change flows through designer + PR; additive = LGTM solo, modifying = architect consult, removing = 1-wave deprecation cycle. **Supersedes** DECISION-4 implementation references к Claude Design (DECISION-4 strategic intent intact; tool changes). ADR-026 update — opt-in if future drift. |
 | **P-INIT-1** | Session 1 (DECISION-1) | Phase-spec'ы Wave 0/1 — **B-level**: inline OpenAPI 3.1 stubs + inline DDL + file-tree diagram + key function signatures (Python+TS) + example test cases (1 unit + 1 integration минимум) + acceptance criteria привязаны к testable checks + `ui-spec:` секция (если phase touches frontend). Wave 2-5 = direction-only до соответствующего acceptance-gate. |
 | **P-INIT-2** | Session 1 (DECISION-7) | **Authoritative spec layer** = `_meta/contracts/<bounded-context>/`. Phase-spec'ы импортируют через cross-link (`## Dependencies → Contracts: [iam](../_meta/contracts/iam/)`), не дублируют DDL/OpenAPI. Backend `src/<context>/` — implementation layer, conform'ит контракту. |
 | **P-INIT-3** | Session 1 (DECISION-10) | **Founder = always final approver для tier 3+** (per ADR-027 tier-table). AI-агенты не имеют merge prerogative. CI green + AI reviewers approved — необходимо, но не достаточно. |
@@ -217,16 +264,34 @@ last-session: 3
 6. **`_meta/verticals/wb-seller/`** × ~10 файлов (per ADR-026 §2): README, domain-glossary, workflow-dag, `prompts/{coordinator,researcher,listing_writer}.md`, `golden-dataset/` (README + tasks placeholder), REVIEW-CHECKLIST, kpis, changelog
 7. **`gates/_schema/gate.schema.json`** + **`gates/_template.md`** (per ADR-025 §1)
 
-### 🔮 Milestone C — Minimal (Wave-0-sprint blockers only, per Session 3 Q4)
+### 🟧 Milestone C — In flight (planned Session 4 / 2026-05-14)
 
-Scope **резко сокращён** относительно first-draft версии. Цель — execution-readiness для Phase 00.1-00.7, не more. Откладываемое НЕ исчезает — становится Milestone D после Wave 0 internal demo retro.
+Scope confirmed per Session 4 grill-decisions C-D1..C-D10. 5 stacked PRs + 1 audit:
 
-**Phase-spec'ы B-level revision (per P-INIT-1):**
-- Revise `roadmap/wave-0-foundation/phases/00.1` через `00.6` → B-level (inline OpenAPI/DDL/signatures/tests/ui-spec)
-- Create `roadmap/wave-0-foundation/phases/00.7` (frontend skeleton via Claude Design) — NEW
+**C.1 — Policy shift + UI playbook revision (~250 LOC) — IN FLIGHT**
+- Session 4 GRILL entry (this §1+§2+§3) + P-DESIGN-1 policy added
+- `_meta/ui/CLAUDE-DESIGN-PROMPTS.md` → rename `UI-DESIGN-PLAYBOOK.md` + full rewrite (ui-ux-pro-max primacy + designer-as-DS-keeper mandate + Claude Design §7 fallback)
+- Cross-refs updated в `_meta/ui/component-inventory.md` + `_meta/ui/REVIEW-CHECKLIST.md`
 
-**4 Light → Medium role upgrade** (если Phase 00.7 близок):
-- `designer`, `frontend-implementer`, `reviewer-frontend`, `evaluator` — upgrade к full Medium content (~250 строк system-prompt + 3-5 workflows + 2-3 checklists)
+**C.2 — 4 Light → Medium role upgrade (~1440 LOC)**
+- `.claude/agents/{designer,frontend-implementer,reviewer-frontend,evaluator}/` full-parity upgrade (~250 lines system-prompt + 3-5 workflows + 2-3 checklists each)
+- `reviewer-frontend` + `evaluator` get NEW `workflows.md` (currently missing)
+- `.claude/agents/_shared/pipeline-templates/{frontend-feature,full-stack-feature}.yaml` — design step description aligned с ui-ux-pro-max (C-D3)
+
+**C.3 — Phase B-level revision: 00.1 + 00.2 + 00.3 (~700 LOC)**
+- Hybrid B-level per C-D6: cross-link к DRAFT-READY contracts, inline phase-specific only, actual signatures + actual test snippets
+
+**C.4 — Phase B-level revision: 00.4 + 00.5 + 00.6 (~900 LOC)**
+- Same hybrid policy; 00.5 ui-spec minimal (task-progress SSE contract used by 00.7)
+
+**C.5 — NEW Phase 00.7 frontend skeleton (~400 LOC)**
+- Functional skeleton end-to-end (auth + cell + task-submit + SSE result) per C-D2
+- ∥ 00.6 после 00.5 per C-D8
+- `PHASES.md` + `README.md` dependency-graph updates
+
+**C.6 — Post-merge consistency audit + fixes (~150 LOC fix budget)**
+- 3 parallel Explore agents (cross-PR consistency / policy compliance / strategic readiness)
+- Findings → Session 5 GRILL entry + §4 inventory move к ✅ Done
 
 ### 🟦 Milestone D — Deferred (post-Wave-0 retro)
 

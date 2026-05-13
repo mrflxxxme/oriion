@@ -452,7 +452,7 @@ When a phase requires a component not in this inventory:
 - ADR-001 — Frontend stack (Vite + React 19 + TanStack + shadcn/ui + Tailwind v4)
 - DECISION-4 — Nordic Warm palette
 - `_meta/ui/design-tokens.md` — token definitions consumed by all components
-- `_meta/ui/CLAUDE-DESIGN-PROMPTS.md` — generation prompts referencing this inventory
+- `_meta/ui/UI-DESIGN-PLAYBOOK.md` — designer workflow + ui-ux-pro-max invocation prompts referencing this inventory (renamed from CLAUDE-DESIGN-PROMPTS.md per Session 4 / P-DESIGN-1)
 - `_meta/ui/REVIEW-CHECKLIST.md` — review gates per component
 - shadcn/ui: https://ui.shadcn.com
 - Radix UI primitives: https://www.radix-ui.com
