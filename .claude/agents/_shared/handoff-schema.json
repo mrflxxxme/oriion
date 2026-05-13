@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oriion.dev/schemas/handoff-event.v1.json",
+  "title": "Oriion Pipeline Handoff Event",
+  "description": "CloudEvents 1.0 compliant handoff between AI-team roles. Used for inter-role messaging within Oriion pipelines (backend-feature, frontend-feature, full-stack-feature). Extension attributes are prefixed with 'oriion_' per CloudEvents naming convention.",
+  "type": "object",
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "datacontenttype",
+    "time",
+    "data"
+  ],
+  "properties": {
+    "specversion": {
+      "const": "1.0",
+      "description": "CloudEvents spec version. Pinned to 1.0."
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique event identifier (UUID v4 recommended)."
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^oriion://agents/[a-z-]+$",
+      "description": "URI identifying the emitting role, e.g. oriion://agents/planner"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^tech\\.oriion\\.[a-z]+\\.[a-z_]+\\.v[0-9]+$",
+      "description": "Reverse-DNS event type with explicit version suffix."
+    },
+    "subject": {
+      "type": "string",
+      "description": "Phase-id or task-id this event pertains to."
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC 3339 timestamp of event emission."
+    },
+    "data": {
+      "type": "object",
+      "description": "Event-type-specific payload. See $defs for per-type schemas."
+    },
+    "oriion_pipeline_id": {
+      "type": "string",
+      "description": "Identifier of the pipeline instance executing this handoff."
+    },
+    "oriion_role_from": {
+      "type": "string",
+      "enum": [
+        "architect",
+        "planner",
+        "memory-curator",
+        "designer",
+        "frontend-implementer",
+        "backend-implementer",
+        "reviewer-frontend",
+        "reviewer-backend",
+        "reviewer-security",
+        "verifier",
+        "evaluator"
+      ]
+    },
+    "oriion_role_to": {
+      "type": ["string", "array"],
+      "description": "Target role(s). Array form supports fan-out (e.g. parallel reviewers)."
+    },
+    "oriion_revision_cycle": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "description": "Current revision cycle (0 = first attempt). Hard cap per ADR-027."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "tech.oriion.plan.task.v1": {
+      "type": "object",
+      "required": ["phase_id", "task_id", "role", "deliverables"],
+      "properties": {
+        "phase_id": {"type": "string"},
+        "task_id": {"type": "string"},
+        "role": {"type": "string"},
+        "depends_on": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "deliverables": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Expected artifacts (file paths or artifact-ids)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.code.commit.v1": {
+      "type": "object",
+      "required": ["phase_id", "commit_sha", "branch", "files_changed"],
+      "properties": {
+        "phase_id": {"type": "string"},
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,40}$"
+        },
+        "branch": {"type": "string"},
+        "files_changed": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "tests_added": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.review.report.v1": {
+      "type": "object",
+      "required": ["phase_id", "verdict", "findings"],
+      "properties": {
+        "phase_id": {"type": "string"},
+        "verdict": {
+          "type": "string",
+          "enum": ["approve", "request_changes", "escalate"]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["severity", "summary"],
+            "properties": {
+              "severity": {
+                "type": "string",
+                "enum": ["info", "minor", "major", "critical"]
+              },
+              "summary": {"type": "string"},
+              "file": {"type": "string"},
+              "line": {"type": "integer"}
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.review.revision.v1": {
+      "type": "object",
+      "required": ["phase_id", "revisions_file_path", "required_changes"],
+      "properties": {
+        "phase_id": {"type": "string"},
+        "revisions_file_path": {"type": "string"},
+        "required_changes": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.phase.complete.v1": {
+      "type": "object",
+      "required": ["phase_id", "deliverables_status"],
+      "properties": {
+        "phase_id": {"type": "string"},
+        "metrics_snapshot": {
+          "type": "object",
+          "properties": {
+            "tokens_in": {"type": "integer"},
+            "tokens_out": {"type": "integer"},
+            "cost_usd": {"type": "number"},
+            "duration_seconds": {"type": "integer"}
+          }
+        },
+        "deliverables_status": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["artifact", "status"],
+            "properties": {
+              "artifact": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": ["delivered", "partial", "missing"]
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.gate.updated.v1": {
+      "type": "object",
+      "required": ["gate_id", "status", "hard_thresholds_met"],
+      "properties": {
+        "gate_id": {"type": "string"},
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_review", "passed", "failed"]
+        },
+        "hard_thresholds_met": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.adr.draft.v1": {
+      "type": "object",
+      "required": ["adr_id", "title"],
+      "properties": {
+        "adr_id": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{3,4}$"
+        },
+        "title": {"type": "string"},
+        "supersedes": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "informs": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.design.mock.v1": {
+      "type": "object",
+      "required": ["phase_id", "ui_spec_ref", "mock_assets"],
+      "properties": {
+        "phase_id": {"type": "string"},
+        "ui_spec_ref": {
+          "type": "string",
+          "description": "Pointer to ui-spec in phase-spec.md or external file."
+        },
+        "mock_assets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "kind"],
+            "properties": {
+              "path": {"type": "string"},
+              "kind": {
+                "type": "string",
+                "enum": ["screen", "component", "flow"]
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.evaluator.verdict.v1": {
+      "type": "object",
+      "required": ["prompt_id", "golden_pass_rate", "adversarial_pass_rate", "verdict"],
+      "properties": {
+        "prompt_id": {"type": "string"},
+        "golden_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "adversarial_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "verdict": {
+          "type": "string",
+          "enum": ["approve", "request_changes", "reject"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "tech.oriion.security.critical.v1": {
+      "type": "object",
+      "required": ["cve_id", "cvss", "affected_files", "escalation_required"],
+      "properties": {
+        "cve_id": {"type": "string"},
+        "cvss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "affected_files": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "escalation_required": {"const": true}
+      },
+      "additionalProperties": false
+    }
+  }
+}

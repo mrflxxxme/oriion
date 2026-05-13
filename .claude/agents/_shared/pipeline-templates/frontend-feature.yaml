@@ -1,0 +1,96 @@
+# Oriion pipeline template — frontend-feature
+# Use when: phase touches frontend only (UI screens, components, client-side logic) with ui-spec
+# Roles invoked: planner → designer → frontend-implementer → reviewer-frontend ∥ reviewer-security → verifier → memory-curator
+# Founder approve: tier 3+ per ADR-027
+
+name: frontend-feature
+version: 1
+applies_to:
+  phase_types: [frontend-ui, frontend-flow]
+  has_ui_spec: true
+
+steps:
+  - id: plan
+    role: planner
+    inputs:
+      - phase_spec.md
+      - ui-spec
+    produces:
+      type: tech.oriion.plan.ui_phase.v1
+      schema: ../handoff-schema.json
+    retry:
+      max_attempts: 2
+      on_failure: escalate-to-architect
+
+  - id: design
+    role: designer
+    depends_on: [plan]
+    consumes:
+      type: tech.oriion.plan.ui_phase.v1
+    produces:
+      type: tech.oriion.design.mock.v1
+    retry:
+      max_attempts: 2
+      on_failure: escalate-to-architect
+
+  - id: implement
+    role: frontend-implementer
+    depends_on: [design]
+    consumes:
+      type: tech.oriion.design.mock.v1
+    produces:
+      type: tech.oriion.code.commit.v1
+    retry:
+      max_attempts: 3
+      on_failure: escalate-to-founder
+
+  - id: review-frontend
+    role: reviewer-frontend
+    depends_on: [implement]
+    consumes:
+      type: tech.oriion.code.commit.v1
+    produces:
+      type: tech.oriion.review.report.v1
+    parallel_with: [review-security]
+
+  - id: review-security
+    role: reviewer-security
+    depends_on: [implement]
+    consumes:
+      type: tech.oriion.code.commit.v1
+    produces:
+      type: tech.oriion.review.report.v1
+    parallel_with: [review-frontend]
+
+  - id: revision-loop
+    condition: any(review-*.verdict == request_changes)
+    max_cycles: 3                # per ADR-027
+    on_max_exceeded: escalate-to-founder
+    loop_back_to: implement
+
+  - id: verify
+    role: verifier
+    depends_on: [review-frontend, review-security]
+    condition: all(review-*.verdict == approve)
+    produces:
+      type: tech.oriion.phase.complete.v1
+
+  - id: curate
+    role: memory-curator
+    depends_on: [verify]
+    consumes:
+      type: tech.oriion.phase.complete.v1
+    produces:
+      type: tech.oriion.gate.updated.v1
+
+  - id: founder-approve
+    actor: founder
+    depends_on: [curate]
+    tier: 3   # per ADR-027 — explicit approve required
+    action: merge_pr
+
+escalation:
+  to: founder
+  via: tech.oriion.conflict.escalation.v1
+
+cost_budget_ref: ../cost-budget.yaml

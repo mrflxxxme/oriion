@@ -1,0 +1,61 @@
+# Oriion AI-team cost-budget policy
+# Owner: Founder
+# Mitigates: R-31 (AI-cost overrun under 11-Opus persistent team)
+# Source-of-truth: this file. ADR-015 / ADR-023 ссылаются на существование политики,
+# но не на числа (per P-AUDIT-1).
+# Reviewed at: every wave-N-to-N+1 gate transition.
+
+version: 1
+last_reviewed: 2026-05-13
+last_reviewed_by: founder
+review_trigger: wave-gate-transition
+
+per_task:
+  soft_cap_usd: 0.50      # warn after exceed; agent продолжает но логирует
+  hard_cap_usd: 2.00      # kill task immediately
+  notes: |
+    Avg expected: $0.10-0.30 per task (Opus, ~3500 tokens out + 8000 in).
+    Hard cap = 6x avg — accounts for retry storms / runaway loops.
+
+per_day:
+  team_soft_cap_usd: 30     # daily team-wide warning threshold
+  team_hard_cap_usd: 75     # daily kill-switch: pause new task spawning
+  notes: |
+    Calibrated for 11 agents × ~5-10 tasks/day in active development.
+    Adjust upward during sprint-end pushes, downward during dormant phases.
+
+per_month:
+  team_kill_switch_usd: 500   # hard monthly ceiling — R-31 mitigation threshold
+  notes: |
+    Per GRILL DECISION-3 target: $200-500/month operational envelope.
+    Above this — escalate to founder для policy review (not silent override).
+
+tier_fallback:
+  trigger:
+    - per_task_soft_cap_exceeded
+    - complexity_score_below: 0.3
+    - role_in: [reviewer-frontend, evaluator]   # less-critical роли first
+  fallback_model: claude-sonnet-4-6
+  notes: |
+    Sonnet ~10x cheaper than Opus. Trade-off: lower quality on architectural tasks.
+    Never fall back: architect, reviewer-security (always Opus).
+
+stagnation_kill_switch_minutes: 30   # per ADR-015 §5
+# Если agent не выпустил handoff-event за 30 минут — autokill + memory-curator
+# emits `tech.oriion.agent.stagnated.v1` к founder.
+
+telemetry:
+  langfuse_endpoint: env:LANGFUSE_HOST
+  langfuse_public_key: env:LANGFUSE_PUBLIC_KEY
+  langfuse_secret_key: env:LANGFUSE_SECRET_KEY
+  emit_events:
+    - task_start
+    - task_complete
+    - cap_breach
+    - fallback_triggered
+    - stagnation_killed
+
+cost_review_cadence:
+  weekly_summary: true
+  gate_transition_required_review: true
+  founder_alert_threshold_pct_of_monthly_cap: 60
