@@ -1,0 +1,143 @@
+# Oriion pipeline template — full-stack-feature
+# Use when: phase touches BOTH backend (API/DB) AND frontend (UI screens) — convergent tracks
+# Roles invoked: planner → [backend-track ∥ frontend-track] → verifier → memory-curator → founder
+#   backend-track : backend-implementer → reviewer-backend ∥ reviewer-security
+#   frontend-track: designer → frontend-implementer → reviewer-frontend ∥ reviewer-security
+# Founder approve: tier 3+ per ADR-027
+
+name: full-stack-feature
+version: 1
+applies_to:
+  phase_types: [full-stack-feature]
+  has_ui_spec: true
+
+steps:
+  - id: plan
+    role: planner
+    inputs:
+      - phase_spec.md
+      - ui-spec
+    produces:
+      type: tech.oriion.plan.task.v1
+      schema: ../handoff-schema.json
+    notes: |
+      Planner splits the phase into backend-track + frontend-track tasks
+      and emits one plan.task.v1 event per track (subject = track-id).
+    retry:
+      max_attempts: 2
+      on_failure: escalate-to-architect
+
+tracks:
+  backend-track:
+    depends_on: [plan]
+    steps:
+      - id: backend-implement
+        role: backend-implementer
+        consumes:
+          type: tech.oriion.plan.task.v1
+        produces:
+          type: tech.oriion.code.commit.v1
+        retry:
+          max_attempts: 3
+          on_failure: escalate-to-founder
+
+      - id: review-backend
+        role: reviewer-backend
+        depends_on: [backend-implement]
+        consumes:
+          type: tech.oriion.code.commit.v1
+        produces:
+          type: tech.oriion.review.report.v1
+        parallel_with: [review-security-backend]
+
+      - id: review-security-backend
+        role: reviewer-security
+        depends_on: [backend-implement]
+        consumes:
+          type: tech.oriion.code.commit.v1
+        produces:
+          type: tech.oriion.review.report.v1
+        parallel_with: [review-backend]
+
+      - id: backend-revision-loop
+        condition: any(review-backend.verdict == request_changes, review-security-backend.verdict == request_changes)
+        max_cycles: 3
+        on_max_exceeded: escalate-to-founder
+        loop_back_to: backend-implement
+
+  frontend-track:
+    depends_on: [plan]
+    steps:
+      - id: design
+        role: designer
+        consumes:
+          type: tech.oriion.plan.task.v1
+        produces:
+          type: tech.oriion.design.mock.v1
+        retry:
+          max_attempts: 2
+          on_failure: escalate-to-architect
+
+      - id: frontend-implement
+        role: frontend-implementer
+        depends_on: [design]
+        consumes:
+          type: tech.oriion.design.mock.v1
+        produces:
+          type: tech.oriion.code.commit.v1
+        retry:
+          max_attempts: 3
+          on_failure: escalate-to-founder
+
+      - id: review-frontend
+        role: reviewer-frontend
+        depends_on: [frontend-implement]
+        consumes:
+          type: tech.oriion.code.commit.v1
+        produces:
+          type: tech.oriion.review.report.v1
+        parallel_with: [review-security-frontend]
+
+      - id: review-security-frontend
+        role: reviewer-security
+        depends_on: [frontend-implement]
+        consumes:
+          type: tech.oriion.code.commit.v1
+        produces:
+          type: tech.oriion.review.report.v1
+        parallel_with: [review-frontend]
+
+      - id: frontend-revision-loop
+        condition: any(review-frontend.verdict == request_changes, review-security-frontend.verdict == request_changes)
+        max_cycles: 3
+        on_max_exceeded: escalate-to-founder
+        loop_back_to: frontend-implement
+
+convergence:
+  - id: verify
+    role: verifier
+    depends_on:
+      tracks: [backend-track, frontend-track]
+    condition: all(review-*.verdict == approve)
+    produces:
+      type: tech.oriion.phase.complete.v1
+
+  - id: curate
+    role: memory-curator
+    depends_on: [verify]
+    consumes:
+      type: tech.oriion.phase.complete.v1
+    produces:
+      type: tech.oriion.gate.updated.v1
+
+  - id: founder-approve
+    actor: founder
+    depends_on: [curate]
+    tier: 3   # per ADR-027 — explicit approve required
+    action: merge_pr
+
+escalation:
+  to: founder
+  via: tech.oriion.conflict.escalation.v1
+
+cost_budget_ref: ../cost-budget.yaml
