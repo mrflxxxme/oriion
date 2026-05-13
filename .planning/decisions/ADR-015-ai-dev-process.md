@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 
-> **Scope change vs предыдущая версия:** этот ADR ранее покрывал шесть тем (tier-review, CI-gates, prod-isolation, worktree, observability, 6 ролей, supporting practices). После [GRILL-DECISIONS-2026-05-13](../_meta/GRILL-DECISIONS-2026-05-13.md) mandate переразделён:
+> **Scope change vs предыдущая версия:** этот ADR ранее покрывал шесть тем (tier-review, CI-gates, prod-isolation, worktree, observability, 6 ролей, supporting practices). После [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) mandate переразделён:
 > - **Tier-based review** → [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) (re-thought tier-table для solo + AI).
 > - **AI-роли (6 → 11) + spawning + AgentDB** → [ADR-023](./ADR-023-ai-team-runtime.md).
 > - **Здесь остаётся:** operational hygiene — изоляция от prod, worktree-per-task, observability + cost-caps, supporting practices.

@@ -4,7 +4,7 @@
 
 ## Decision
 
-Покрывает [GRILL-DECISIONS-2026-05-13](../_meta/GRILL-DECISIONS-2026-05-13.md) DECISION-7. Фиксирует структуру контрактов через bounded-context split. Phase-spec'ы перестают дублировать DDL/API — они ссылаются на authoritative spec в `_meta/contracts/<context>/`.
+Покрывает [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) DECISION-7. Фиксирует структуру контрактов через bounded-context split. Phase-spec'ы перестают дублировать DDL/API — они ссылаются на authoritative spec в `_meta/contracts/<context>/`.
 
 ### 1. Folder layout — 10 bounded contexts
 
@@ -85,7 +85,7 @@ Phase-spec **не дублирует** DDL/OpenAPI. Если phase добавл�
 
 ## Links
 
-- [GRILL-DECISIONS-2026-05-13](../_meta/GRILL-DECISIONS-2026-05-13.md) — DECISION-7
+- [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) — DECISION-7
 - [ADR-001](./ADR-001-modular-monolith.md) — repository structure (revised: ссылка на `_meta/contracts/`)
 - [ADR-009](./ADR-009-multitenancy-3-levels.md) — multitenancy (use `_meta/contracts/multitenancy/`)
 - [ADR-021](./ADR-021-ai-generated-pixel-pipeline.md) — `agent_archetype_id` FK (revised: ссылка сюда)
