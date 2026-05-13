@@ -4,6 +4,7 @@ description: Registry of deep-grill sessions for project Oriion — each session
 type: meta-registry
 status: living document
 last-updated: 2026-05-13
+last-session: 3
 ---
 
 # GRILL-DECISIONS — Oriion Registry
@@ -21,12 +22,63 @@ last-updated: 2026-05-13
 
 | # | Date | Type | Topic | Outcome | Commit |
 |---|---|---|---|---|---|
+| 3 | 2026-05-13 | Post-Milestone-B audit | Cross-PR consistency + ADR compliance + strategic readiness | 2 critical issues fixed via B.5 + 4 grill-decisions locked + policy P-AUDIT-3 added | [PR #N TBD](https://github.com/mrflxxxme/oriion/pull/TBD) |
 | 2 | 2026-05-13 | Audit follow-up | Milestone A consistency check | Cost-policy cleanup, R-20/R-30 split, Phase 00.5 column rename | [PR #2 d1f41d3](https://github.com/mrflxxxme/oriion/pull/2) |
 | 1 | 2026-05-13 | Initial deep-grill | 11 fundamental decisions (team / contracts / gates / vertical-expertise / Git) | 10 ADR + R-29 closed + R-31 added + catalog update | [PR #2 c78c381](https://github.com/mrflxxxme/oriion/pull/2) |
 
 ---
 
 ## §2 Session detail (newest first)
+
+### Session 3 — Post-Milestone-B consistency audit (2026-05-13, post-PR-#4-#7-open)
+
+**Trigger:** founder request post-Milestone-B: «проведи дополнительное исследование на целостность, отсутствие пробелов/противоречий внутри собранных PR, а также их достаточность и соответствие моим целям в проекте. Хочу убедиться что всё готово без ошибок к переходу на следующий этап».
+
+**Method:** 3 параллельных Explore-агента просканировали Milestone B (4 PR, 152 файла):
+- (a) Cross-PR internal consistency (handoff event-types, role naming, contract FK refs, cost-budget consistency, gate-threshold ↔ verifier-checklist alignment, WB-Seller coordinator ↔ contracts API mapping, naming compliance, OpenAPI/JSON Schema validity)
+- (b) ADR + grill-decisions + policy compliance (ADR-023..027 all sections, P-AUDIT-1/2, P-INIT-1..5, §4 inventory delivery)
+- (c) Strategic readiness (Phase 00.1 readiness, Wave 0 critical path, Milestone C scope-split, cost-budget realism для Wave 1+, founder goal alignment)
+
+**Critical findings:**
+
+| ID | Finding | Resolution (B.5) |
+|---|---|---|
+| **C1** | `handoff-schema.json` определял 10 `$defs` event-types, но 11 `handoff-templates.md` ссылались на 36 unique events → **26 missing schema definitions**. Escalation/cross-cutting events (conflict.escalation, agent.stagnated, audit.report, grill.decision, phase.stuck, plan.ui_phase, etc) эмитились бы без validation в Phase 00.1+. | Extend handoff-schema.json с 26 missing `$defs` — все inferred из handoff-templates references. → **Q1 grill decision**. |
+| **C2** | WB-Seller `prompts/coordinator.md` `tools_allowed:` использовал slugs (`tasks.create_step`, `memory.cells_search`) не совпадающие с actual REST operationIds (`createTask`, `searchCellMemory`) в `_meta/contracts/*/api.yaml`. Coordinator emit'ил бы invalid tool calls в Phase 00.5. | Создать `_meta/tools/registry.md` — single source-of-truth для всех tool-slugs (REST operationIds + AgentDB MCP names + built-in tools). Update coordinator.md tools_allowed на registry-conformant slugs. Reviewer-backend проверяет conformance. → **Q2 grill decision**. |
+
+**Non-critical findings (deferred to Milestone C/D):**
+- Coordinator.md body не упоминает registry — added via B.5
+- 4 Light roles (designer / frontend-implementer / reviewer-frontend / evaluator) могут потребовать upgrade к Medium перед Phase 00.7 — deferred к Milestone C trigger
+
+**Strategic decisions (Q3-Q4 grill):**
+
+| Q | Topic | Decision | Rationale |
+|---|---|---|---|
+| **Q3** | Cost-budget Wave 1+ scaling | **Decouple dev_team + user_production budgets** в cost-budget.yaml. dev_team = $500/mo (current cap для AI-team internal work). user_production = dormant до Wave 1, founder sets caps перед wave-1-to-2 gate. Separate telemetry partitions. | Wave 1+ frontend builds + user-cells executing tasks через LLM gateway создаст confusing signal если оба budget'а смешаны. Decouple даёт clean burn-rate dashboards (dev vs production). |
+| **Q4** | Milestone C scope | **Minimal C** — только Wave-0-sprint blockers: Phase 00.1-00.6 B-level revision (P-INIT-1) + Phase 00.7 spec. Verticals naporneniya (40-60 files) + meta-cleanup + handbook + ADR-004/016 + 4 Light→Medium upgrade — **deferred к Milestone D** после Wave 0→1 gate retro. | Faster feedback cycle до Phase 00.1 execution. Откладываемое НЕ исчезает — становится Milestone D после Wave 0 internal demo. |
+
+**Verified correct (audit confirmed):**
+
+- 11 ролей в `.claude/agents/` exact match с ADR-023 §1 (canonical slugs)
+- All 11 roles имеют 7 mandatory файлов (profile/system-prompt/workflows/tools-allowlist/handoff-templates/memory + checklists/) per ADR-023 §4
+- All 10 bounded contexts в `_meta/contracts/` exist с 4 mandatory файлами per ADR-024 §2-3
+- All 5 wave-N-to-N+1 gates compliant с ADR-025 §1 frontmatter schema (status=PENDING, hard_thresholds verbatim match)
+- WB-Seller vertical structure compliant с ADR-026 §2 (8 top-level files + prompts/ + golden-dataset/)
+- DECISION-11 frontmatter contract соблюдён в всех 3 prompts (coordinator + researcher + listing_writer)
+- P-AUDIT-1 (no $ numbers в ADR/contracts/gates) — zero violations
+- P-AUDIT-2 (deprecated terms) — все hits в negative-form guard-comments only
+- P-INIT-3 (founder = tier 3+ approver) — закреплено в `.claude/AGENTS.md` global rules
+- P-INIT-4 (anti-hallucination Level B) — `_meta/verticals/wb-seller/REVIEW-CHECKLIST.md` includes source-citation + founder-review + evaluator gate + 90-day re-verification
+- P-INIT-5 (solo founder + 11 AI) — нет multi-FTE legacy references
+- §4 «🔜 Milestone B» inventory delivered 100% (90 + 40 + 15 + 7 = 152 files across 4 PR #4-#7)
+
+**Files modified в B.5 (commit TBD после push):**
+- `.claude/agents/_shared/handoff-schema.json` — 10 → 36 $defs
+- `.claude/agents/_shared/cost-budget.yaml` — v1 → v2 (split dev_team + user_production)
+- `.planning/_meta/tools/registry.md` — NEW (~250 строк tool-slug registry)
+- `.planning/_meta/verticals/wb-seller/prompts/coordinator.md` — tools_allowed alignment + registry reference в body
+
+---
 
 ### Session 2 — Milestone A consistency audit (2026-05-13, post-PR-#2-c78c381)
 
@@ -111,6 +163,8 @@ last-updated: 2026-05-13
 |---|---|---|
 | **P-AUDIT-1** | Session 2 | **Экономические числа** (cost caps, budgets, financial targets, MRR thresholds, pricing) — НЕ live в ADR / risks-register / phase-spec'ах. Founder discretion only via `.claude/agents/_shared/cost-budget.yaml` (Milestone B artefact). ADR могут ссылаться на существование `cost-budget.yaml` как механизма, но не на конкретные числа. |
 | **P-AUDIT-2** | Session 2 | Когда ADR объявляет термин/column/API deprecated, phase-spec'ы с этим термином патчатся **в той же PR** где объявлена deprecation. Не deferred в follow-up milestone — иначе AI-агент материализует deprecated artifact. |
+| **P-AUDIT-3** | Session 3 | **Tool-naming registry-conformance.** Любой `.claude/agents/*/tools-allowlist.md` ИЛИ `_meta/verticals/<slug>/prompts/*.md` `tools_allowed:` field MUST reference только slugs из `_meta/tools/registry.md`. Reviewer-backend проверяет conformance перед PR approval. Новый tool = registry-PR-update с justification + role-allowlist + cross-link к contract OR MCP doc. CI check (future Phase 00.1 deliverable) автоматизирует validation. |
+| **P-AUDIT-4** | Session 3 | **Cost-budget structure separation.** `.claude/agents/_shared/cost-budget.yaml` MUST разделять `dev_team` (AI-team internal work) и `user_production` (user-cells через LLM gateway) с separate kill-switches, separate telemetry partitions, separate review thresholds. Founder задаёт `user_production.*` numbers перед wave-1-to-2 gate (когда friends start generating real user-traffic cost). dev_team baseline = $500/mo unless explicit override. |
 | **P-INIT-1** | Session 1 (DECISION-1) | Phase-spec'ы Wave 0/1 — **B-level**: inline OpenAPI 3.1 stubs + inline DDL + file-tree diagram + key function signatures (Python+TS) + example test cases (1 unit + 1 integration минимум) + acceptance criteria привязаны к testable checks + `ui-spec:` секция (если phase touches frontend). Wave 2-5 = direction-only до соответствующего acceptance-gate. |
 | **P-INIT-2** | Session 1 (DECISION-7) | **Authoritative spec layer** = `_meta/contracts/<bounded-context>/`. Phase-spec'ы импортируют через cross-link (`## Dependencies → Contracts: [iam](../_meta/contracts/iam/)`), не дублируют DDL/OpenAPI. Backend `src/<context>/` — implementation layer, conform'ит контракту. |
 | **P-INIT-3** | Session 1 (DECISION-10) | **Founder = always final approver для tier 3+** (per ADR-027 tier-table). AI-агенты не имеют merge prerogative. CI green + AI reviewers approved — необходимо, но не достаточно. |
@@ -129,6 +183,18 @@ last-updated: 2026-05-13
 - `risks/REGISTER.md`: R-29 closed, R-31 added, R-20/R-30 mandate-split
 - Phase 00.5 — column rename `ui_sprite_archetype` → `agent_archetype_id`
 - Policy decisions zafiksirovaны в §3
+
+### ✅ Done (Milestone B — PR #4-#7 + B.5)
+
+**4 stacked PR с branch-tree base'ами (per Session 3 Q2 grill decision):**
+
+- **B.1 [#4](https://github.com/mrflxxxme/oriion/pull/4):** `.claude/AGENTS.md` + 11 role-dirs (Medium × 7 / Light × 4) + `_shared/` (handoff-schema + cost-budget + 3 pipeline-templates) — 90 файлов / +8295 LOC
+- **B.2 [#5](https://github.com/mrflxxxme/oriion/pull/5):** `_meta/contracts/<context>/` × 10 contexts × 4 mandatory files (iam/multitenancy/rbac/llm-gateway/agents/tasks DRAFT-READY + billing/mcp/artifacts/memory SKELETON) — 40 файлов / +4848 LOC
+- **B.3 [#6](https://github.com/mrflxxxme/oriion/pull/6):** `_meta/ui/` × 4 (nordic-warm tokens + 18-component inventory + Claude Design prompts + review checklist) + `_meta/verticals/wb-seller/` × 11 (8 DRAFT + 3 prompts с coordinator full + researcher/listing_writer skeleton + golden-dataset README) — 15 файлов / +2187 LOC
+- **B.4 [#7](https://github.com/mrflxxxme/oriion/pull/7):** `gates/_schema/gate.schema.json` + `_template.md` + 5 wave-N-to-N+1.md (all DRAFT с заполненными hard_thresholds из ADR-025 §1, status=PENDING) — 7 файлов / +955 LOC
+- **B.5 [#TBD]:** Session 3 audit fixes — handoff-schema extension (10→36 $defs) + `_meta/tools/registry.md` + cost-budget v2 (dev_team / user_production split per P-AUDIT-4) + coordinator.md tool-slug alignment per P-AUDIT-3 + this GRILL-DECISIONS Session 3 entry
+
+**Cumulative Milestone B:** 152 + B.5 файлов across 5 PRs. Foundation для Phase 00.1+ готова.
 
 ### 🔜 Milestone B (next session — structural skeletons)
 
@@ -151,14 +217,24 @@ last-updated: 2026-05-13
 6. **`_meta/verticals/wb-seller/`** × ~10 файлов (per ADR-026 §2): README, domain-glossary, workflow-dag, `prompts/{coordinator,researcher,listing_writer}.md`, `golden-dataset/` (README + tasks placeholder), REVIEW-CHECKLIST, kpis, changelog
 7. **`gates/_schema/gate.schema.json`** + **`gates/_template.md`** (per ADR-025 §1)
 
-### 🔮 Milestone C (after B — phase-spec + meta updates)
+### 🔮 Milestone C — Minimal (Wave-0-sprint blockers only, per Session 3 Q4)
 
-**Phase-spec'ы:**
-- Create Phase 00.7 (frontend skeleton via Claude Design) — добавляется в Wave 0
-- Revise Wave 0 phase-specs 00.1-00.6 → B-level (per P-INIT-1: inline OpenAPI/DDL/signatures/tests)
-- Phase 00.5 — добавить vertical-tasks для `_meta/verticals/wb-seller/` per ADR-026 (40-60 файлов deliverable)
+Scope **резко сокращён** относительно first-draft версии. Цель — execution-readiness для Phase 00.1-00.7, не more. Откладываемое НЕ исчезает — становится Milestone D после Wave 0 internal demo retro.
 
-**Meta-файлы:**
+**Phase-spec'ы B-level revision (per P-INIT-1):**
+- Revise `roadmap/wave-0-foundation/phases/00.1` через `00.6` → B-level (inline OpenAPI/DDL/signatures/tests/ui-spec)
+- Create `roadmap/wave-0-foundation/phases/00.7` (frontend skeleton via Claude Design) — NEW
+
+**4 Light → Medium role upgrade** (если Phase 00.7 близок):
+- `designer`, `frontend-implementer`, `reviewer-frontend`, `evaluator` — upgrade к full Medium content (~250 строк system-prompt + 3-5 workflows + 2-3 checklists)
+
+### 🟦 Milestone D — Deferred (post-Wave-0 retro)
+
+**Vertical naporneniya:**
+- Phase 00.5 vertical-tasks для `_meta/verticals/wb-seller/` (WB-Seller 40-60 files + 30 golden-dataset tasks per ADR-026 §1)
+- 4 additional verticals scaffolds (Marketing / TG-Creator / Accounting / SMB-Sales — Wave 1+)
+
+**Meta-файлы cleanup:**
 - `PROJECT.md` — team section solo + 11 AI (P-INIT-5)
 - `STATUS.md` — убрать OQ-13/14/15/16 из active blockers; new Phase 00.7 row
 - `_meta/open-questions.md` — close OQ-13/14/15/16 with `status: closed (N/A: solo + AI model)` per P-INIT-5
@@ -171,7 +247,7 @@ last-updated: 2026-05-13
 - `agent-handbook/00-START-HERE.md` — pipeline-flow mention + ссылка на `.claude/AGENTS.md`
 
 **ADR backlog (deferred high-severity):**
-- ADR-004 + ADR-016 — replace `ui_sprite_archetype` в live SQL examples (per P-AUDIT-2, но эти файлы не были в Milestone A scope; теперь надо)
+- ADR-004 + ADR-016 — replace `ui_sprite_archetype` в live SQL examples (per P-AUDIT-2)
 
 **Roadmap:**
 - `roadmap/wave-1-core-mvp/README.md` — acceptance metrics align с ADR-025 (NPS≥30, pass_rate≥0.9)

@@ -1,48 +1,77 @@
-# Oriion AI-team cost-budget policy
+# Oriion AI cost-budget policy
 # Owner: Founder
 # Mitigates: R-31 (AI-cost overrun under 11-Opus persistent team)
 # Source-of-truth: this file. ADR-015 / ADR-023 ссылаются на существование политики,
 # но не на числа (per P-AUDIT-1).
 # Reviewed at: every wave-N-to-N+1 gate transition.
 
-version: 1
+version: 2
 last_reviewed: 2026-05-13
 last_reviewed_by: founder
 review_trigger: wave-gate-transition
+restructure_rationale: |
+  v1 imeл единые caps на всё. v2 (Session 3 grill Q3) разделяет:
+  - dev_team: внутренняя работа 11 AI-агентов (planner / implementer / reviewer / verifier
+    / memory-curator / architect / etc) — scales с phase-count, predictable
+  - user_production: user-cells executing tasks через LLM gateway — scales с user-base,
+    unpredictable, ДОЛЖЕН быть isolated от dev-policy для clean signal interpretation
 
-per_task:
-  soft_cap_usd: 0.50      # warn after exceed; agent продолжает но логирует
-  hard_cap_usd: 2.00      # kill task immediately
-  notes: |
-    Avg expected: $0.10-0.30 per task (Opus, ~3500 tokens out + 8000 in).
-    Hard cap = 6x avg — accounts for retry storms / runaway loops.
+dev_team:
+  description: "AI-team internal development loop (planner, implementers, reviewers, verifier, memory-curator, architect, designer, evaluator). Activates ALWAYS."
+  per_task:
+    soft_cap_usd: 0.50
+    hard_cap_usd: 2.00
+    notes: |
+      Avg expected: $0.10-0.30 per task (Opus, ~3500 tokens out + 8000 in).
+      Hard cap = 6x avg — accounts for retry storms / runaway loops.
+  per_day:
+    team_soft_cap_usd: 30
+    team_hard_cap_usd: 75
+    notes: |
+      Calibrated for 11 agents × ~5-10 tasks/day в active development.
+      Adjust upward during sprint-end pushes, downward during dormant phases.
+  per_month:
+    team_kill_switch_usd: 500
+    notes: |
+      Per GRILL DECISION-3 target: $200-500/month operational envelope для dev work.
+      Above this — escalate to founder для policy review (not silent override).
+  tier_fallback:
+    trigger:
+      - per_task_soft_cap_exceeded
+      - complexity_score_below: 0.3
+      - role_in: [reviewer-frontend, evaluator, designer, frontend-implementer]
+    fallback_model: claude-sonnet-4-6
+    notes: |
+      Sonnet ~10x cheaper than Opus. Trade-off: lower quality on architectural tasks.
+      Never fall back: architect, planner, memory-curator, reviewer-security, backend-implementer, verifier (always Opus).
 
-per_day:
-  team_soft_cap_usd: 30     # daily team-wide warning threshold
-  team_hard_cap_usd: 75     # daily kill-switch: pause new task spawning
-  notes: |
-    Calibrated for 11 agents × ~5-10 tasks/day in active development.
-    Adjust upward during sprint-end pushes, downward during dormant phases.
+user_production:
+  description: "User-cells executing tasks через LLM-gateway (real customer-facing AI calls). Activates after Wave 1 launch."
+  status: dormant_until_wave_1   # Wave 0 = internal demo only, no production user-traffic
+  per_request:
+    soft_cap_usd: null   # set when Wave 1 friend-loop activates
+    hard_cap_usd: null
+    notes: |
+      Per-request budget enforced via LLM-gateway middleware (llm_usage_log + byok_keys
+      monthly_quota). Founder задаёт values перед wave-1-to-2 gate (when friends start
+      generating real cost).
+  per_organization_per_month:
+    soft_cap_usd: null
+    hard_cap_usd: null
+    notes: |
+      Default per-org caps для platform-paid LLM usage. BYOK orgs обходят cap (свой billing).
+  team_wide_per_month:
+    kill_switch_usd: null
+    notes: |
+      Hard ceiling для combined user-traffic spend (platform-paid only, excluding BYOK).
+      Wave 1 starting estimate: $1500/mo (4-5 friends × 5 tasks/day × $0.20 × 30 days).
+      Wave 2 estimate: $5000-15000/mo (100 weekly registrations × adoption curve).
 
-per_month:
-  team_kill_switch_usd: 500   # hard monthly ceiling — R-31 mitigation threshold
-  notes: |
-    Per GRILL DECISION-3 target: $200-500/month operational envelope.
-    Above this — escalate to founder для policy review (not silent override).
-
-tier_fallback:
-  trigger:
-    - per_task_soft_cap_exceeded
-    - complexity_score_below: 0.3
-    - role_in: [reviewer-frontend, evaluator]   # less-critical роли first
-  fallback_model: claude-sonnet-4-6
-  notes: |
-    Sonnet ~10x cheaper than Opus. Trade-off: lower quality on architectural tasks.
-    Never fall back: architect, reviewer-security (always Opus).
-
-stagnation_kill_switch_minutes: 30   # per ADR-015 §5
-# Если agent не выпустил handoff-event за 30 минут — autokill + memory-curator
-# emits `tech.oriion.agent.stagnated.v1` к founder.
+operational:
+  stagnation_kill_switch_minutes: 30   # per ADR-015 §5 — applies к dev_team AI-agents only
+  notes_user_traffic: |
+    User-cells не имеют stagnation kill-switch — user может legitimately leave a session открытой.
+    Session-timeout (per iam context) handles это отдельно (30 days refresh-token TTL).
 
 telemetry:
   langfuse_endpoint: env:LANGFUSE_HOST
@@ -54,8 +83,23 @@ telemetry:
     - cap_breach
     - fallback_triggered
     - stagnation_killed
+    - user_traffic_request_completed   # NEW v2
+    - user_traffic_org_cap_breached    # NEW v2
+  partition_by:
+    - cost_source   # dev_team | user_production
+    - role          # для dev_team breakdown
+    - organization_id   # для user_production breakdown
 
 cost_review_cadence:
   weekly_summary: true
   gate_transition_required_review: true
   founder_alert_threshold_pct_of_monthly_cap: 60
+  separate_dashboards:
+    - dev_team_burn_rate
+    - user_production_burn_rate
+
+# Migration note v1→v2 (this Session 3 audit):
+# - Existing per_task/per_day/per_month → moved under dev_team.*
+# - New user_production.* section added (dormant до Wave 1)
+# - tier_fallback role list expanded к 4 roles (Designer/frontend-impl added as Light cost-savers)
+# - Telemetry partition by cost_source added

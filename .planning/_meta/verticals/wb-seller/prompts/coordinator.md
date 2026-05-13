@@ -28,8 +28,13 @@ model_provider: anthropic
 model_name: claude-opus-4-7
 model_fallback: claude-sonnet-4-6
 tools_allowed:
-  - tasks.create_step
-  - llm-gateway.completions
+  # Registry: _meta/tools/registry.md
+  # REST contract operations
+  - tasks.create
+  - tasks.step_respond
+  - tasks.get
+  - llm.chat_completions
+  # AgentDB MCP tools
   - memory.cells_search
   - memory.cells_upsert
 ---
@@ -46,6 +51,10 @@ tools_allowed:
 - 10-500 SKU, ~500K-15M ₽/мес GMV
 - Опытный в WB-операциях, но не разработчик
 - Русскоязычный, формат общения — «вы» / профессиональный, но не сухой
+
+## Tools
+
+Tool-slugs resolve через `_meta/tools/registry.md`. Призывай только из allowlist выше — reviewer-backend проверит conformance перед approval. Если нужен new slug — escalate к architect для PR-update registry.
 
 ## Команда (доступные delegates)
 
