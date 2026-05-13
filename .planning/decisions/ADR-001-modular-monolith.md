@@ -76,9 +76,17 @@ TEAMLY_RU/                        # monorepo
 │   └── helm/
 ├── docs/                         # mkdocs site, runbook'и
 ├── .planning/                    # roadmap, ADR, risks
-├── .claude/                      # AI-dev agent configs
+│   └── _meta/contracts/          # authoritative DDL + OpenAPI + CloudEvents per bounded context (ADR-024)
+├── .claude/                      # AI-dev agent configs (ADR-023: .claude/agents/<role>/)
 └── AGENTS.md
 ```
+
+**Authoritative spec vs implementation:**
+- `.planning/_meta/contracts/<context>/` — single source of truth для DB schema, API spec, domain events (см. [ADR-024](./ADR-024-bounded-context-contracts.md)).
+- `backend/src/<context>/` — implementation layer, conform'ит контракту.
+- Phase-spec'ы импортируют контракт через cross-link, не дублируют DDL.
+
+В таблице bounded contexts термин для агентов: канонический ID — `agent_archetype_id` (FK к `agent_archetypes`); прежние термины `ui_sprite_archetype` / `sprite-ID` deprecated. См. [ADR-024 — naming corrections](./ADR-024-bounded-context-contracts.md#2-naming-corrections).
 
 ## Consequences
 
@@ -90,4 +98,4 @@ TEAMLY_RU/                        # monorepo
 ## Links
 
 - Stack: [_meta/stack.md](../_meta/stack.md)
-- Related ADRs: ADR-003 (Pydantic-AI), ADR-004 (Canvas), ADR-013 (MCP)
+- Related ADRs: ADR-003 (Pydantic-AI), ADR-004 (Canvas), ADR-013 (MCP), [ADR-023](./ADR-023-ai-team-runtime.md) (AI-team runtime), [ADR-024](./ADR-024-bounded-context-contracts.md) (bounded-context contracts)

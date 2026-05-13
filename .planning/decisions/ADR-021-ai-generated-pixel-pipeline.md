@@ -26,13 +26,15 @@
 
 **24 archetypes:**
 
-| ID | Archetype | Стиль |
+| agent_archetype_id | Archetype | Стиль |
 |---|---|---|
 | `creative01-08` | Casual creative | Хипстер, дизайнер, художник |
 | `formal01-05` | Suit/professional | Бизнесмен, юрист, бухгалтер |
 | `hoodie01-04` | Tech/casual | Разработчик, исследователь |
 | `casual01-04` | Generic office | Менеджер, ассистент |
 | `service01-03` | Service/support | Customer support, sales |
+
+Эти ID являются FK к `agents.agent_archetypes.archetype_id` (см. [ADR-024](./ADR-024-bounded-context-contracts.md)). SemVer-версионирование archetype assets — через колонку `agents.agent_archetypes.version`, не через [ADR-010](./ADR-010-role-versioning.md) (которое scoped на prompt-файлы в `_meta/verticals/`). Прежние термины `ui_sprite_archetype` / `sprite-ID` deprecated.
 
 Generic naming (для reuse в разных team-presets), РФ-стилизация в окружении (см. ADR-004).
 
@@ -76,7 +78,7 @@ Generic naming (для reuse в разных team-presets), РФ-стилиза�
 
 ### Asset versioning
 
-URL: `/api/assets/agents/<id>/<state>.png?v=<version>`
+URL: `/api/assets/agents/<agent_archetype_id>/<state>.png?v=<version>`, где `<version>` = значение из `agents.agent_archetypes.version` (см. [ADR-024](./ADR-024-bounded-context-contracts.md)).
 - Immutable (cache-control max-age=31536000, immutable)
 - Version bump при изменении asset
 - Old versions сохраняются (legacy clients продолжают работать)
@@ -106,4 +108,4 @@ URL: `/api/assets/agents/<id>/<state>.png?v=<version>`
 
 - Risks: [R-14](../risks/REGISTER.md), [R-23](../risks/REGISTER.md), [R-24](../risks/REGISTER.md)
 - Phase: 02.1 (Pixel Department implementation)
-- Related ADRs: ADR-004 (Pixel architecture), ADR-017 (vertical-героев привязка к templates)
+- Related ADRs: ADR-004 (Pixel architecture), ADR-017 (vertical-героев привязка к templates), [ADR-024](./ADR-024-bounded-context-contracts.md) (`agents` bounded context — schema для `agent_archetypes`)

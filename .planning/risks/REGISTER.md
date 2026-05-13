@@ -168,6 +168,20 @@ R-NN. <Название>
 - **Severity:** medium · **Likelihood:** medium · **Owner:** Tech Lead
 - **Митигация:** [ADR-019](../decisions/ADR-019-vertical-autonomous-mode.md): dedicated MCP-server monitoring + auto-fallback to «degraded mode» + clear communication к клиентам; semantic-versioning для наших MCP-серверов
 
+## R-29. Founder vertical expertise gap — claim vs reality для 5 vertical-templates
+
+- **Status:** `closed (resolved)` — 2026-05-13
+- **Severity (когда был open):** high · **Likelihood (когда был open):** medium · **Owner:** Founder
+- **Rationale закрытия:** Founder operates as real-world expert across all 5 vertical-templates (WB-Селлер, Marketing-Агентство, TG-Крейтор, ИП-Бухгалтерия, SMB-Sales). Vertical-template content validation gate handled через [ADR-026](../decisions/ADR-026-vertical-expertise-pipeline.md): founder-review checklist + evaluator gate (≥75% golden-dataset pass + 100% adversarial probes) + Wave 1+ friend-loop (3-5 ICP-friends × 5 задач) + 90-day re-verification cycle. См. [GRILL-DECISIONS-2026-05-13 DECISION-6](../_meta/GRILL-DECISIONS-2026-05-13.md).
+- **Monitoring (на случай re-opening):** evaluator pass-rate < 75% подряд 2 цикла на одной вертикали → перевести обратно в `open` + флаг founder.
+
+## R-31. AI-cost overrun under 11-Opus persistent team
+
+- **Severity:** high · **Likelihood:** high · **Owner:** Founder
+- **Митигация:** [ADR-023](../decisions/ADR-023-ai-team-runtime.md) Consequences + `.claude/agents/_shared/cost-budget.yaml` (Milestone B): per-role monthly cap + tier-1 Sonnet fallback для routine tasks. Целевой budget $200-500/мес (per [GRILL DECISION-3](../_meta/GRILL-DECISIONS-2026-05-13.md)). Hard cap per-day per-agent $50 + 30-min stagnation kill-switch ([ADR-015 §5](../decisions/ADR-015-ai-dev-process.md)). Cost telemetry — Langfuse dev-instance.
+- **Trigger re-evaluation:** monthly OpenRouter / Anthropic invoice > $750 sustained 2 месяца подряд → escalate founder, переоценить fallback policy в `cost-budget.yaml`.
+- **Monitoring:** monthly spend per role, ratio Opus/Sonnet invocations, kill-switch trigger count
+
 ---
 
 ## Стратегические ставки (с kill criteria)

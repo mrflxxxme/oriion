@@ -6,11 +6,12 @@
 
 | ID | Решение |
 |---|---|
-| [ADR-001](./ADR-001-modular-monolith.md) | Модульный монолит: Python+FastAPI + Vite+React (split frontend/backend) |
+| [ADR-001](./ADR-001-modular-monolith.md) | Модульный монолит: Python+FastAPI + Vite+React (split frontend/backend) + `_meta/contracts/` authoritative spec |
 | [ADR-002](./ADR-002-llm-gateway.md) | LLM Multi-provider Gateway — триконтурный стек с BYOK first-class |
 | [ADR-003](./ADR-003-pydantic-ai-runtime.md) | Pydantic-AI как агентный runtime |
 | [ADR-009](./ADR-009-multitenancy-3-levels.md) | Multitenancy: Cell как domain-first concept + 3 уровня изоляции |
 | [ADR-013](./ADR-013-mcp-protocol.md) | MCP-протокол как universal connector layer + кураторский каталог |
+| [ADR-024](./ADR-024-bounded-context-contracts.md) | Bounded-context contracts: 10 контекстов в `_meta/contracts/` + CloudEvents 1.0 + naming corrections |
 
 ## Frontend / UI
 
@@ -18,7 +19,7 @@
 |---|---|
 | [ADR-004](./ADR-004-pixel-department.md) | Pixel Department — Native Canvas 2D + AI-generated + 5 hand-drawn vertical-героев |
 | [ADR-016](./ADR-016-team-first-ux.md) | Team-first UX — «нанять команду» как primary abstraction |
-| [ADR-021](./ADR-021-ai-generated-pixel-pipeline.md) | AI-generated pixel-asset pipeline + hand-drawn vertical-герои |
+| [ADR-021](./ADR-021-ai-generated-pixel-pipeline.md) | AI-generated pixel-asset pipeline + hand-drawn vertical-герои (`agent_archetype_id` FK к [ADR-024](./ADR-024-bounded-context-contracts.md)) |
 | [ADR-022](./ADR-022-coordinator-wizard-llm-hybrid.md) | Coordinator — Wizard (free) + LLM (trial/paid) гибрид |
 
 ## Backend / Runtime
@@ -45,6 +46,8 @@
 | [ADR-017](./ADR-017-vertical-templates.md) | 5 стартовых vertical-templates как primary USP |
 | [ADR-008](./ADR-008-credits-billing.md) | Team-кредиты + ЮKassa, Solo/Команды 5/15/30 + BYOK режим |
 | [ADR-012](./ADR-012-artifacts.md) | Артефакты: Yjs для документов, S3 для ассетов |
+| [ADR-025](./ADR-025-acceptance-gate-format.md) | Acceptance-gate format: Wave→Wave transitions с hard go/no-go thresholds |
+| [ADR-026](./ADR-026-vertical-expertise-pipeline.md) | Vertical-expertise pipeline: D-pattern + anti-hallucination protocol |
 
 ## Security & operations
 
@@ -52,7 +55,9 @@
 |---|---|
 | [ADR-007](./ADR-007-authentik-then-keycloak.md) | Auth: Custom JWT (W0-1) → Logto (W2-3) → Keycloak (Enterprise) |
 | [ADR-014](./ADR-014-security.md) | Security: RBAC + DLP + isolation memory от tool-output |
-| [ADR-015](./ADR-015-ai-dev-process.md) | AI-dev-процесс: 6 ролей + tier-based ревью + изоляция от prod |
+| [ADR-015](./ADR-015-ai-dev-process.md) | AI-dev operational hygiene: isolation, observability, kill-switch, supporting practices |
+| [ADR-023](./ADR-023-ai-team-runtime.md) | AI-team runtime: 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB namespaces |
+| [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) | Solo + AI Git/PR workflow: tier-table re-thought + atomic commits + failure handling |
 
 ## Шаблон нового ADR
 
