@@ -9,7 +9,7 @@
 ### Bad: Load-everything-first
 ```
 1. Read PROJECT.md (3KB)
-2. Read all 22 ADR (60KB)
+2. Read all 28 ADR (~70KB)
 3. Read full glossary (8KB)
 4. Read full stack.md (8KB)
 5. Read risks/REGISTER.md (20KB)

@@ -1,4 +1,4 @@
-# ADR Catalog
+﻿# ADR Catalog
 
 > Architecture Decision Records. Формат: Decision / Implementation / Consequences / Links.
 
@@ -6,12 +6,12 @@
 
 | ID | Решение |
 |---|---|
-| [ADR-001](./ADR-001-modular-monolith.md) | Модульный монолит: Python+FastAPI + Vite+React (split frontend/backend) + `_meta/contracts/` authoritative spec |
+| [ADR-001](./ADR-001-modular-monolith.md) | Модульный монолит: Python+FastAPI + Vite+React (split frontend/backend) + `contracts/` authoritative spec |
 | [ADR-002](./ADR-002-llm-gateway.md) | LLM Multi-provider Gateway — триконтурный стек с BYOK first-class |
 | [ADR-003](./ADR-003-pydantic-ai-runtime.md) | Pydantic-AI как агентный runtime |
 | [ADR-009](./ADR-009-multitenancy-3-levels.md) | Multitenancy: Cell как domain-first concept + 3 уровня изоляции |
 | [ADR-013](./ADR-013-mcp-protocol.md) | MCP-протокол как universal connector layer + кураторский каталог |
-| [ADR-024](./ADR-024-bounded-context-contracts.md) | Bounded-context contracts: 10 контекстов в `_meta/contracts/` + CloudEvents 1.0 + naming corrections |
+| [ADR-024](./ADR-024-bounded-context-contracts.md) | Bounded-context contracts: 10 контекстов в `contracts/` + CloudEvents 1.0 + naming corrections |
 
 ## Frontend / UI
 
@@ -58,6 +58,12 @@
 | [ADR-015](./ADR-015-ai-dev-process.md) | AI-dev operational hygiene: isolation, observability, kill-switch, supporting practices |
 | [ADR-023](./ADR-023-ai-team-runtime.md) | AI-team runtime: 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB namespaces |
 | [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) | Solo + AI Git/PR workflow: tier-table re-thought + atomic commits + failure handling |
+
+## Governance & policies
+
+| ID | Решение |
+|---|---|
+| [ADR-028](./ADR-028-policies-registry.md) | Policies Registry — canonical home для P-INIT-1..5 / P-AUDIT-1..4 / P-DESIGN-1 + DECISION-N → ADR cross-ref (заменяет `_meta/GRILL-DECISIONS-ORIION.md`) |
 
 ## Шаблон нового ADR
 

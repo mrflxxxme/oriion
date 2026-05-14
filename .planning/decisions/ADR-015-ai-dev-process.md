@@ -1,8 +1,8 @@
-# ADR-015: AI-dev operational hygiene (isolation, observability, kill-switch)
+﻿# ADR-015: AI-dev operational hygiene (isolation, observability, kill-switch)
 
 - **Status:** Accepted
 
-> **Scope change vs предыдущая версия:** этот ADR ранее покрывал шесть тем (tier-review, CI-gates, prod-isolation, worktree, observability, 6 ролей, supporting practices). После [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) mandate переразделён:
+> **Scope change vs предыдущая версия:** этот ADR ранее покрывал шесть тем (tier-review, CI-gates, prod-isolation, worktree, observability, 6 ролей, supporting practices). После [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) mandate переразделён:
 > - **Tier-based review** → [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) (re-thought tier-table для solo + AI).
 > - **AI-роли (6 → 11) + spawning + AgentDB** → [ADR-023](./ADR-023-ai-team-runtime.md).
 > - **Здесь остаётся:** operational hygiene — изоляция от prod, worktree-per-task, observability + cost-caps, supporting practices.

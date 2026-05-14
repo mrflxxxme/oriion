@@ -1,4 +1,4 @@
-# Conventions — code, tests, process
+﻿# Conventions — code, tests, process
 
 > Не повторять в phase-файлах. Если фаза нарушает convention — это надо обосновать в самой фазе.
 
@@ -48,7 +48,7 @@
 
 ## Tier-based review
 
-**Source of truth:** [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) — 5 tiers с AI reviewers (per ADR-023 11-role catalog) + Founder approval per [P-INIT-3](./GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) (Founder = always final approver tier 3+).
+**Source of truth:** [ADR-027 §tier-table](../decisions/ADR-027-solo-ai-git-pr-workflow.md) — 5 tiers с AI reviewers (per ADR-023 11-role catalog) + Founder approval per [P-INIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home) (Founder = always final approver tier 3+).
 
 Не дублируем tier-table инлайн. При изменении tier-policy — обновляется ADR-027, не этот файл.
 

@@ -1,4 +1,4 @@
-# 02-DELEGATION — Карта subagents + правила делегирования
+﻿# 02-DELEGATION — Карта subagents + правила делегирования
 
 > **Цель:** использовать subagents на полную. Каждое делегирование освобождает main-agent context + распараллеливает работу.
 
@@ -35,7 +35,7 @@
 
 | Role | Mandate | Когда invoke |
 |---|---|---|
-| **designer** | DS-keeper; UI-mocks через `ui-ux-pro-max` skill (primary) или Claude Design (fallback Wave 1+) per [P-DESIGN-1](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) | Phase touches frontend; `ui-spec:` section needs realisation |
+| **designer** | DS-keeper; UI-mocks через `ui-ux-pro-max` skill (primary) или Claude Design (fallback Wave 1+) per [P-DESIGN-1](../decisions/ADR-028-policies-registry.md#policies-canonical-home) | Phase touches frontend; `ui-spec:` section needs realisation |
 | **frontend-implementer** | designer-output → React+TanStack+shadcn code | После designer handoff в frontend-feature / full-stack-feature pipelines |
 | **backend-implementer** | Phase-spec backend tasks → Python+FastAPI+Pydantic code | Backend tasks per `backend-feature.yaml` template |
 
@@ -44,10 +44,10 @@
 | Role | Mandate | Когда invoke |
 |---|---|---|
 | **reviewer-frontend** | Tokens-compliance, accessibility AA, inventory-conformance | После frontend-implementer; parallel с reviewer-backend в full-stack pipeline |
-| **reviewer-backend** | Code/API/DB/migrations review + [P-AUDIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) tools-allowlist conformance | После backend-implementer; tier 3+ обязательно |
+| **reviewer-backend** | Code/API/DB/migrations review + [P-AUDIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home) tools-allowlist conformance | После backend-implementer; tier 3+ обязательно |
 | **reviewer-security** | OWASP / secrets / DLP / dependency-scan | Tier 4 (auth/billing/migrations), perимёр Wave 0→1 gate |
 | **verifier** | Runs acceptance criteria as tests, gates merge | Pre-merge tier 3+; phase gate verification |
-| **evaluator** | LLM-as-judge для vertical-prompts golden-dataset (≥75% pass + 100% adversarial per [DECISION-11](../_meta/GRILL-DECISIONS-ORIION.md#decision-11-anti-hallucination-для-vertical-prompt-author--bw0--cw1)) | Promote vertical-prompts `draft` → `reviewed`; Wave 0 internal demo gate |
+| **evaluator** | LLM-as-judge для vertical-prompts golden-dataset (≥75% pass + 100% adversarial per [DECISION-11](../decisions/ADR-028-policies-registry.md#decision-11)) | Promote vertical-prompts `draft` → `reviewed`; Wave 0 internal demo gate |
 
 ### Pipeline templates (3 YAML per ADR-023 §3)
 

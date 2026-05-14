@@ -1,6 +1,6 @@
-# 07-AI-TEAM-PIPELINE — Pipeline mechanics for 11 persistent Opus AI-agents
+﻿# 07-AI-TEAM-PIPELINE — Pipeline mechanics for 11 persistent Opus AI-agents
 
-> **Цель:** Single source-of-truth для **как** работает AI-team pipeline. Реализационные детали 11 ролей лежат в [`.claude/agents/<role>/`](../../.claude/agents/); этот документ описывает **runtime, handoff, failure, и cost mechanics** между ними per [ADR-023](../decisions/ADR-023-ai-team-runtime.md), [ADR-025](../decisions/ADR-025-gate-format.md), [ADR-027](../decisions/ADR-027-git-pr-workflow.md).
+> **Цель:** Single source-of-truth для **как** работает AI-team pipeline. Реализационные детали 11 ролей лежат в [`.claude/agents/<role>/`](../../.claude/agents/); этот документ описывает **runtime, handoff, failure, и cost mechanics** между ними per [ADR-023](../decisions/ADR-023-ai-team-runtime.md), [ADR-025](../decisions/ADR-025-gate-format.md), [ADR-027](../decisions/ADR-027-solo-ai-git-pr-workflow.md).
 
 > **Аудитория:** AI-agent в любой role (architect, planner, implementer, reviewer, verifier, memory-curator) — этот файл даёт mental model для координации внутри pipeline.
 
@@ -13,7 +13,7 @@
 
 ## 1. Pipeline overview
 
-11 persistent Opus AI-agents (per [ADR-023 §1](../decisions/ADR-023-ai-team-runtime.md), [DECISION-3](../_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents)) делятся на 3 слоя:
+11 persistent Opus AI-agents (per [ADR-023 §1](../decisions/ADR-023-ai-team-runtime.md), [DECISION-3](../decisions/ADR-028-policies-registry.md#decision-3)) делятся на 3 слоя:
 
 - **Cross-cutting (3):** `architect` (ADR-keeper) / `planner` (phase → PLAN.md) / `memory-curator` (state-sync + archive)
 - **Implementation (3):** `designer` (DS-keeper + UI mocks) / `frontend-implementer` (React+TanStack) / `backend-implementer` (Python+FastAPI+Pydantic)
@@ -45,13 +45,13 @@
   memory-curator (state updates + STATUS / risks / gate-fills)
         │
         ▼
-  Founder approve (tier 3+ per [P-INIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable))
+  Founder approve (tier 3+ per [P-INIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home))
         │
         ▼
   PR merge → main
 ```
 
-Per [DECISION-3](../_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents): **Founder = always final approver tier 3+**. AI-агенты не имеют merge prerogative.
+Per [DECISION-3](../decisions/ADR-028-policies-registry.md#decision-3): **Founder = always final approver tier 3+**. AI-агенты не имеют merge prerogative.
 
 ---
 
@@ -62,7 +62,7 @@ Per [DECISION-3](../_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--p
 | Template | Когда применяется | Sequence |
 |---|---|---|
 | `backend-feature.yaml` | Phase touches только backend (API, DB, migrations) | planner → backend-implementer → (reviewer-backend ∥ reviewer-security) → verifier → memory-curator |
-| `frontend-feature.yaml` | Phase touches только frontend (UI, routing, components) | planner → designer (ui-ux-pro-max primary per [P-DESIGN-1](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)) → frontend-implementer → reviewer-frontend → verifier → memory-curator |
+| `frontend-feature.yaml` | Phase touches только frontend (UI, routing, components) | planner → designer (ui-ux-pro-max primary per [P-DESIGN-1](../decisions/ADR-028-policies-registry.md#policies-canonical-home)) → frontend-implementer → reviewer-frontend → verifier → memory-curator |
 | `full-stack-feature.yaml` | Phase touches both layers (auth, billing, vertical-runtime) | planner → fork: (designer → frontend-impl) ∥ (backend-impl) → converge: (reviewer-frontend ∥ reviewer-backend ∥ reviewer-security) → verifier → memory-curator |
 
 **Template selection:** planner читает phase-spec frontmatter + `ui-spec:` presence → выбирает template → invokes implementers per template DAG.
@@ -103,7 +103,7 @@ data:
 
 ## 4. Failure handling — revision loop
 
-Per [DECISION-10](../_meta/GRILL-DECISIONS-ORIION.md#decision-10-gitpr-workflow--c-phase-branch--atomic-ai-commits--selective-rebase):
+Per [DECISION-10](../decisions/ADR-028-policies-registry.md#decision-10):
 
 ```
 reviewer | verifier обнаруживает issue
@@ -168,13 +168,13 @@ Per [ADR-023 §7](../decisions/ADR-023-ai-team-runtime.md): every phase имее
 
 ### 5.4 Tools-allowlist conformance per P-AUDIT-3
 
-`reviewer-backend` validates что `tools_allowed:` в любом prompt (`.claude/agents/*/tools-allowlist.md` ИЛИ `_meta/verticals/*/prompts/*.md`) — все slugs из [`_meta/tools/registry.md`](../_meta/tools/registry.md). Non-conformant = block PR (per [P-AUDIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)).
+`reviewer-backend` validates что `tools_allowed:` в любом prompt (`.claude/agents/*/tools-allowlist.md` ИЛИ `verticals/*/prompts/*.md`) — все slugs из [`tools/registry.md`](../tools/registry.md). Non-conformant = block PR (per [P-AUDIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home)).
 
 ---
 
 ## 6. Cost-control hooks
 
-Per [P-AUDIT-4](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable): cost-budget separated в [`.claude/agents/_shared/cost-budget.yaml`](../../.claude/agents/_shared/cost-budget.yaml) на 2 partition:
+Per [P-AUDIT-4](../decisions/ADR-028-policies-registry.md#policies-canonical-home): cost-budget separated в [`.claude/agents/_shared/cost-budget.yaml`](../../.claude/agents/_shared/cost-budget.yaml) на 2 partition:
 
 - **`dev_team`** — AI-team internal work (planning, implementation, review, verification). Wave 0-3 dev cap = founder-controlled.
 - **`user_production`** — user-cells executing tasks через LLM gateway (Wave 1+). Dormant до Wave 1; founder sets caps перед wave-1-to-2 gate.
@@ -221,7 +221,7 @@ Per [P-AUDIT-4](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-sess
 
 ## 8. Founder approval points
 
-Per [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) + [P-INIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable):
+Per [ADR-027 §tier-table](../decisions/ADR-027-solo-ai-git-pr-workflow.md) + [P-INIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home):
 
 | Tier | Founder action | When |
 |---|---|---|
@@ -243,7 +243,7 @@ Per [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) + [P-INIT-3]
 - `oriion.escalation.scope-creep.v1` — Founder decides: expand phase-spec или defer к новой phase
 - `oriion.cost.hard-cap-hit.v1` — Founder approves cap-bump или suspends phase
 
-**Founder = единственный source-of-truth для tier 3+ merge.** Этот контракт zafiksirovan в [P-INIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) и не override-яется без новой grill-session.
+**Founder = единственный source-of-truth для tier 3+ merge.** Этот контракт zafiksirovan в [P-INIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home) и не override-яется без новой grill-session.
 
 ---
 
@@ -253,9 +253,9 @@ Per [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) + [P-INIT-3]
 - **Bounded contexts + naming:** [ADR-024](../decisions/ADR-024-bounded-context-contracts.md)
 - **Gate format (Wave-N-to-N+1):** [ADR-025](../decisions/ADR-025-gate-format.md)
 - **Vertical-expertise (evaluator gate):** [ADR-026](../decisions/ADR-026-vertical-expertise.md)
-- **Git/PR/tier:** [ADR-027](../decisions/ADR-027-git-pr-workflow.md)
-- **Policies:** [P-INIT-1..5 + P-AUDIT-1..4 + P-DESIGN-1](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)
-- **Tool registry:** [`_meta/tools/registry.md`](../_meta/tools/registry.md)
+- **Git/PR/tier:** [ADR-027](../decisions/ADR-027-solo-ai-git-pr-workflow.md)
+- **Policies:** [P-INIT-1..5 + P-AUDIT-1..4 + P-DESIGN-1](../decisions/ADR-028-policies-registry.md#policies-canonical-home)
+- **Tool registry:** [`tools/registry.md`](../tools/registry.md)
 - **Pipeline YAML templates:** [`.claude/agents/_shared/pipeline-templates/`](../../.claude/agents/_shared/pipeline-templates/)
 - **Handoff schema:** [`.claude/agents/_shared/handoff-schema.json`](../../.claude/agents/_shared/handoff-schema.json)
 - **Cost budget:** [`.claude/agents/_shared/cost-budget.yaml`](../../.claude/agents/_shared/cost-budget.yaml)

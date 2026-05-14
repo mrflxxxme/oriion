@@ -1,4 +1,4 @@
-# 04-HANDOFF — Передача context между сессиями / агентами
+﻿# 04-HANDOFF — Передача context между сессиями / агентами
 
 > **Цель:** работа не теряется при switch'е agent / session / phase. Каждое завершение задачи оставляет следы для следующего agent'а.
 
@@ -114,7 +114,7 @@
 | Commit message | Что сделано, кому ссылки, TBD-tokens |
 | `.planning/handoffs/YYYY-MM-DD-slug.md` | Полный handoff (session-end) |
 | `.planning/STATUS.md` | Текущее состояние проекта (rolling) |
-| `_meta/open-questions.md` | Если открыт новый OQ |
+| `OPEN-QUESTIONS.md` | Если открыт новый OQ |
 | `risks/REGISTER.md` | Если новый risk discovered |
 | ADR (new или revised) | Если архитектурное решение |
 | PR description | Что в PR (Tier-based template) |

@@ -1,4 +1,4 @@
-# STATUS — текущее состояние проекта
+﻿# STATUS — текущее состояние проекта
 
 > Rolling-status. Обновляется при phase complete / blocker resolved / новом ADR.
 
@@ -29,9 +29,9 @@
 | OQ-04 | РКН-уведомление | Founder + юрист | Required до Phase 00.2 |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa |
 
-> **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) (solo founder + 11 AI model).
+> **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model).
 
-Полный список — [`_meta/open-questions.md`](./_meta/open-questions.md).
+Полный список — [`OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md).
 
 ## Top-priority risks (active monitoring)
 

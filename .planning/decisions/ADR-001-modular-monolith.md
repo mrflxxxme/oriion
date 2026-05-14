@@ -1,4 +1,4 @@
-# ADR-001: Модульный монолит — Python+FastAPI backend + Vite+React frontend (monorepo)
+﻿# ADR-001: Модульный монолит — Python+FastAPI backend + Vite+React frontend (monorepo)
 
 - **Status:** Accepted
 
@@ -76,13 +76,13 @@ TEAMLY_RU/                        # monorepo
 │   └── helm/
 ├── docs/                         # mkdocs site, runbook'и
 ├── .planning/                    # roadmap, ADR, risks
-│   └── _meta/contracts/          # authoritative DDL + OpenAPI + CloudEvents per bounded context (ADR-024)
+│   └── contracts/          # authoritative DDL + OpenAPI + CloudEvents per bounded context (ADR-024)
 ├── .claude/                      # AI-dev agent configs (ADR-023: .claude/agents/<role>/)
 └── AGENTS.md
 ```
 
 **Authoritative spec vs implementation:**
-- `.planning/_meta/contracts/<context>/` — single source of truth для DB schema, API spec, domain events (см. [ADR-024](./ADR-024-bounded-context-contracts.md)).
+- `.planning/contracts/<context>/` — single source of truth для DB schema, API spec, domain events (см. [ADR-024](./ADR-024-bounded-context-contracts.md)).
 - `backend/src/<context>/` — implementation layer, conform'ит контракту.
 - Phase-spec'ы импортируют контракт через cross-link, не дублируют DDL.
 

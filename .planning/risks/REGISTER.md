@@ -1,4 +1,4 @@
-# Risks Register
+﻿# Risks Register
 
 > Активные риски с mitigation, owner, monitoring. Все митигации ссылаются на ADR / phase / процесс.
 
@@ -175,7 +175,7 @@ R-NN. <Название>
 
 - **Status:** `closed (resolved)` — 2026-05-13
 - **Severity (когда был open):** high · **Likelihood (когда был open):** medium · **Owner:** Founder
-- **Rationale закрытия:** Founder operates as real-world expert across all 5 vertical-templates (WB-Селлер, Marketing-Агентство, TG-Крейтор, ИП-Бухгалтерия, SMB-Sales). Vertical-template content validation gate handled через [ADR-026](../decisions/ADR-026-vertical-expertise-pipeline.md): founder-review checklist + evaluator gate (≥75% golden-dataset pass + 100% adversarial probes) + Wave 1+ friend-loop (3-5 ICP-friends × 5 задач) + 90-day re-verification cycle. См. [GRILL-DECISIONS-ORIION DECISION-6](../_meta/GRILL-DECISIONS-ORIION.md).
+- **Rationale закрытия:** Founder operates as real-world expert across all 5 vertical-templates (WB-Селлер, Marketing-Агентство, TG-Крейтор, ИП-Бухгалтерия, SMB-Sales). Vertical-template content validation gate handled через [ADR-026](../decisions/ADR-026-vertical-expertise-pipeline.md): founder-review checklist + evaluator gate (≥75% golden-dataset pass + 100% adversarial probes) + Wave 1+ friend-loop (3-5 ICP-friends × 5 задач) + 90-day re-verification cycle. См. [GRILL-DECISIONS-ORIION DECISION-6](../decisions/ADR-028-policies-registry.md).
 - **Monitoring (на случай re-opening):** evaluator pass-rate < 75% подряд 2 цикла на одной вертикали → перевести обратно в `open` + флаг founder.
 
 ## R-31. AI-cost overrun under 11-Opus persistent team

@@ -1,4 +1,4 @@
-# Wave 0 — Phase Index
+﻿# Wave 0 — Phase Index
 
 | Phase | Slug | Длительность | Dependencies | Owner |
 |---|---|---|---|---|
@@ -26,7 +26,7 @@
 
 - 00.2, 00.3, 00.4 могут идти параллельно после 00.1
 - 00.6 и 00.7 идут параллельно после 00.5 (per Session 4 C-D8 — ∥ placement, оба после 00.5)
-- 00.7 frontend-implementer работает с backend mocks для `/api/auth/*`, `/api/cells/*`, `/api/tasks/*` пока 00.2/00.5 не Done — но контракты в `_meta/contracts/*` fix'д Wave 0
+- 00.7 frontend-implementer работает с backend mocks для `/api/auth/*`, `/api/cells/*`, `/api/tasks/*` пока 00.2/00.5 не Done — но контракты в `contracts/*` fix'д Wave 0
 
 ## Total
 

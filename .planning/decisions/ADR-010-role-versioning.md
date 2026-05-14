@@ -1,10 +1,10 @@
-# ADR-010: Версионирование ролей/templates — SemVer + Canary + Golden dataset
+﻿# ADR-010: Версионирование ролей/templates — SemVer + Canary + Golden dataset
 
 - **Status:** Accepted
 
 ## Scope clarification
 
-Versioning per этот ADR применяется к prompt-файлам ролей в `_meta/verticals/<slug>/prompts/<role>.md` (см. [ADR-026](./ADR-026-vertical-expertise-pipeline.md)). Frontmatter contract из ADR-026 включает поле `version: <semver>` — изменения tracked здесь. `role_key` = `<vertical-slug>:<role-name>` (например `wb-seller:coordinator`).
+Versioning per этот ADR применяется к prompt-файлам ролей в `verticals/<slug>/prompts/<role>.md` (см. [ADR-026](./ADR-026-vertical-expertise-pipeline.md)). Frontmatter contract из ADR-026 включает поле `version: <semver>` — изменения tracked здесь. `role_key` = `<vertical-slug>:<role-name>` (например `wb-seller:coordinator`).
 
 Sprite/archetype IDs (`agent_archetype_id` per [ADR-024](./ADR-024-bounded-context-contracts.md)) — отдельная сущность с собственным versioning через колонку `agents.agent_archetypes.version`. Их жизненный цикл не управляется этим ADR (см. [ADR-021](./ADR-021-ai-generated-pixel-pipeline.md)).
 

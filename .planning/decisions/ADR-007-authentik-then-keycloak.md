@@ -1,4 +1,4 @@
-# ADR-007: Auth — Custom JWT (Wave 0-1) → Logto (Wave 2-3) → Keycloak (Enterprise)
+﻿# ADR-007: Auth — Custom JWT (Wave 0-1) → Logto (Wave 2-3) → Keycloak (Enterprise)
 
 - **Status:** Accepted
 
@@ -149,7 +149,7 @@ enabled_at timestamptz
 
 Implementation owner — `backend-implementer` (см. [ADR-023](./ADR-023-ai-team-runtime.md)). Quality gate — `reviewer-backend` + `reviewer-security` (tier 4 per [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md): architecture + security + billing + migrations требуют 3 AI reviewers + explicit founder approve + ADR-link). Deployment секреты — per [ADR-015](./ADR-015-ai-dev-process.md) isolation policy (никаких production credentials в AI-context'е).
 
-Schema `iam.*` фиксируется в [`_meta/contracts/iam/schema.sql`](../_meta/contracts/iam/) per [ADR-024](./ADR-024-bounded-context-contracts.md) — Alembic migrations лежат в `backend/alembic/versions/iam/`.
+Schema `iam.*` фиксируется в [`contracts/iam/schema.sql`](../contracts/iam/) per [ADR-024](./ADR-024-bounded-context-contracts.md) — Alembic migrations лежат в `backend/alembic/versions/iam/`.
 
 ## Links
 
