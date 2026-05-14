@@ -150,15 +150,9 @@ Per tier-based ruleset (см. conventions.md):
 
 ## Tier-based review
 
-Из ADR-015 / conventions.md:
+**Source of truth:** [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) — 5 tiers с AI reviewers (per ADR-023 11-role catalog) + Founder approval per [P-INIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) (Founder = always final approver tier 3+).
 
-| Tier | Примеры | Auto-merge | AI-review | Human review |
-|---|---|---|---|---|
-| **1** | Docs, format, lint-fix, dependency patch | ✅ если CI зелёный | — | — |
-| **2** | Tests, simple refactors, copy changes | ❌ | 1 AI (code-reviewer) | Опц. |
-| **3** | New endpoint, new component, новая фича | ❌ | 1 AI (code-reviewer) | 1 human (Tech Lead) |
-| **4** | Архитектурные, security, migrations, billing | ❌ | 2 AI (code + security) | 2 human (senior+) |
-| **5** | Hotfix в prod | ❌ | 1 AI | 1 senior expedited |
+Не дублируем tier-table инлайн. При изменении tier-policy → обновляется ADR-027.
 
 ## CI gates (mandatory)
 
