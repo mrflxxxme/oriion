@@ -248,7 +248,7 @@ npm run lint && npm run typecheck && npm test && npm run build
 - **DECISION-4** — Nordic Warm design philosophy
 - `_meta/ui/design-tokens.md` — token contracts
 - `_meta/ui/component-inventory.md` — allowed components
-- `_meta/ui/CLAUDE-DESIGN-PROMPTS.md` — designer prompt patterns
+- `_meta/ui/UI-DESIGN-PLAYBOOK.md` — designer workflow + ui-ux-pro-max invocation prompts (renamed from CLAUDE-DESIGN-PROMPTS.md per Session 4 / P-DESIGN-1)
 - **WCAG 2.1 AA** — https://www.w3.org/WAI/WCAG21/quickref/
 - **axe DevTools** — https://www.deque.com/axe/devtools/
 
