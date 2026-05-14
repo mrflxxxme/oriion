@@ -4,7 +4,7 @@ description: Registry of deep-grill sessions for project Oriion — each session
 type: meta-registry
 status: living document
 last-updated: 2026-05-14
-last-session: 5
+last-session: 6
 ---
 
 # GRILL-DECISIONS — Oriion Registry
@@ -22,6 +22,7 @@ last-session: 5
 
 | # | Date | Type | Topic | Outcome | Commit |
 |---|---|---|---|---|---|
+| 6 | 2026-05-14 | Milestone D planning + execution + audit | Pre-Wave-0 cleanup + WB-Seller naporneniya (Phase 00.5 evaluator-gate prerequisite). Scope split D (now, pre-Wave-0) vs E (post-Wave-0 retro). 10 grill-decisions D-D1..D-D10 locked through founder + Claude Opus dialogue. Sequential execution D.1→D.4 + D.5 audit. | 4 stacked PRs + 1 audit: D.1 [#17](https://github.com/mrflxxxme/oriion/pull/17) / D.2 [#18](https://github.com/mrflxxxme/oriion/pull/18) / D.3 [#19](https://github.com/mrflxxxme/oriion/pull/19) / D.4 [#20](https://github.com/mrflxxxme/oriion/pull/20) / D.5 [#21 TBD](https://github.com/mrflxxxme/oriion/pulls). 1 P0 finding resolved (events.yaml 3 new $defs added). Milestone D → ✅ Done. Milestone E placeholder created для post-Wave-0 retro. |
 | 5 | 2026-05-14 | Post-Milestone-C consistency audit | Cross-PR consistency + policy compliance + strategic readiness across C.1-C.5 | Clean — no P0 findings post-verification (3 false positives from audit agents resolved by source-of-truth cross-check). Wave 0 ready for Phase 00.1 execution. Milestone C → ✅ Done. | [PR #16 TBD](https://github.com/mrflxxxme/oriion/pulls) |
 | 4 | 2026-05-14 | Milestone C planning grill | UI-design policy shift (designer = DS-keeper, primary = ui-ux-pro-max) + Milestone C scope lock + execution plan (5 stacked PR + audit) | 10 grill-decisions C-D1..C-D10 locked + policy P-DESIGN-1 added + UI playbook rewrite + scope split C vs D | [PR #11 6f94262](https://github.com/mrflxxxme/oriion/pull/11) (C.1 + onwards C.2-C.5 #12-#15) |
 | 3 | 2026-05-13 | Post-Milestone-B audit | Cross-PR consistency + ADR compliance + strategic readiness | 2 critical issues fixed via B.5 + 4 grill-decisions locked + policy P-AUDIT-3 added | [PR #N TBD](https://github.com/mrflxxxme/oriion/pull/TBD) |
@@ -31,6 +32,87 @@ last-session: 5
 ---
 
 ## §2 Session detail (newest first)
+
+### Session 6 — Milestone D planning + execution + audit (2026-05-14, pre-Wave-0)
+
+**Trigger:** founder request post-Milestone-C-clean: «Прочти `.planning/_meta/GRILL-DECISIONS-ORIION.md`, составь план выполнения задач для проработки Milestone D, согласуй со мной, закрепи в сессии и давай сделаем это!» — invoked via `/anthropic-skills:grill-me`.
+
+**Method:** Founder + Claude Opus (grill-me skill) walked decision tree branch-by-branch. Parallel Explore reconnaissance + 9 AskUserQuestion rounds. Plan written к plan-file + ExitPlanMode → approved. Sequential PR execution D.1→D.4 + post-merge audit D.5.
+
+**Strategic decisions (D-D1..D-D10):**
+
+| Q | Topic | Decision | Rationale |
+|---|---|---|---|
+| **D-D1** | Milestone D scope | **Split D (now, pre-Wave-0) + E (post-Wave-0 retro).** D scope = WB-Seller naporneniya (Phase 00.5 blocker) + meta-files cleanup + ADR-016 line 48 deprecation fix. E scope = 4 additional verticals + Wave 1 acceptance metrics + AI-velocity recalc + roadmap calibration. | §4 backlog содержит mix learning-dependent (Wave 1 metrics, AI-velocity — нужны actuals) и блокирующих Wave 0 elements (WB-Seller для Phase 00.5). Split минимизирует переделки. |
+| **D-D2** | WB-Seller scope | **Full per ADR-026 §1** — 30 golden tasks + 5 adversarial + promoted prompts + frontmatter contract per DECISION-11. | Phase 00.5 evaluator gate (≥75% golden + 100% adversarial) невозможен без 30 tasks; founder = real-world expert делает content генерацию быстрой. |
+| **D-D3** | PR structure | **4 stacked PRs + 1 audit (D.1..D.5)** — amended from initial 5+1 после D-D5 collapse. D.1 meta+ADR-016 / D.2 handbook / D.3 WB prompts / D.4 WB dataset / D.5 audit. | Mirror C-pattern. ADR-016 single-line edit merged в D.1 после D-D5 R-NN skip → no standalone D.3 PR for ADR cleanup. |
+| **D-D4** | Cleanup depth | **Audit-driven surgical per grep-verified scope** — fix only real drift, не blindly follow §4 (which is stale с Session 2). PLACEHOLDERS.md added к scope (not in §4 originally); ADR-004 removed as no-op (grep-verified clean). | §4 backlog wording 9 months old; reality drifted (PLACEHOLDERS new gaps, glossary already partially cleaned). Surgical = lowest blast radius. |
+| **D-D5** | ADR-016 cleanup + R-NN | **ADR-016 surgical line 48 only; R-NN gap formalization skipped.** | P-AUDIT-2 deprecates literal term `ui_sprite_archetype` per ADR-024 §2 — lines 56/63 use `custom_sprite`/`sprite_id` (different identifiers, conceptually OK per ADR-021 sprite-pipeline). R-NN cosmetic only, no Wave 0 impact. |
+| **D-D6** | 30 tasks taxonomy | **Task-type × difficulty matrix 5×6** — 5 primary tasks × (2 easy + 3 medium + 1 hard) = 30. Equal archetype coverage; conformant DECISION-6 10/15/5 split. | Per-archetype balance > usage-frequency skew (evaluator needs even coverage). Each task uses full DAG → tests all 3 archetypes. |
+| **D-D7** | 5 adversarial probes | **5 failure-mode categories (A1-A5):** A1 hallucination-nonexistent-category / A2 PII-injection-review-response / A3 defamation-request / A4 price-coordination-request / A5 stale-data-tariff. | Broad robustness coverage > deep single-category. 100% pass-rate hard requirement per DECISION-11 = blocks prompt promote `draft` → `reviewed`. |
+| **D-D8** | 07-AI-TEAM-PIPELINE.md NEW | **Comprehensive reference ~300 LOC** — 8 sections: 1) pipeline overview / 2) pipeline templates / 3) handoff contract / 4) failure handling / 5) anti-drift mechanisms / 6) cost-control hooks / 7) CI integration / 8) Founder approval points. | Single source-of-truth для pipeline mechanics. Cross-links к ADR-023/025/027 prevent drift. Implementer-actionable but не duplicates ADR content. |
+| **D-D9** | D.5 audit pattern | **Same C.6 — 3 parallel Explore agents:** (a) cross-PR consistency / (b) policy compliance / (c) strategic readiness. | Proven pattern B.5+C.6; risk-mitigation перед Phase 00.5 launch. False-positive ratio expected (~70-80% per Session 5 precedent). |
+| **D-D10** | Source-citation policy | **Official only (Wave 0 strictest):** WB Help Center + Partner Portal + WB API docs + founder expertise footnote. Community sources (Sellematica, top WB-TG channels) deferred к Wave 1+ friend-loop. | Lowest hallucination risk Wave 0. Founder = expert per R-29 — adds expertise where official docs gaps exist. |
+
+**Audit findings reconciliation (D.5 — 3 parallel Explore agents):**
+
+| Agent | Verdict | Notes |
+|---|---|---|
+| (a) Cross-PR consistency | ✅ Clean | D.3 prompts ≥200 LOC each verified; tools_allowed registry-conformant |
+| (b) Policy compliance | ✅ Clean (9 policies passing) | P-INIT-3/4/5 + P-AUDIT-1/2/3/4 + P-DESIGN-1 + DECISION-11 — no violations |
+| (c) Strategic readiness | ⚠️ 1 P0 finding | 3 event-types в D.4 adversarial probes flagged missing from handoff-schema.json $defs |
+
+**P0 finding reconciliation (Session 5 false-positive pattern repeats):**
+
+Audit agent (c) flagged `oriion.research.category-not-found.v1` / `oriion.research.stale-data.v1` / `oriion.write.legal-edge.v1` missing from `.claude/agents/_shared/handoff-schema.json`. Source-of-truth check показал:
+
+- **handoff-schema.json** содержит `tech.oriion.*` prefix events (36 $defs per B.5) — для inter-agent CloudEvents handoff per ADR-023
+- **`_meta/contracts/tasks/events.yaml`** содержит `oriion.*.*` domain events (8 entries) — для tasks/billing/llm-gateway domain emissions per ADR-024
+
+Two separate vocabularies serving different layers. The 3 events referenced в D.4 belong в events.yaml-vocabulary, не handoff-schema-vocabulary. Real gap = events.yaml missing 3 new event types.
+
+**Fix applied в D.5:** added 3 entries к `_meta/contracts/tasks/events.yaml`:
+- `oriion.research.category-not-found.v1` (emit; researcher domain) — adversarial probe A001 trigger
+- `oriion.research.stale-data.v1` (emit; researcher freshness check) — adversarial probe A005 trigger
+- `oriion.write.legal-edge.v1` (emit; coordinator refusal path) — adversarial probes A003 + A004 + golden task 024 trigger
+
+**Audit verdict — clean post-fix (no remaining P0):**
+
+- ✅ Phase 00.1 still unblocked (only OQ-17 + OQ-18 financial blockers, не D-affected)
+- ✅ Phase 00.5 evaluator gate ready-to-shoot: 30 tasks + 5 adversarial + rubrics + 3 events registered
+- ✅ All 3 WB prompts status=`draft` с `next-verification: 2026-08-14` (90d per P-INIT-4)
+- ✅ Milestone E placeholder scope correctly contained (no 4-vertical scaffolds, no Wave 1 metrics modification, no AI-velocity recalc)
+- ✅ Phase 00.7 frontend skeleton spec preserved
+- ✅ AI-team 11 roles structure intact
+- ✅ Cumulative WB-Seller prompts 605 LOC (target ≥600)
+
+**Milestone D statistics (cumulative D.1-D.5):**
+
+| PR | Branch | Files | LOC added | LOC removed |
+|----|--------|-------|-----------|-------------|
+| D.1 [#17](https://github.com/mrflxxxme/oriion/pull/17) | `feature/milestone-d-1-meta-cleanup-and-adr016` | 7 | +49 | -33 |
+| D.2 [#18](https://github.com/mrflxxxme/oriion/pull/18) | `feature/milestone-d-2-handbook-update` | 4 | +317 | -11 |
+| D.3 [#19](https://github.com/mrflxxxme/oriion/pull/19) | `feature/milestone-d-3-wb-seller-prompts` | 3 | +406 | -107 |
+| D.4 [#20](https://github.com/mrflxxxme/oriion/pull/20) | `feature/milestone-d-4-wb-seller-dataset` | 36 | +~1100 | -13 |
+| D.5 [#21 TBD](https://github.com/mrflxxxme/oriion/pulls) | `feature/milestone-d-5-audit` | 2 | +TBD | -0 |
+| **Total** | | **~52** | **~1872** | **~164** |
+
+**Forward-looking (Milestone E — Deferred, post-Wave-0 retro):**
+
+Items remaining for Milestone E (triggers after Wave 0 internal demo gate passes per ADR-025):
+
+- 4 additional verticals scaffolds (Marketing / TG-Creator / Accounting / SMB-Sales — Wave 1+ scope per ADR-026 §1)
+- `roadmap/wave-1-core-mvp/README.md` acceptance metrics calibration (NPS≥30, pass_rate≥0.9 per ADR-025) — нужны Wave 0 actuals
+- `roadmap/wave-0-foundation/PHASES.md` AI-velocity timeline recalc — нужны Phase 00.1-00.3 actuals
+- `roadmap/wave-0-foundation/README.md` capacity → AI-velocity terms refinement
+- R-NN gap formalization (R-13 / R-15 history) — explicitly deferred per D-D5
+
+**Files modified в D.5 (this commit):**
+
+- `.planning/_meta/contracts/tasks/events.yaml` — +3 entries (research.category-not-found / research.stale-data / write.legal-edge) per audit P0 fix
+- `.planning/_meta/GRILL-DECISIONS-ORIION.md` — Session 6 entry (§1 + §2) + §4 inventory move Milestone D → ✅ Done + Milestone E placeholder; last-session 5 → 6
+
+---
 
 ### Session 5 — Post-Milestone-C consistency audit (2026-05-14, post-C.1..C.5 PR open)
 
@@ -364,34 +446,41 @@ Scope delivered per Session 4 grill-decisions C-D1..C-D10. 5 stacked PRs + 1 aud
 
 **Cumulative Milestone C:** 32 файлов across 6 PRs / ~6050 LOC added. Foundation для Phase 00.1+ execution ready.
 
-### 🟦 Milestone D — Deferred (post-Wave-0 retro)
+### ✅ Done (Milestone D — PR #17..#21)
 
-**Vertical naporneniya:**
-- Phase 00.5 vertical-tasks для `_meta/verticals/wb-seller/` (WB-Seller 40-60 files + 30 golden-dataset tasks per ADR-026 §1)
-- 4 additional verticals scaffolds (Marketing / TG-Creator / Accounting / SMB-Sales — Wave 1+)
+Scope delivered per Session 6 grill-decisions D-D1..D-D10. 4 stacked PRs + 1 audit (D.5):
 
-**Meta-файлы cleanup:**
-- `PROJECT.md` — team section solo + 11 AI (P-INIT-5)
-- `STATUS.md` — убрать OQ-13/14/15/16 из active blockers; new Phase 00.7 row
-- `_meta/open-questions.md` — close OQ-13/14/15/16 with `status: closed (N/A: solo + AI model)` per P-INIT-5
-- `_meta/conventions.md:33` — replace `app/` → `frontend/src/routes/` (TanStack); tier-table → cross-ref ADR-027
-- `_meta/glossary.md` — add `agent_archetype_id` / `agent_archetypes` / `system_roles`; remove `ui_sprite_archetype`
-- `_meta/stack.md` — verify frontend structure совпадает с ADR-001 (revised)
-- `agent-handbook/02-DELEGATION.md` — переписать под 11 ролей из ADR-023
-- `agent-handbook/05-PR-WORKFLOW.md` — убрать inline tier-table, cross-ref на ADR-027
-- `agent-handbook/07-AI-TEAM-PIPELINE.md` — NEW: pipeline template + handoff schema + failure handling
-- `agent-handbook/00-START-HERE.md` — pipeline-flow mention + ссылка на `.claude/AGENTS.md`
+- **D.1 [#17](https://github.com/mrflxxxme/oriion/pull/17):** Meta-cleanup + ADR-016 deprecation fix — STATUS.md (remove OQ-13/14 active blockers), `_meta/open-questions.md` (close OQ-13/14/15/16 per P-INIT-5), PLACEHOLDERS.md (rewrite Команда section + close 6 hire placeholders 🚫), `_meta/conventions.md` (line 33 `app/` → `frontend/src/routes/` TanStack; tier-table → cross-ref ADR-027), `_meta/glossary.md` (ADD agent_archetype / agent_archetype_id / system_role entries per ADR-024 §2), PROJECT.md (Команда section: solo + 11 AI per DECISION-3), ADR-016 line 48 surgical edit (`ui_sprite_archetype` → `agent_archetype_id` per P-AUDIT-2). 7 files / +49 / -33 LOC.
 
-**ADR backlog (deferred high-severity):**
-- ADR-004 + ADR-016 — replace `ui_sprite_archetype` в live SQL examples (per P-AUDIT-2)
+- **D.2 [#18](https://github.com/mrflxxxme/oriion/pull/18):** Agent-handbook update — 02-DELEGATION.md (ADD «Internal AI-team — 11 persistent Opus roles» as PRIMARY section; external catalog renamed → non-persistent fallback), 05-PR-WORKFLOW.md (remove inline tier-table, cross-ref ADR-027 per P-INIT-3), **07-AI-TEAM-PIPELINE.md NEW** (~260 LOC, 8 sections: pipeline overview / templates / handoff contract / failure handling / anti-drift / cost-control / CI / Founder approve points per D-D8), 00-START-HERE.md (topic shortcut к 07 + link к .claude/AGENTS.md). 4 files / +317 / -11 LOC.
 
-**Roadmap:**
-- `roadmap/wave-1-core-mvp/README.md` — acceptance metrics align с ADR-025 (NPS≥30, pass_rate≥0.9)
-- `roadmap/wave-0-foundation/PHASES.md` — AI-velocity timeline пересчёт (под solo + 11 AI vs 2.5 FTE × 15 дней)
-- `roadmap/wave-0-foundation/README.md` — capacity → AI-velocity terms
+- **D.3 [#19](https://github.com/mrflxxxme/oriion/pull/19):** WB-Seller prompts promote — researcher.md (76→204 lines, full body), listing_writer.md (91→204 lines, full body), coordinator.md (139→201 lines, per-task workflows + output protocol). All 3 prompts с frontmatter contract per DECISION-11: status=`draft`, verified-sources ≥3 entries each, tools_allowed registry-conformant (P-AUDIT-3). 3 files / +406 / -107 LOC.
 
-**Risks:**
-- R-NN gaps: формализовать что R-13 / R-15 были — restored или explicit «merged into R-NN» entries
+- **D.4 [#20](https://github.com/mrflxxxme/oriion/pull/20):** WB-Seller golden-dataset — 30 tasks (5×6 matrix: 5 primary tasks × (2 easy + 3 medium + 1 hard) per D-D6) + 5 adversarial probes (A001 hallucination / A002 PII / A003 defamation / A004 antitrust / A005 stale-data per D-D7; 100% pass-rate required) + README.md expansion (5-probe failure-mode table + file naming convention + 90-day re-verification cycle). 36 files / +~1100 / -13 LOC.
+
+- **D.5 [#21 TBD](https://github.com/mrflxxxme/oriion/pulls):** Post-merge consistency audit — 3 parallel Explore agents per D-D9 ((a) cross-PR consistency clean / (b) policy compliance clean — 9 policies passing / (c) strategic readiness 1 P0 finding). P0 reconciled per Session 5 false-positive pattern: audit-agent confused handoff-schema vocabulary (`tech.oriion.*`) с events.yaml vocabulary (`oriion.*.*`). **Fix applied:** added 3 entries к `_meta/contracts/tasks/events.yaml` (research.category-not-found / research.stale-data / write.legal-edge). Session 6 GRILL entry; §4 inventory move D к ✅ Done + Milestone E placeholder. 2 files / ~TBD LOC.
+
+**Cumulative Milestone D:** ~52 файлов across 5 PRs / ~1872 LOC added. Phase 00.5 evaluator gate ready-to-shoot (30 golden + 5 adversarial primed; 3 WB prompts status=`draft` awaiting founder-review + evaluator-pass перед promote → `reviewed`).
+
+### 🟦 Milestone E — Deferred (post-Wave-0 retro)
+
+Triggers after Wave 0 internal demo gate passes per ADR-025. Items remain learning-dependent (need Wave 0 actuals):
+
+**4 additional verticals scaffolds (Wave 1+ scope per ADR-026 §1):**
+- Marketing-agency vertical (40-60 files + 30 golden tasks + 5 adversarial)
+- TG-Creator vertical
+- ИП-Бухгалтерия (Accounting) vertical
+- СМБ-Sales vertical
+
+**Wave 1 metrics calibration (need Wave 0 actuals):**
+- `roadmap/wave-1-core-mvp/README.md` acceptance metrics align с ADR-025 (NPS≥30, pass_rate≥0.9)
+- `roadmap/wave-0-foundation/PHASES.md` AI-velocity timeline recalc (под solo + 11 AI vs 2.5 FTE × 15 дней)
+- `roadmap/wave-0-foundation/README.md` capacity → AI-velocity terms refinement
+
+**Risks formalization:**
+- R-NN gaps: формализовать что R-13 / R-15 были (restored или explicit «merged into R-NN» entries) — explicitly deferred per D-D5
+
+**Triggered when:** internal_demo.passed=true (Wave 0→1 gate per DECISION-9) AND Phase 00.5 evaluator-gate completed for WB-Seller (≥75% golden + 100% adversarial).
 
 ### 📌 Out-of-scope (отдельные founder decisions, не привязаны к Milestone)
 

@@ -113,3 +113,41 @@ events:
     direction: consume
     description: On engage, all queued/running tasks are cancelled with cancelled_by=kill_switch.
     source_context: billing
+
+  # === Vertical-prompt escalation events (Milestone D.5 — emit from vertical archetypes per DECISION-11 + adversarial probes) ===
+
+  - type: oriion.research.category-not-found.v1
+    direction: emit
+    description: Researcher detected requested category does not exist in WB-catalog. Coordinator MUST NOT proceed to listing-writer; should respond `out-of-scope` to user. Adversarial probe A001 verifies this path.
+    data_schema:
+      type: object
+      required: [task_id, category_hint_input]
+      properties:
+        task_id:             { type: string, format: uuid }
+        category_hint_input: { type: string }
+        researcher_evidence: { type: string, description: "Why category determined non-existent (e.g. catalog lookup failed)" }
+
+  - type: oriion.research.stale-data.v1
+    direction: emit
+    description: Researcher detected cached data exceeds freshness TTL (90 days default for category rules; 24h for competitor snapshots). Coordinator MUST trigger re-research or escalate to founder. Adversarial probe A005 verifies this path.
+    data_schema:
+      type: object
+      required: [task_id, stale_field, accessed_at, max_age_days]
+      properties:
+        task_id:        { type: string, format: uuid }
+        stale_field:    { type: string, description: "e.g. category_commission_pct" }
+        accessed_at:    { type: string, format: date-time }
+        max_age_days:   { type: integer }
+        suggested_action: { type: string, enum: [re-research, founder-escalation, partial-payload] }
+
+  - type: oriion.write.legal-edge.v1
+    direction: emit
+    description: Listing-writer detected legal-edge content (defamation request, antitrust request, fraud-claim review, safety claim without certification). Coordinator MUST refuse downstream invocation and cite specific legal references. Adversarial probes A003 + A004 verify this path; golden task 024 covers defamatory review path.
+    data_schema:
+      type: object
+      required: [task_id, edge_category, refusal_basis]
+      properties:
+        task_id:        { type: string, format: uuid }
+        edge_category:  { type: string, enum: [defamation-request, antitrust-request, fraud-claim-review, safety-claim-without-cert, medical-claim, comparative-claim-named-competitor] }
+        refusal_basis:  { type: array, items: { type: string }, description: "Cited legal/policy references (e.g. ст. 152 ГК РФ, ФЗ о защите конкуренции, WB community guidelines)" }
+        suggested_legitimate_path: { type: string, nullable: true }

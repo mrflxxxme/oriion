@@ -45,7 +45,7 @@ agents.roles
   default_tools[]
   recommended_model_tier
   risk_level
-  ui_sprite_archetype  -- 'creative01', 'formal05', ...
+  agent_archetype_id   -- FK к agents.agent_archetypes (per ADR-024 §2; deprecated alias `ui_sprite_archetype`)
 
 agents.team_presets
   preset_key (PK)  -- 'wb_seller', 'marketing_agency_ru', ...

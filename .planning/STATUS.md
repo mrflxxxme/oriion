@@ -24,12 +24,12 @@
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
-| OQ-13 | Tech Lead hire | Founder | Required для Phase 00.1 |
-| OQ-14 | Senior Backend hire | Founder | Required для Phase 00.1 |
 | OQ-17 | Funding-стратегия | Founder | Required до старта разработки |
 | OQ-18 | Burn-бюджет | Founder | Required до старта разработки |
 | OQ-04 | РКН-уведомление | Founder + юрист | Required до Phase 00.2 |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa |
+
+> **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) (solo founder + 11 AI model).
 
 Полный список — [`_meta/open-questions.md`](./_meta/open-questions.md).
 

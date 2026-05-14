@@ -79,3 +79,13 @@
 | **Pyodide** | Python WebAssembly runtime в браузере. Используем для Analyst-роли в Wave 2. См. ADR-020. |
 | **Pixel-Art-XL LoRA** | Community model для SDXL/Flux, генерирует pixel-art стиль. Используется в asset-pipeline Wave 2 (ADR-021). |
 | **Aseprite** | Pixel-art редактор. Используется для post-processing AI-generated assets. |
+
+## Схема данных (термины из контрактов)
+
+> Канонические identifier'ы из `_meta/contracts/<bounded-context>/` per [ADR-024 §2](../decisions/ADR-024-bounded-context-contracts.md#2-naming-corrections). При работе с DDL/migrations использовать ТОЛЬКО эти термины.
+
+| Термин | Определение |
+|---|---|
+| **agent_archetype** | Тип / шаблон агента из таблицы `agents.agent_archetypes` (pre-defined): хранит system_prompt, default_tools, recommended_model_tier, UI sprite reference. 24 стартовых архетипа (5 vertical-героев + 19 generic). См. [ADR-024 §2](../decisions/ADR-024-bounded-context-contracts.md#2-naming-corrections), [ADR-021](../decisions/ADR-021-ai-generated-pixel-pipeline.md). Deprecated alias: `ui_sprite_archetype` (никогда не использовать в новых implementations per [P-AUDIT-2](./GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)). |
+| **agent_archetype_id** | FK к `agents.agent_archetypes.archetype_id`. Используется в `agents.roles`, `agents.team_presets`, `agents.cell_agents`. **Никогда** не использовать deprecated `ui_sprite_archetype` / `sprite_id` в новом коде. См. [ADR-024 §2](../decisions/ADR-024-bounded-context-contracts.md#2-naming-corrections). |
+| **system_role** | Запись в `rbac.system_roles` (system-level permissions: Owner / Admin / Member / Viewer / Bot per workspace). **НЕ путать** с `agent_archetype` (vertical-level AI agent role) или с `agents.roles` (внутренняя role-метадата agent'а). См. [ADR-024 §2](../decisions/ADR-024-bounded-context-contracts.md#2-naming-corrections). Deprecated alias: `roles_rbac` (renamed per ADR-024). |
