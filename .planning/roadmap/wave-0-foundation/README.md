@@ -24,6 +24,7 @@ End-to-end pipeline: auth → DB (cell) → LLM-gateway (3 провайдера 
 - Pydantic-AI runtime: WB-Селлер team-preset (Coordinator + Listing Writer + Researcher)
 - Docker Compose deploy + Caddy reverse proxy
 - OpenTelemetry → Grafana (минимум)
+- **Frontend skeleton (Phase 00.7 NEW per Session 4 / C-D2):** functional Wave-0 demo UI — auth + cell-list + task-submit + SSE result view, materializing все 18 components из `_meta/ui/component-inventory.md` через ui-ux-pro-max designer workflow
 
 **Nice-to-have (можно отложить в Wave 1):**
 - Yandex ID / VK ID OAuth
