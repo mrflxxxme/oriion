@@ -4,7 +4,7 @@ description: Registry of deep-grill sessions for project Oriion — each session
 type: meta-registry
 status: living document
 last-updated: 2026-05-14
-last-session: 4
+last-session: 5
 ---
 
 # GRILL-DECISIONS — Oriion Registry
@@ -22,7 +22,8 @@ last-session: 4
 
 | # | Date | Type | Topic | Outcome | Commit |
 |---|---|---|---|---|---|
-| 4 | 2026-05-14 | Milestone C planning grill | UI-design policy shift (designer = DS-keeper, primary = ui-ux-pro-max) + Milestone C scope lock + execution plan (5 stacked PR + audit) | 10 grill-decisions C-D1..C-D10 locked + policy P-DESIGN-1 added + UI playbook rewrite + scope split C vs D | [PR #TBD](https://github.com/mrflxxxme/oriion/pulls) (C.1 in flight) |
+| 5 | 2026-05-14 | Post-Milestone-C consistency audit | Cross-PR consistency + policy compliance + strategic readiness across C.1-C.5 | Clean — no P0 findings post-verification (3 false positives from audit agents resolved by source-of-truth cross-check). Wave 0 ready for Phase 00.1 execution. Milestone C → ✅ Done. | [PR #16 TBD](https://github.com/mrflxxxme/oriion/pulls) |
+| 4 | 2026-05-14 | Milestone C planning grill | UI-design policy shift (designer = DS-keeper, primary = ui-ux-pro-max) + Milestone C scope lock + execution plan (5 stacked PR + audit) | 10 grill-decisions C-D1..C-D10 locked + policy P-DESIGN-1 added + UI playbook rewrite + scope split C vs D | [PR #11 6f94262](https://github.com/mrflxxxme/oriion/pull/11) (C.1 + onwards C.2-C.5 #12-#15) |
 | 3 | 2026-05-13 | Post-Milestone-B audit | Cross-PR consistency + ADR compliance + strategic readiness | 2 critical issues fixed via B.5 + 4 grill-decisions locked + policy P-AUDIT-3 added | [PR #N TBD](https://github.com/mrflxxxme/oriion/pull/TBD) |
 | 2 | 2026-05-13 | Audit follow-up | Milestone A consistency check | Cost-policy cleanup, R-20/R-30 split, Phase 00.5 column rename | [PR #2 d1f41d3](https://github.com/mrflxxxme/oriion/pull/2) |
 | 1 | 2026-05-13 | Initial deep-grill | 11 fundamental decisions (team / contracts / gates / vertical-expertise / Git) | 10 ADR + R-29 closed + R-31 added + catalog update | [PR #2 c78c381](https://github.com/mrflxxxme/oriion/pull/2) |
@@ -30,6 +31,87 @@ last-session: 4
 ---
 
 ## §2 Session detail (newest first)
+
+### Session 5 — Post-Milestone-C consistency audit (2026-05-14, post-C.1..C.5 PR open)
+
+**Trigger:** Milestone C finale per C-D10 — 3 parallel Explore agents audit C.1-C.5 cumulative state before declaring Milestone C complete. Pattern повторяет Milestone B B.5 (Session 3 audit, 2 critical findings).
+
+**Method:** 3 parallel Explore agents:
+- **(a) Cross-PR internal consistency** — phase-spec ↔ contracts cross-refs, role tools-allowlist conformance, pipeline-template ↔ role mandate alignment, SSE event-types alignment, component-inventory cross-refs
+- **(b) Policy compliance** — P-DESIGN-1 (designer = DS-keeper, ui-ux-pro-max primary), P-INIT-1 (B-level), P-INIT-2 (cross-link), P-AUDIT-1/2/3, P-INIT-3/4/5
+- **(c) Strategic readiness** — Phase 00.1 execution-readiness, Wave 0 critical-path, pipeline-template ↔ role alignment, Phase 00.7 prerequisites, Wave 0→1 gate readiness, AI-team capacity, SSE integration
+
+**Findings reconciliation:**
+
+Audit agents выдали несколько P0 flags, но source-of-truth cross-check показал что все critical findings — **false positives** из-за partial visibility / location confusion / stale state в audit agents:
+
+| Audit finding | Source-of-truth check | Verdict |
+|---|---|---|
+| Agent (a) A-1: "SSE event-type mismatch — 00.7 expects 9, 00.5 lists 8" | `grep "task\." 00.5-pydantic-ai-wb-team.md TaskStreamEvent literal` → 9 events (started/step_started/step_token/step_completed/delegation_started/delegation_completed/completed/cancelled/failed). 00.7 AC11 says "all 9". | **False positive** — alignment correct (9 = 9) |
+| Agent (a) A-2: "Component inventory has 56 items, spec claims 18" | `grep -c "^### \d+\." component-inventory.md` → 18 numbered components. Out-of-scope section (RichTextEditor, FileUpload, DatePicker etc.) explicitly Wave 1+ deferred. | **False positive** — 18 verified |
+| Agent (a) A-3: "PHASES.md missing 00.7 entry" | `grep -c "^| \[00\." PHASES.md` → 7 rows. C.5 added 00.7 row + updated dependency graph. | **False positive** — agent saw stale state |
+| Agent (a) A-5: "PHASES.md gate criterion says '6 phases' but now 7" | `grep "Все .* phases" PHASES.md` → "Все 7 phases в статусе Done" (line 43). C.5 update applied. | **False positive** — agent saw stale state |
+| Agent (b) — Multiple P0 findings | Agent (b) searched `_meta/phase-specs/` but phase-specs live в `roadmap/wave-0-foundation/phases/`. Agent had incorrect location assumption. | **Audit-agent-error** — phase-specs exist + are B-level per P-INIT-1 |
+
+**Audit verdict — clean (no P0 findings requiring fix):**
+
+- ✅ Phase-spec ↔ contracts cross-references all valid (iam/multitenancy/rbac/agents/tasks/llm-gateway DRAFT-READY; billing/memory SKELETON with inline minimum)
+- ✅ Tools registry conformance per P-AUDIT-3 — all role tools-allowlist entries reference registry slugs
+- ✅ Pipeline templates `frontend-feature.yaml` + `full-stack-feature.yaml` updated с ui-ux-pro-max notes per P-DESIGN-1 (C-D3)
+- ✅ Phase 00.5 SSE event-types (9) ↔ Phase 00.7 TaskProgressStream (9) aligned
+- ✅ Phase dependency graph acyclic: 00.5 → {00.6, 00.7} parallel placement per C-D8
+- ✅ 18 component-inventory items all referenced across 5 Phase 00.7 routes
+- ✅ P-DESIGN-1 enforced: designer = DS-keeper mandate, ui-ux-pro-max primary, Claude Design fallback only §7 of UI-DESIGN-PLAYBOOK
+- ✅ P-INIT-1 (B-level) per phase 00.1-00.7: file-tree + inline OpenAPI/DDL OR cross-link + function signatures + ≥1 unit + ≥1 integration test
+- ✅ P-INIT-2 (cross-link) — phase-specs cross-link к DRAFT-READY contracts, не дублируют DDL/OpenAPI
+- ✅ P-AUDIT-1 (no economic numbers в specs) — economic numbers только в `cost-budget.yaml`
+- ✅ P-AUDIT-2 (deprecated terms) — `ui_sprite_archetype` confined к GRILL Session 2 deprecation note + ADR-024 §4 deprecation declaration only
+- ✅ P-INIT-3/4/5 (founder approver / anti-hallucination / solo + 11 AI) — all enforced в role system-prompts + PHASES.md team description
+- ✅ All 11 persistent Opus roles scaffolded с system-prompt + workflows + ≥1 checklist
+- ✅ Wave 0→1 gate `internal_demo.passed=true` unblocked by Phase 00.7 AC3 + AC7
+- ✅ Phase 00.1 execution-ready — no TBD/FIXME markers blocking start
+
+**Minor clarification (non-blocking):**
+- Phase 00.6 spec mentions "Параллельно с 00.7" в Dependencies section. PHASES.md row shows deps `[00.1, 00.5]` (not 00.7) — correct since 00.6 не depends on 00.7, они parallel. No fix needed; documentation consistent.
+
+**Milestone C statistics (cumulative C.1-C.5):**
+
+| PR | Branch | Files | LOC added | LOC removed |
+|----|--------|-------|-----------|-------------|
+| C.1 #11 | `feature/milestone-c-1-policy-shift` | 5 | +376 | -232 |
+| C.2 #12 | `feature/milestone-c-2-role-upgrade` | 17 | +2750 | -199 |
+| C.3 #13 | `feature/milestone-c-3-phases-backend-foundation` | 3 | +1018 | -212 |
+| C.4 #14 | `feature/milestone-c-4-phases-runtime-deploy` | 3 | +1330 | -266 |
+| C.5 #15 | `feature/milestone-c-5-phase-00-7-frontend` | 3 | +575 | -8 |
+| C.6 #16 | `feature/milestone-c-6-audit-fix` | 1 | +TBD | -0 (this commit) |
+| **Total** | | **32** | **~6050 LOC** | **~917 LOC** |
+
+**Verified correct (audit confirmed, no changes needed):**
+
+- 7 Wave 0 phases (00.1-00.7) all B-level per P-INIT-1 — total ~3000 LOC across phase-specs
+- 4 Light→Medium role upgrades — full parity with backend-implementer baseline (~250 lines system-prompt + 3-5 workflows + 2-3 checklists each)
+- UI-DESIGN-PLAYBOOK.md rename + rewrite — Claude Design moved к §7 fallback only
+- Session 4 GRILL entry + P-DESIGN-1 policy + §4 Milestone C inventory expansion
+- Pipeline templates updated с ui-ux-pro-max notes
+- Cross-refs `_meta/ui/component-inventory.md` + `REVIEW-CHECKLIST.md` point к UI-DESIGN-PLAYBOOK.md
+- PHASES.md dependency graph updated: 00.5 → {00.6, 00.7} parallel
+- Wave 0 team description aligned с solo + 11 AI per Session 1 DECISION-3 + ADR-023
+
+**Forward-looking (Milestone D — Wave 0 retro):**
+
+Deferred items per Session 3 Q4 still в §4 «🟦 Milestone D — Deferred»:
+- Vertical naporneniya (Phase 00.5 vertical-tasks для wb-seller 40-60 files + 30 golden-dataset tasks)
+- 4 additional verticals scaffolds (Marketing / TG-Creator / Accounting / SMB-Sales)
+- Meta-files cleanup (PROJECT.md team section, STATUS.md OQ removal, conventions.md frontend path, glossary.md sprite cleanup, agent-handbook updates)
+- ADR backlog (ADR-004 + ADR-016 `ui_sprite_archetype` removal from live SQL examples)
+- Roadmap (wave-1-core-mvp acceptance metrics align с ADR-025; AI-velocity timeline recalc)
+- R-NN gaps formalization (R-13 / R-15 history)
+
+**Files modified в C.6 (this commit):**
+
+- `.planning/_meta/GRILL-DECISIONS-ORIION.md` — Session 5 entry (§1 + §2) + §4 inventory move Milestone C к ✅ Done; last-session 4 → 5
+
+---
 
 ### Session 4 — Milestone C planning grill (2026-05-14, post-Milestone-B-merged-PR-#10)
 
@@ -264,34 +346,23 @@ last-session: 4
 6. **`_meta/verticals/wb-seller/`** × ~10 файлов (per ADR-026 §2): README, domain-glossary, workflow-dag, `prompts/{coordinator,researcher,listing_writer}.md`, `golden-dataset/` (README + tasks placeholder), REVIEW-CHECKLIST, kpis, changelog
 7. **`gates/_schema/gate.schema.json`** + **`gates/_template.md`** (per ADR-025 §1)
 
-### 🟧 Milestone C — In flight (planned Session 4 / 2026-05-14)
+### ✅ Done (Milestone C — PR #11..#16)
 
-Scope confirmed per Session 4 grill-decisions C-D1..C-D10. 5 stacked PRs + 1 audit:
+Scope delivered per Session 4 grill-decisions C-D1..C-D10. 5 stacked PRs + 1 audit (C.6):
 
-**C.1 — Policy shift + UI playbook revision (~250 LOC) — IN FLIGHT**
-- Session 4 GRILL entry (this §1+§2+§3) + P-DESIGN-1 policy added
-- `_meta/ui/CLAUDE-DESIGN-PROMPTS.md` → rename `UI-DESIGN-PLAYBOOK.md` + full rewrite (ui-ux-pro-max primacy + designer-as-DS-keeper mandate + Claude Design §7 fallback)
-- Cross-refs updated в `_meta/ui/component-inventory.md` + `_meta/ui/REVIEW-CHECKLIST.md`
+- **C.1 [#11](https://github.com/mrflxxxme/oriion/pull/11):** Policy shift + UI playbook revision — `_meta/ui/CLAUDE-DESIGN-PROMPTS.md` → renamed `UI-DESIGN-PLAYBOOK.md` (git rename + full rewrite per C-D9); Session 4 GRILL entry в §1+§2; P-DESIGN-1 policy в §3; §4 inventory expansion. 5 files / +376 / -232 LOC.
 
-**C.2 — 4 Light → Medium role upgrade (~1440 LOC)**
-- `.claude/agents/{designer,frontend-implementer,reviewer-frontend,evaluator}/` full-parity upgrade (~250 lines system-prompt + 3-5 workflows + 2-3 checklists each)
-- `reviewer-frontend` + `evaluator` get NEW `workflows.md` (currently missing)
-- `.claude/agents/_shared/pipeline-templates/{frontend-feature,full-stack-feature}.yaml` — design step description aligned с ui-ux-pro-max (C-D3)
+- **C.2 [#12](https://github.com/mrflxxxme/oriion/pull/12):** 4 Light→Medium role upgrade (designer / frontend-implementer / reviewer-frontend / evaluator) — full parity с backend-implementer baseline; 2 new `workflows.md` (reviewer-frontend + evaluator); 7 new checklists; pipeline templates `frontend-feature.yaml` + `full-stack-feature.yaml` updated с ui-ux-pro-max notes per P-DESIGN-1. 17 files / +2750 / -199 LOC.
 
-**C.3 — Phase B-level revision: 00.1 + 00.2 + 00.3 (~700 LOC)**
-- Hybrid B-level per C-D6: cross-link к DRAFT-READY contracts, inline phase-specific only, actual signatures + actual test snippets
+- **C.3 [#13](https://github.com/mrflxxxme/oriion/pull/13):** Phase B-level revision 00.1 (84→359 lines) + 00.2 (94→307) + 00.3 (103→418). Hybrid cross-link к DRAFT-READY contracts (iam/multitenancy/rbac) + phase-specific inline (docker-compose.dev.yml, FZ-152 audit, RLS pattern). 3 files / +1018 / -212 LOC.
 
-**C.4 — Phase B-level revision: 00.4 + 00.5 + 00.6 (~900 LOC)**
-- Same hybrid policy; 00.5 ui-spec minimal (task-progress SSE contract used by 00.7)
+- **C.4 [#14](https://github.com/mrflxxxme/oriion/pull/14):** Phase B-level revision 00.4 (126→442 lines) + 00.5 (120→441) + 00.6 (89→513). Hybrid cross-link к contracts + phase-specific inline (provider circuit breaker, Pydantic-AI delegation, staging compose + Prometheus). 3 files / +1330 / -266 LOC.
 
-**C.5 — NEW Phase 00.7 frontend skeleton (~400 LOC)**
-- Functional skeleton end-to-end (auth + cell + task-submit + SSE result) per C-D2
-- ∥ 00.6 после 00.5 per C-D8
-- `PHASES.md` + `README.md` dependency-graph updates
+- **C.5 [#15](https://github.com/mrflxxxme/oriion/pull/15):** NEW Phase 00.7 frontend skeleton (556 lines) — functional Wave-0 demo UI (register → login → cells → task-submit → SSE result), full ui-spec block 5 pages × 18 components. PHASES.md + README.md updated: 00.5 → {00.6, 00.7} parallel placement per C-D8. 3 files / +575 / -8 LOC.
 
-**C.6 — Post-merge consistency audit + fixes (~150 LOC fix budget)**
-- 3 parallel Explore agents (cross-PR consistency / policy compliance / strategic readiness)
-- Findings → Session 5 GRILL entry + §4 inventory move к ✅ Done
+- **C.6 [#16](https://github.com/mrflxxxme/oriion/pull/16):** Post-merge consistency audit — 3 parallel Explore agents (cross-PR consistency / policy compliance / strategic readiness). Findings → all false positives via source-of-truth cross-check. **Verdict: clean — no P0 findings.** Session 5 GRILL entry; §4 inventory move Milestone C к ✅ Done. 1 file / TBD LOC.
+
+**Cumulative Milestone C:** 32 файлов across 6 PRs / ~6050 LOC added. Foundation для Phase 00.1+ execution ready.
 
 ### 🟦 Milestone D — Deferred (post-Wave-0 retro)
 
