@@ -27,7 +27,7 @@
 | `TBD_OOO_BANK_ACCOUNT` | Расчётный счёт | OQ-02 | ⏳ | — |
 | `TBD_OOO_BANK_NAME` | Название банка | OQ-02 | ⏳ | — |
 | `TBD_OOO_BANK_BIK` | БИК банка | OQ-02 | ⏳ | — |
-| `TBD_OOO_CEO_NAME` | ФИО директора / ИП | OQ-02 / OQ-13 | ⏳ | — |
+| `TBD_OOO_CEO_NAME` | ФИО директора / ИП | OQ-02 | ⏳ | — |
 | `TBD_OOO_CEO_PHONE` | Контактный телефон директора | OQ-02 | ⏳ | — |
 | `TBD_TAX_REGIME` | УСН-6% / УСН-15% / ОСН | OQ-02 | ⏳ | — |
 
@@ -121,16 +121,18 @@
 | `TBD_SENTRY_DSN` | Sentry DSN для error tracking | ⏳ (self-hosted в Wave 0.6) |
 | `TBD_GRAFANA_ADMIN_PASSWORD` | Grafana admin password | ⏳ (в Lockbox) |
 
-## Команда (зависит от hire-status OQ-13/14/15)
+## Команда (solo founder + 11 AI per P-INIT-5)
+
+> Per [GRILL DECISION-3](./_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents) + [P-INIT-5](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable): team = 1 founder + 11 persistent Opus AI-агентов. Hire placeholders for Tech Lead / Senior Backend / Senior Frontend / DevOps closed как `🚫 N/A` (OQ-13/14/15 закрыты per P-INIT-5).
 
 | Token | Назначение | Status |
 |---|---|---|
-| `TBD_TECH_LEAD_NAME` | Имя Tech Lead | OQ-13 ⏳ |
-| `TBD_TECH_LEAD_EMAIL` | Email Tech Lead | OQ-13 ⏳ |
-| `TBD_TECH_LEAD_TELEGRAM` | Telegram Tech Lead | OQ-13 ⏳ |
-| `TBD_SENIOR_BACKEND_NAME` | Имя Senior Backend | OQ-14 ⏳ |
-| `TBD_SENIOR_FRONTEND_NAME` | Имя Senior Frontend (Wave 1+) | OQ-15 ⏳ |
-| `TBD_DEVOPS_NAME` | Имя DevOps (0.5 FTE) | OQ-14 ⏳ |
+| `TBD_TECH_LEAD_NAME` | Имя Tech Lead | 🚫 N/A: solo + AI per P-INIT-5 (OQ-13 closed) |
+| `TBD_TECH_LEAD_EMAIL` | Email Tech Lead | 🚫 N/A: solo + AI per P-INIT-5 (OQ-13 closed) |
+| `TBD_TECH_LEAD_TELEGRAM` | Telegram Tech Lead | 🚫 N/A: solo + AI per P-INIT-5 (OQ-13 closed) |
+| `TBD_SENIOR_BACKEND_NAME` | Имя Senior Backend | 🚫 N/A: backend-implementer AI role per P-INIT-5 (OQ-14 closed) |
+| `TBD_SENIOR_FRONTEND_NAME` | Имя Senior Frontend (Wave 1+) | 🚫 N/A: frontend-implementer AI role per P-INIT-5 (OQ-15 closed) |
+| `TBD_DEVOPS_NAME` | Имя DevOps (0.5 FTE) | 🚫 N/A: devops-implementer non-persistent AI role per P-INIT-5 (OQ-14 closed) |
 | `TBD_FOUNDER_NAME` | Имя founder | ✅ КИРИЛЛ У. (uklonskiy.k@gmail.com) |
 | `TBD_DESIGNER_CONTACT` | Контакт freelance pixel-artist (Wave 2) | OQ-25 ⏳ |
 | `TBD_LAWYER_CONTACT` | Юрист (Wave 1+) | OQ-03 ⏳ |

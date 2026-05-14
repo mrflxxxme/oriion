@@ -13,12 +13,14 @@
 
 ## Команда
 
-| # | Вопрос | Варианты | Дедлайн | Owner |
+> **Status: all 4 closed `N/A` per [P-INIT-5](./GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)** — team model = solo founder + 11 persistent Opus AI-agents (see [ADR-023](../decisions/ADR-023-ai-team-runtime.md), [DECISION-3](./GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents)). R-29 closed via founder vertical expertise.
+
+| # | Вопрос | Resolution | Closed-by | Owner |
 |---|---|---|---|---|
-| OQ-13 | Co-founder / CTO | Есть / нанимаем / соло | До Phase 00.1 | Founder |
-| OQ-14 | Senior Backend Python | Штат / ИП / контракт | До Phase 00.1 | Founder |
-| OQ-15 | Senior Frontend (Vite+React+TanStack+Canvas) | Хабр Карьера / Geekjob | До Phase 01.5 | Tech Lead |
-| OQ-16 | Бумажные правила (40ч неделя, отпуска) | Принять / не принимать | До найма N>2 | Founder |
+| OQ-13 | Co-founder / CTO | **соло** (founder = solo) | P-INIT-5 / Session 1 GRILL | Founder |
+| OQ-14 | Senior Backend Python | **N/A** (backend-implementer AI role) | P-INIT-5 / Session 1 GRILL | Founder |
+| OQ-15 | Senior Frontend (Vite+React+TanStack+Canvas) | **N/A** (frontend-implementer AI role) | P-INIT-5 / Session 1 GRILL | Founder |
+| OQ-16 | Бумажные правила (40ч неделя, отпуска) | **N/A** (no human hires Wave 0-3) | P-INIT-5 / Session 1 GRILL | Founder |
 
 ## Финансы
 
@@ -50,6 +52,7 @@
 
 ## Сводка по блокирующим Wave 0
 
-**Required до Phase 00.1:** OQ-13, OQ-14, OQ-17, OQ-18
+**Required до Phase 00.1:** OQ-17, OQ-18
 **Required до Phase 00.2:** OQ-04
-**Не блокирует Phase 00.1 (можно параллельно):** OQ-02, OQ-03, OQ-05, OQ-09, OQ-15, OQ-19, OQ-21, OQ-22, OQ-25, OQ-26
+**Не блокирует Phase 00.1 (можно параллельно):** OQ-02, OQ-03, OQ-05, OQ-09, OQ-19, OQ-21, OQ-22, OQ-25, OQ-26
+**Closed `N/A` per P-INIT-5 (solo + 11 AI model):** OQ-13, OQ-14, OQ-15, OQ-16

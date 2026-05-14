@@ -34,12 +34,17 @@
 
 ## Команда
 
-- 1× Tech Lead (штат) — архитектура, ADR-keeper, code review
-- 1× Senior Backend (Python) — runtime, gateway, billing
-- 1× Senior Frontend (Vite+React+Canvas) — UI, Pixel Department
-- 0.5× DevOps — инфра, CI/CD, observability
-- 1× Founder/Product — продукт, sales, hiring
-- AI-агенты разработки — [`agent-handbook/`](./agent-handbook/)
+Per [GRILL DECISION-3](./_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents) + [P-INIT-5](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable): **solo founder + 11 persistent Opus AI-агентов**.
+
+- **Founder** — продукт, архитектура, sales, final approver per [ADR-027](./decisions/ADR-027-git-pr-workflow.md) tier-table (всегда tier 3+ approval) per [P-INIT-3](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)
+- **11 persistent Opus AI-агентов** в [`.claude/agents/<role>/`](../.claude/agents/) per [ADR-023](./decisions/ADR-023-ai-team-runtime.md):
+  - **Cross-cutting (3):** architect / planner / memory-curator
+  - **Implementation (3):** designer / frontend-implementer / backend-implementer
+  - **Quality gates (5):** reviewer-frontend / reviewer-backend / reviewer-security / verifier / evaluator
+- **Non-persistent роли** (spawned per phase): vertical-prompt-author / mcp-builder / devops-implementer / golden-dataset-curator
+- **Pipeline runtime:** Claude Code Task tool + AgentDB memory per ADR-023 §6-7; handbook entry-point — [`agent-handbook/`](./agent-handbook/)
+
+R-29 закрыт через founder personal vertical expertise (см. [risks/REGISTER.md](./risks/REGISTER.md)).
 
 ## Текущая phase
 

@@ -30,7 +30,7 @@
 | Тесты | Vitest для unit, Playwright для e2e |
 | State | Zustand для глобального, TanStack Query для server state |
 | Стили | Tailwind v4 + shadcn/ui компоненты, без CSS-in-JS |
-| Структура | `app/` (Next.js App Router) + `components/` + `lib/` + `features/<bounded_context>/` |
+| Структура | `frontend/src/routes/` (TanStack file-based router) + `frontend/src/components/` + `frontend/src/lib/` + `frontend/src/features/<bounded_context>/` — per [ADR-001](../decisions/ADR-001-modular-monolith.md) (revised) |
 | Размер файла | < 400 строк |
 | Imports | Абсолютные через `@/*` |
 | Accessibility | ARIA labels обязательны, контраст AA минимум |
@@ -46,15 +46,11 @@
 | PR description | Шаблон: Goal / Changes / Tests / Checklist / Linked phase / ADR refs |
 | Размер PR | < 500 строк изменений (исключения для генерируемого кода, миграций) |
 
-## Tier-based review (ADR-015)
+## Tier-based review
 
-| Tier | Примеры | Auto-merge | AI-review | Human review |
-|---|---|---|---|---|
-| **1** | Docs, format, lint-fix, dependency bumps (patch) | ✅ если CI зелёный | — | — |
-| **2** | Tests, simple refactors, copy changes | ❌ | 1 AI | Опционально |
-| **3** | New endpoint, new component, новая фича | ❌ | 1 AI | 1 human |
-| **4** | Архитектурные изменения, security, migrations, billing | ❌ | 2 AI (code + security) | 2 human (senior+) |
-| **5** | Hotfix в prod | ❌ | 1 AI | 1 senior expedited |
+**Source of truth:** [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) — 5 tiers с AI reviewers (per ADR-023 11-role catalog) + Founder approval per [P-INIT-3](./GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) (Founder = always final approver tier 3+).
+
+Не дублируем tier-table инлайн. При изменении tier-policy — обновляется ADR-027, не этот файл.
 
 ## CI gates (обязательно для каждого PR)
 
