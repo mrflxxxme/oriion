@@ -77,6 +77,12 @@ tracks:
         retry:
           max_attempts: 2
           on_failure: escalate-to-architect
+        notes: |
+          Designer = DS-keeper (P-DESIGN-1). Primary UI-generation tool = `ui-ux-pro-max`
+          skill invoked via Skill tool inside Claude Code session. Claude Design = fallback
+          only для Wave 1+ high-fidelity polishing per UI-DESIGN-PLAYBOOK §7.
+          Drop-in mocks materialized в `frontend/src/features/<feature>/<ComponentName>.tsx`
+          consumable by frontend-implementer без re-design.
 
       - id: frontend-implement
         role: frontend-implementer
