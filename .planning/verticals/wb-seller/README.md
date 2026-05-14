@@ -78,11 +78,11 @@ milestone: B.3 (skeleton) → C Phase 00.5 (full materialization)
 
 ## References
 
-- [ADR-026](../../decisions/ADR-026-vertical-expertise.md) — vertical-expertise architecture
+- [ADR-026](../../decisions/ADR-026-vertical-expertise-pipeline.md) — vertical-expertise architecture
 - [DECISION-6](../../decisions/ADR-028-policies-registry.md#decision-6) — vertical Pattern D + founder = real expert WB-Seller
 - [R-29](../../decisions/ADR-028-policies-registry.md#p-init-5) — closed (founder expertise as Level-B foundation)
 - [DECISION-11](../../decisions/ADR-028-policies-registry.md#decision-11) — frontmatter contract
-- [Phase 00.5](../../roadmap.md) — Milestone C deliverable
+- [Phase 00.5](../../roadmap/wave-0-foundation/phases/00.5-pydantic-ai-wb-team.md) — Milestone C deliverable
 
 ## Status & next steps
 

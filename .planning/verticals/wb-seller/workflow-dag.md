@@ -116,13 +116,13 @@ Per [`contracts/tasks/events.yaml`](../../contracts/tasks/events.yaml):
 
 ## Cost budgeting
 
-Per `_shared/cost-budget.yaml`:
+Per `.claude/agents/_shared/cost-budget.yaml`:
 - Single task end-to-end: ≤ ₽5 LLM cost target (Wave 0 internal)
 - Wave 1+: ≤ 10% от paid price per action
 
 ## References
 
-- [ADR-026](../../decisions/ADR-026-vertical-expertise.md)
+- [ADR-026](../../decisions/ADR-026-vertical-expertise-pipeline.md)
 - [`contracts/agents/`](../../contracts/agents/) — agent_archetypes table
 - [`contracts/tasks/`](../../contracts/tasks/) — task lifecycle + events
-- [ADR-015](../../decisions/ADR-015-task-lifecycle.md) — stagnation auto-kill
+- [ADR-015](../../decisions/ADR-015-ai-dev-process.md) — stagnation auto-kill

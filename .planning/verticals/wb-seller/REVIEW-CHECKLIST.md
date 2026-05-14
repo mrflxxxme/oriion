@@ -34,7 +34,7 @@ applies-to: vertical-prompts/* (coordinator, researcher, listing_writer) + golde
 - [ ] Generated artifacts достижимы через WB Personal Cabinet UX OR API (Wave 1+)
 - [ ] No требования к продавцу делать невозможное (e.g., модифицировать WB-internal ranking logic)
 - [ ] Recommended actions feasible в текущем WB регуляторном field
-- [ ] Cost-per-task оценка сходится с `_shared/cost-budget.yaml` guardrails
+- [ ] Cost-per-task оценка сходится с `.claude/agents/_shared/cost-budget.yaml` guardrails
 - [ ] Memory-write patterns не создают PII-утечек
 
 ## 3. Quality gates
@@ -80,7 +80,7 @@ applies-to: vertical-prompts/* (coordinator, researcher, listing_writer) + golde
 
 ## References
 
-- [ADR-026 §3-4](../../decisions/ADR-026-vertical-expertise.md) — anti-hallucination protocol
+- [ADR-026 §3-4](../../decisions/ADR-026-vertical-expertise-pipeline.md) — anti-hallucination protocol
 - [DECISION-11](../../decisions/ADR-028-policies-registry.md#decision-11) — frontmatter contract
-- [P-INIT-4](../../roadmap.md) — review checkpoint phase
+- [P-INIT-4](../../decisions/ADR-028-policies-registry.md#p-init-4) — review checkpoint phase
 - [`golden-dataset/README.md`](./golden-dataset/README.md) — evaluator methodology

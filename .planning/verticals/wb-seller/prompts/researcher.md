@@ -52,7 +52,7 @@ tools_allowed:
 
 ## Tools
 
-Tool-slugs resolve через [`tools/registry.md`](../../tools/registry.md). Призывай только из allowlist выше — reviewer-backend проверит conformance перед approval per [P-AUDIT-3](../../../decisions/ADR-028-policies-registry.md#policies-canonical-home).
+Tool-slugs resolve через [`tools/registry.md`](../../../tools/registry.md). Призывай только из allowlist выше — reviewer-backend проверит conformance перед approval per [P-AUDIT-3](../../../decisions/ADR-028-policies-registry.md#policies-canonical-home).
 
 - `llm.chat_completions` — structured-output mode (JSON schema enforced) для category/competitor analysis
 - `llm.embeddings` — semantic comparison при поиске similar SKU patterns в cell memory

@@ -1,4 +1,4 @@
----
+﻿---
 title: "WB-Seller — Business KPIs"
 vertical_slug: wb-seller
 version: 0.1.0
@@ -59,7 +59,7 @@ Gate-thresholds per ADR-025 wave-3-to-4:
 
 ## Per-task economic targets
 
-- **Cost per task** (LLM + infra): documented в `_shared/cost-budget.yaml`. Goal: cost should be < 10% of price-charged-per-action
+- **Cost per task** (LLM + infra): documented в `.claude/agents/_shared/cost-budget.yaml`. Goal: cost should be < 10% of price-charged-per-action
 - **Time-to-completion**: median ≤ 90 seconds per task
 - **Token budget** Wave 0: ≤ 50K input + 8K output total per task (across coordinator + researcher + writer)
 
@@ -78,5 +78,5 @@ Gate-thresholds per ADR-025 wave-3-to-4:
 ## References
 
 - [ADR-025](../../decisions/ADR-025-wave-gates.md) — wave gate thresholds
-- [ADR-026](../../decisions/ADR-026-vertical-expertise.md) — vertical-expertise
-- [`_shared/cost-budget.yaml`](../../_shared/cost-budget.yaml) — per-task cost guardrails
+- [ADR-026](../../decisions/ADR-026-vertical-expertise-pipeline.md) — vertical-expertise
+- [P-AUDIT-4 cost-budget structure](../../decisions/ADR-028-policies-registry.md#p-audit-4) — per-task cost guardrails

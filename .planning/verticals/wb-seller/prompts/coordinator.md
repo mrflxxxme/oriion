@@ -182,8 +182,8 @@ Full DAG details — [`workflow-dag.md`](../workflow-dag.md). Below — coordina
 ## Failure handling
 
 - Если step fails 3 раза подряд → emit `oriion.tasks.task.failed.v1` + suggest альтернативу
-- Если cost-budget warning от `_shared/cost-budget.yaml` → switch к fallback model (`claude-sonnet-4-6`) или suspend non-critical steps
-- Stagnation > 30 минут → auto-kill (per [ADR-015](../../../decisions/ADR-015-task-lifecycle.md) §5)
+- Если cost-budget warning от `.claude/agents/_shared/cost-budget.yaml` → switch к fallback model (`claude-sonnet-4-6`) или suspend non-critical steps
+- Stagnation > 30 минут → auto-kill (per [ADR-015](../../../decisions/ADR-015-ai-dev-process.md) §5)
 - Если researcher returns «insufficient data» 2 раза → escalate к founder
 
 ## Versioning

@@ -27,5 +27,6 @@ Append-only журнал AI-агентских сессий. Одна запис
   - Path C: `.planning/README.md` сокращён до «what is this project» (~2 KB); `agent-handbook/00-START-HERE.md` переписан как полный workflow protocol с жёстким bootstrap-чек-листом (4 файла).
   - JOURNAL + HANDOFF созданы как обязательные exit-артефакты; Exit ritual добавлен в `agent-handbook/05-PR-WORKFLOW.md` как hard rule.
 - Decisions: см. plan `C:\Users\KUklonskiy\.claude\plans\fluffy-napping-sunrise.md` (branches A–E, 10 решений).
-- Next: Stage 7 (distill `_meta/GRILL-DECISIONS-ORIION.md` в ADR + ref-replace + slim PROJECT.md), затем закрытие OQ-17/18 → старт Phase 00.1.
-- Refs: PR будет создан после Stage 8 верификации; план fluffy-napping-sunrise.md.
+- Next: закрытие OQ-17 (фандинг) + OQ-18 (burn-budget) — founder decision → старт Phase 00.1 (Repo & CI/CD).
+- Follow-up в той же PR: зачищены pre-existing broken-ссылки в `verticals/wb-seller/*` (ADR-026 filename, ADR-015 filename, `roadmap.md`, depth-3 `tools/`, `_shared/cost-budget.yaml` пути).
+- Refs: PR [oriion#22](https://github.com/mrflxxxme/oriion/pull/22); план fluffy-napping-sunrise.md.

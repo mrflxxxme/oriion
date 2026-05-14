@@ -72,9 +72,9 @@ Bootstrap (4 файла):
 
 ## Known caveats
 
-- В нескольких файлах в `verticals/wb-seller/` остались pre-existing броken-ссылки (filename mismatches: `ADR-026-vertical-expertise.md` вместо `-pipeline.md`; `roadmap.md` вместо `roadmap/`; `_shared/cost-budget.yaml` — файла нет). Эти ссылки были broken и до move-операции, **не созданы** этой сессией. Подлежат починке в Stage 7 distill (часть из них также упоминают `DECISION-N` / `P-INIT-N`).
-- В файлах под `verticals/wb-seller/prompts/` и `golden-dataset/` есть `../../tools/` (depth-3 file, нужен `../../../tools/`) — pre-existing, починятся вместе с distill-проходом.
 - 3 worktree-директории (peaceful-hermann, optimistic-raman, zen-murdock) сняты с git worktree list, но папки на диске не удалены (Windows file-lock от watcher-процессов). Не git-state; можно удалить вручную позже.
+
+Все известные pre-existing broken-ссылки в `verticals/wb-seller/*` (ADR-026 filename mismatch, ADR-015 filename mismatch, `roadmap.md`, депth-3 `tools/` ссылки, `_shared/cost-budget.yaml` пути) починены в follow-up commit'е этой PR.
 
 ## Build / test state
 

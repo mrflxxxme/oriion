@@ -78,7 +78,7 @@ last_evaluated: null
 | Independence | Judge никогда не sees agent-being-evaluated identity (blind eval) |
 | Self-consistency | Каждая task evaluated 3x, median score taken |
 | Trigger | Manually invoked per archetype version-bump (не on every user-task) |
-| Cost | Documented в `_shared/cost-budget.yaml` — separate evaluator budget line |
+| Cost | Documented в `.claude/agents/_shared/cost-budget.yaml` — separate evaluator budget line |
 
 ## Rubric weighting principles
 
@@ -135,7 +135,7 @@ Probes материализованы в `adversarial/A###-<slug>.md`, marked `a
 
 ## References
 
-- [ADR-026 §3-4](../../../decisions/ADR-026-vertical-expertise.md) — anti-hallucination Level B/C
+- [ADR-026 §3-4](../../../decisions/ADR-026-vertical-expertise-pipeline.md) — anti-hallucination Level B/C
 - [DECISION-11](../../../decisions/ADR-028-policies-registry.md#decision-11) — frontmatter contract
-- [P-INIT-4](../../../roadmap.md) — review checkpoint phase
+- [P-INIT-4](../../../decisions/ADR-028-policies-registry.md#p-init-4) — review checkpoint phase
 - [`REVIEW-CHECKLIST.md`](../REVIEW-CHECKLIST.md) — founder gate

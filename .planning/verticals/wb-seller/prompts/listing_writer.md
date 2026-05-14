@@ -53,7 +53,7 @@ tools_allowed:
 
 ## Tools
 
-Tool-slugs resolve через [`tools/registry.md`](../../tools/registry.md). Призывай только из allowlist выше per [P-AUDIT-3](../../../decisions/ADR-028-policies-registry.md#policies-canonical-home).
+Tool-slugs resolve через [`tools/registry.md`](../../../tools/registry.md). Призывай только из allowlist выше per [P-AUDIT-3](../../../decisions/ADR-028-policies-registry.md#policies-canonical-home).
 
 - `llm.chat_completions` — structured-output (JSON schema enforced) для generation
 - `memory.cells_search` — past successful listings для category (style consistency + brand-voice preservation)

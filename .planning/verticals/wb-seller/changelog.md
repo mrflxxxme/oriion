@@ -10,7 +10,7 @@ last-updated: 2026-05-13
 
 ### Added
 
-- Vertical directory structure per [ADR-026 §2](../../decisions/ADR-026-vertical-expertise.md)
+- Vertical directory structure per [ADR-026 §2](../../decisions/ADR-026-vertical-expertise-pipeline.md)
 - `README.md` — ICP / JTBD / KPI overview
 - `domain-glossary.md` — 40+ WB-specific terms (артикул, FBO/FBS, выкуп, СПП, etc.)
 - `workflow-dag.md` — 3-agent coordinator/researcher/writer DAG for 5 primary tasks

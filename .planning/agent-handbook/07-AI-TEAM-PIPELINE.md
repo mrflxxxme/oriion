@@ -252,7 +252,7 @@ Per [ADR-027 §tier-table](../decisions/ADR-027-solo-ai-git-pr-workflow.md) + [P
 - **Pipeline overview + role catalog:** [ADR-023 §1-3](../decisions/ADR-023-ai-team-runtime.md)
 - **Bounded contexts + naming:** [ADR-024](../decisions/ADR-024-bounded-context-contracts.md)
 - **Gate format (Wave-N-to-N+1):** [ADR-025](../decisions/ADR-025-gate-format.md)
-- **Vertical-expertise (evaluator gate):** [ADR-026](../decisions/ADR-026-vertical-expertise.md)
+- **Vertical-expertise (evaluator gate):** [ADR-026](../decisions/ADR-026-vertical-expertise-pipeline.md)
 - **Git/PR/tier:** [ADR-027](../decisions/ADR-027-solo-ai-git-pr-workflow.md)
 - **Policies:** [P-INIT-1..5 + P-AUDIT-1..4 + P-DESIGN-1](../decisions/ADR-028-policies-registry.md#policies-canonical-home)
 - **Tool registry:** [`tools/registry.md`](../tools/registry.md)
