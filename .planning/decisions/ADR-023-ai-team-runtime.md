@@ -1,10 +1,10 @@
-# ADR-023: AI-team runtime — 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB bridge
+﻿# ADR-023: AI-team runtime — 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB bridge
 
 - **Status:** Accepted
 
 ## Decision
 
-Покрывает [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) DECISION-3 (team-модель), DECISION-5 (folder-структура), DECISION-8 (spawning runtime). Определяет «КТО эти агенты» и «КАК они запускаются». Тематики Git/PR workflow и operational hygiene вынесены в ADR-027 и ADR-015 (revised) соответственно.
+Покрывает [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) DECISION-3 (team-модель), DECISION-5 (folder-структура), DECISION-8 (spawning runtime). Определяет «КТО эти агенты» и «КАК они запускаются». Тематики Git/PR workflow и operational hygiene вынесены в ADR-027 и ADR-015 (revised) соответственно.
 
 ### 1. Команда — 1 founder + 11 persistent Opus-ролей
 
@@ -118,7 +118,7 @@ JIT-loading: каждый sub-файл загружается только ко�
 
 ## Links
 
-- [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) — DECISION-3, DECISION-5, DECISION-8
+- [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) — DECISION-3, DECISION-5, DECISION-8
 - [ADR-015](./ADR-015-ai-dev-process.md) — operational hygiene (isolation, observability, kill-switch)
 - [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) — Git/PR workflow + tier-table
 - [ADR-024](./ADR-024-bounded-context-contracts.md) — bounded-context contracts (используется ролями)

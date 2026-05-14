@@ -1,4 +1,4 @@
-# PLACEHOLDERS — Реестр TBD-значений
+﻿# PLACEHOLDERS — Реестр TBD-значений
 
 > **Single source of truth для всех TBD identifier'ов.** AI-агенты используют эти token'ы в коде/конфигах когда конкретное значение ещё не известно (зависит от founder-decision из open-questions).
 >
@@ -123,7 +123,7 @@
 
 ## Команда (solo founder + 11 AI per P-INIT-5)
 
-> Per [GRILL DECISION-3](./_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents) + [P-INIT-5](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable): team = 1 founder + 11 persistent Opus AI-агентов. Hire placeholders for Tech Lead / Senior Backend / Senior Frontend / DevOps closed как `🚫 N/A` (OQ-13/14/15 закрыты per P-INIT-5).
+> Per [GRILL DECISION-3](./decisions/ADR-028-policies-registry.md#decision-3) + [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home): team = 1 founder + 11 persistent Opus AI-агентов. Hire placeholders for Tech Lead / Senior Backend / Senior Frontend / DevOps closed как `🚫 N/A` (OQ-13/14/15 закрыты per P-INIT-5).
 
 | Token | Назначение | Status |
 |---|---|---|

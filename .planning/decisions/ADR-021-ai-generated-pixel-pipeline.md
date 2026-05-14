@@ -1,4 +1,4 @@
-# ADR-021: AI-generated pixel-asset pipeline + 5 vertical-героев hand-drawn
+﻿# ADR-021: AI-generated pixel-asset pipeline + 5 vertical-героев hand-drawn
 
 - **Status:** Accepted
 
@@ -34,7 +34,7 @@
 | `casual01-04` | Generic office | Менеджер, ассистент |
 | `service01-03` | Service/support | Customer support, sales |
 
-Эти ID являются FK к `agents.agent_archetypes.archetype_id` (см. [ADR-024](./ADR-024-bounded-context-contracts.md)). SemVer-версионирование archetype assets — через колонку `agents.agent_archetypes.version`, не через [ADR-010](./ADR-010-role-versioning.md) (которое scoped на prompt-файлы в `_meta/verticals/`). Прежние термины `ui_sprite_archetype` / `sprite-ID` deprecated.
+Эти ID являются FK к `agents.agent_archetypes.archetype_id` (см. [ADR-024](./ADR-024-bounded-context-contracts.md)). SemVer-версионирование archetype assets — через колонку `agents.agent_archetypes.version`, не через [ADR-010](./ADR-010-role-versioning.md) (которое scoped на prompt-файлы в `verticals/`). Прежние термины `ui_sprite_archetype` / `sprite-ID` deprecated.
 
 Generic naming (для reuse в разных team-presets), РФ-стилизация в окружении (см. ADR-004).
 

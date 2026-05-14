@@ -1,10 +1,10 @@
-# ADR-026: Vertical-expertise pipeline — D-pattern + anti-hallucination protocol
+﻿# ADR-026: Vertical-expertise pipeline — D-pattern + anti-hallucination protocol
 
 - **Status:** Accepted
 
 ## Decision
 
-Покрывает [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) DECISION-6 (vertical-expertise модель) + DECISION-11 (anti-hallucination protocol). Фиксирует, как создаётся, проверяется и поддерживается контент для каждой из 5 vertical-templates ([ADR-017](./ADR-017-vertical-templates.md)).
+Покрывает [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) DECISION-6 (vertical-expertise модель) + DECISION-11 (anti-hallucination protocol). Фиксирует, как создаётся, проверяется и поддерживается контент для каждой из 5 vertical-templates ([ADR-017](./ADR-017-vertical-templates.md)).
 
 ### 1. Pattern D — AI-baseline + founder edit + friends-loop
 
@@ -24,10 +24,10 @@ Pipeline для нового vertical-template:
 
 **Founder = real-world expert** по всем 5 vertical-templates (WB-Селлер, Marketing-Агентство, TG-Крейтор, ИП-Бухгалтерия, SMB-Sales), что закрывает [R-29](../risks/REGISTER.md#r-29-founder-vertical-expertise-gap). Vertical content validation gate — не «AI claim», а personal operating expertise + structured re-verification.
 
-### 2. `_meta/verticals/<slug>/` structure
+### 2. `verticals/<slug>/` structure
 
 ```
-.planning/_meta/verticals/<vertical-slug>/
+.planning/verticals/<vertical-slug>/
 ├── README.md              # ICP, JTBD, KPI, primary tasks
 ├── domain-glossary.md     # термины (FBO, FBS, артикул, выкуп, рейтинг, ...)
 ├── workflow-dag.md        # как агенты взаимодействуют (Coordinator → Researcher → Writer → ...)
@@ -45,7 +45,7 @@ Pipeline для нового vertical-template:
 └── changelog.md           # изменения промптов (regression-tracking)
 ```
 
-Wave 0 deliverable: `_meta/verticals/wb-seller/` полностью готов (~40-60 файлов) — единственная вертикаль на Phase 00.5. Wave 1+ — остальные четыре. Конкретная генерация — Milestone B (skeleton) + Phase 00.5 (наполнение для WB-Селлер).
+Wave 0 deliverable: `verticals/wb-seller/` полностью готов (~40-60 файлов) — единственная вертикаль на Phase 00.5. Wave 1+ — остальные четыре. Конкретная генерация — Milestone B (skeleton) + Phase 00.5 (наполнение для WB-Селлер).
 
 ### 3. Wave 0 anti-hallucination — Level B (founder=expert + evaluator gate)
 
@@ -97,7 +97,7 @@ next-verification: 2026-08-13        # +90 days
 
 ### 6. 90-day re-verification cycle
 
-memory-curator (см. ADR-023) ежедневно сканирует все `_meta/verticals/<slug>/prompts/<role>.md`:
+memory-curator (см. ADR-023) ежедневно сканирует все `verticals/<slug>/prompts/<role>.md`:
 - Если `next-verification - today < 7 days` → создать PR с заголовком `chore(vertical): re-verify <vertical>/<role>`.
 - PR прикрепляет: actual evaluator rerun results, diff'ы к `verified-sources` URLs, suggested updates.
 - Founder review → либо approve (bump `next-verification` на 90 дней), либо revise (back to draft).
@@ -113,7 +113,7 @@ memory-curator (см. ADR-023) ежедневно сканирует все `_me
 
 ## Links
 
-- [GRILL-DECISIONS-ORIION](../_meta/GRILL-DECISIONS-ORIION.md) — DECISION-6, DECISION-11
+- [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) — DECISION-6, DECISION-11
 - [ADR-010](./ADR-010-role-versioning.md) — SemVer policy для prompt-файлов (revised — scope clarification)
 - [ADR-017](./ADR-017-vertical-templates.md) — 5 vertical-templates как primary USP
 - [ADR-023](./ADR-023-ai-team-runtime.md) — evaluator + vertical-prompt-author + memory-curator

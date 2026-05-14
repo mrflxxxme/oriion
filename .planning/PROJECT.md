@@ -19,6 +19,8 @@
 - **Cloud:** Yandex Cloud ru-central-1 (Москва)
 - **Connectors:** MCP-протокол
 
+Полный стек — [`_meta/stack.md`](./_meta/stack.md).
+
 ## Roadmap (6 волн)
 
 | Wave | Срок | Цель | Метрика успеха |
@@ -30,21 +32,21 @@
 | **4. Масштаб + Partner** | 12 нед | K8s + Partner programme + dedicated namespace Pro | 2000 платящих, MRR ≥15 млн ₽ |
 | **5+. Enterprise & v2** | 12+ мес | On-premise + Firecracker + open marketplace | TBD |
 
-Детали — [`roadmap/INDEX.md`](./roadmap/INDEX.md).
+Детали — [`roadmap/README.md`](./roadmap/README.md).
 
 ## Команда
 
-Per [GRILL DECISION-3](./_meta/GRILL-DECISIONS-ORIION.md#decision-3-team-model--bc--pipeline-per-phase--11-persistent-opus-agents) + [P-INIT-5](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable): **solo founder + 11 persistent Opus AI-агентов**.
+Per [P-INIT-5](./decisions/ADR-028-policies-registry.md#p-init-5) + [ADR-023](./decisions/ADR-023-ai-team-runtime.md): **solo founder + 11 persistent Opus AI-агентов**.
 
-- **Founder** — продукт, архитектура, sales, final approver per [ADR-027](./decisions/ADR-027-git-pr-workflow.md) tier-table (всегда tier 3+ approval) per [P-INIT-3](./_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable)
+- **Founder** — продукт, архитектура, sales, final approver per [ADR-027](./decisions/ADR-027-solo-ai-git-pr-workflow.md) tier-table (всегда tier 3+ approval) per [P-INIT-3](./decisions/ADR-028-policies-registry.md#p-init-3).
 - **11 persistent Opus AI-агентов** в [`.claude/agents/<role>/`](../.claude/agents/) per [ADR-023](./decisions/ADR-023-ai-team-runtime.md):
   - **Cross-cutting (3):** architect / planner / memory-curator
   - **Implementation (3):** designer / frontend-implementer / backend-implementer
   - **Quality gates (5):** reviewer-frontend / reviewer-backend / reviewer-security / verifier / evaluator
-- **Non-persistent роли** (spawned per phase): vertical-prompt-author / mcp-builder / devops-implementer / golden-dataset-curator
-- **Pipeline runtime:** Claude Code Task tool + AgentDB memory per ADR-023 §6-7; handbook entry-point — [`agent-handbook/`](./agent-handbook/)
+- **Non-persistent роли** (spawned per phase): vertical-prompt-author / mcp-builder / devops-implementer / golden-dataset-curator.
+- **Pipeline runtime:** Claude Code Task tool + AgentDB memory per ADR-023 §6-7; handbook entry-point — [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md).
 
-R-29 закрыт через founder personal vertical expertise (см. [risks/REGISTER.md](./risks/REGISTER.md)).
+R-29 закрыт через founder personal vertical expertise (см. [`risks/REGISTER.md`](./risks/REGISTER.md)).
 
 ## Текущая phase
 
@@ -64,47 +66,10 @@ R-29 закрыт через founder personal vertical expertise (см. [risks/R
 
 Детали — [`decisions/ADR-017-vertical-templates.md`](./decisions/ADR-017-vertical-templates.md).
 
-## Ключевые ADR (полный каталог в [`decisions/`](./decisions/))
+## Архитектурные решения
 
-### Core
-- [ADR-001](./decisions/ADR-001-modular-monolith.md) — Модульный монолит (FastAPI + Vite+React, split)
-- [ADR-002](./decisions/ADR-002-llm-gateway.md) — LLM Multi-provider Gateway + BYOK
-- [ADR-003](./decisions/ADR-003-pydantic-ai-runtime.md) — Pydantic-AI runtime
-- [ADR-009](./decisions/ADR-009-multitenancy-3-levels.md) — Cell-first multitenancy
-- [ADR-013](./decisions/ADR-013-mcp-protocol.md) — MCP-протокол
+Полный каталог ADR — [`decisions/README.md`](./decisions/README.md). Политики и cross-ref решений — [`decisions/ADR-028-policies-registry.md`](./decisions/ADR-028-policies-registry.md).
 
-### UI / Pixel
-- [ADR-004](./decisions/ADR-004-pixel-department.md) — Pixel Department (Canvas 2D)
-- [ADR-016](./decisions/ADR-016-team-first-ux.md) — Team-first UX
-- [ADR-021](./decisions/ADR-021-ai-generated-pixel-pipeline.md) — AI-generated pixel pipeline
-- [ADR-022](./decisions/ADR-022-coordinator-wizard-llm-hybrid.md) — Coordinator hybrid
+## Тарифы
 
-### Backend / Runtime
-- [ADR-005](./decisions/ADR-005-pgvector-then-qdrant.md) — pgvector → Qdrant
-- [ADR-006](./decisions/ADR-006-gvisor-then-firecracker.md) — Pyodide → gVisor → Firecracker
-- [ADR-011](./decisions/ADR-011-memory-2-level.md) — Memory + PARA
-- [ADR-019](./decisions/ADR-019-vertical-autonomous-mode.md) — Vertical Autonomous Mode
-- [ADR-020](./decisions/ADR-020-pyodide-code-execution.md) — Pyodide WASM
-
-### LLM / Product
-- [ADR-018](./decisions/ADR-018-deepseek-primary-llm.md) — DeepSeek primary
-- [ADR-010](./decisions/ADR-010-role-versioning.md) — SemVer + Canary + Golden datasets
-- [ADR-017](./decisions/ADR-017-vertical-templates.md) — 5 vertical-templates
-- [ADR-008](./decisions/ADR-008-credits-billing.md) — Team-кредиты + ЮKassa
-- [ADR-012](./decisions/ADR-012-artifacts.md) — Yjs + S3
-
-### Security & Ops
-- [ADR-007](./decisions/ADR-007-authentik-then-keycloak.md) — Auth: Custom JWT → Logto → Keycloak
-- [ADR-014](./decisions/ADR-014-security.md) — RBAC + DLP + isolation
-- [ADR-015](./decisions/ADR-015-ai-dev-process.md) — AI-dev process
-
-## Tariffs (детали — [ADR-008](./decisions/ADR-008-credits-billing.md))
-
-| Тариф | ₽/мес | Cells | Agents | Included T-credits | BYOK ₽/мес |
-|---|---|---|---|---|---|
-| Trial | 0 (14 дней) | 1 | 3 | 500 | — |
-| Solo | 990 | 1 | 3 | 300 | 490 |
-| Команда 5 | 1900 | 3 | 5 | 600 | 890 |
-| Команда 15 | 4900 | 5 | 15 | 2000 | 2400 |
-| Команда 30 | 9900 | 10 | 30 | 5000 | 4900 |
-| Enterprise | Custom | Custom | Custom | Custom | + on-premise |
+См. [`decisions/ADR-008-credits-billing.md`](./decisions/ADR-008-credits-billing.md).

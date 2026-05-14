@@ -1,4 +1,4 @@
----
+﻿---
 gate: wave-0-to-1
 status: PENDING
 opened_at: 2026-05-13T12:00:00Z
@@ -29,7 +29,7 @@ deliverables:
     name: "Auth, multitenancy, RBAC, LLM-gateway, agents, tasks backend ready"
     status: pending
     owner: "backend-implementer"
-    notes: "Per _meta/contracts/<context>/ Wave 0 critical contexts"
+    notes: "Per contracts/<context>/ Wave 0 critical contexts"
   - id: D4
     name: "WB-Seller team golden-dataset (30 tasks) materialized and evaluator passes"
     status: pending

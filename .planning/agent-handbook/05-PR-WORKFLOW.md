@@ -1,4 +1,4 @@
-# 05-PR-WORKFLOW — Workflow для Pull Requests
+﻿# 05-PR-WORKFLOW — Workflow для Pull Requests
 
 > **Цель:** atomic PR, чёткий review-process, voiceless integration в main. Каждый PR — это понятная единица изменений с tests + docs.
 
@@ -10,9 +10,33 @@
 3. PR создан (используя template)
 4. CI gates pass (lint/types/tests/security/SBOM)
 5. Tier-based review (см. ниже)
-6. Merge в main (squash или rebase per repo policy)
-7. Phase-checkpoint updated в roadmap (mark done)
+6. **Exit ritual выполнен** (JOURNAL + HANDOFF — см. ниже)
+7. Merge в main (squash или rebase per repo policy)
+8. Phase-checkpoint updated в roadmap (mark done)
 ```
+
+## Exit ritual (обязателен перед merge)
+
+Перед merge каждой PR агент обязан выполнить три действия:
+
+1. **Append запись в [`../JOURNAL.md`](../JOURNAL.md)** (append-only журнал сессий). Шаблон:
+   ```
+   ## YYYY-MM-DD · <branch-slug> · @<agent>
+   - Scope: <одно предложение>
+   - Done: <ключевые изменения>
+   - Decisions: <ссылки на новые ADR, если есть>
+   - Next: <что должен сделать следующий agent>
+   - Refs: PR #NNN, phase ID
+   ```
+   При >300 строк журнал откатывается в `dev-log/archive/JOURNAL-YYYYQN.md` (создаётся при необходимости).
+
+2. **Перезаписать [`../HANDOFF.md`](../HANDOFF.md)** — снимок текущего state для следующей сессии (current phase, in-progress work, blockers, must-read files, рекомендации по next-action). История — через `git log HANDOFF.md`.
+
+3. **Упомянуть оба обновления в описании PR** (в разделе «Linked artifacts» или отдельной строкой «Exit ritual: JOURNAL +1, HANDOFF refreshed»).
+
+**Без выполнения Exit ritual review-gate блокирует merge.** Это hard rule — не soft-рекомендация. Reviewer проверяет наличие обновлений `JOURNAL.md` и `HANDOFF.md` в diff'е PR.
+
+**Исключение:** trivial auto-merge Tier 1 (typo fix, format-only) — можно пропустить, но рекомендуется записать одну строку в JOURNAL для трейсабилити.
 
 ## Branching
 
@@ -150,7 +174,7 @@ Per tier-based ruleset (см. conventions.md):
 
 ## Tier-based review
 
-**Source of truth:** [ADR-027 §tier-table](../decisions/ADR-027-git-pr-workflow.md) — 5 tiers с AI reviewers (per ADR-023 11-role catalog) + Founder approval per [P-INIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) (Founder = always final approver tier 3+).
+**Source of truth:** [ADR-027 §tier-table](../decisions/ADR-027-solo-ai-git-pr-workflow.md) — 5 tiers с AI reviewers (per ADR-023 11-role catalog) + Founder approval per [P-INIT-3](../decisions/ADR-028-policies-registry.md#policies-canonical-home) (Founder = always final approver tier 3+).
 
 Не дублируем tier-table инлайн. При изменении tier-policy → обновляется ADR-027.
 
