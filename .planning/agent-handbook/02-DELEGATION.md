@@ -18,7 +18,57 @@
 - Decision-making (subagent предлагает, ты решаешь)
 - Final approval / merge (это ваша ответственность)
 
-## Subagent catalog (curated для нашего проекта)
+## Internal AI-team — 11 persistent Opus roles (per ADR-023)
+
+> **Источник истины:** [`.claude/agents/<role>/`](../../.claude/agents/) — system-prompt + workflows + checklists + tools-allowlist + handoff-templates + memory per [ADR-023 §4](../decisions/ADR-023-ai-team-runtime.md).
+> Полный pipeline mechanics — [`07-AI-TEAM-PIPELINE.md`](./07-AI-TEAM-PIPELINE.md).
+
+### Cross-cutting (3)
+
+| Role | Mandate | Когда invoke |
+|---|---|---|
+| **architect** | Cross-phase invariants, ADR-keeper, escalation arbiter | Архитектурный grill, ADR creation, cross-boundary дилеммы |
+| **planner** | Phase-spec → executable PLAN.md (decomposes for pipeline) | Старт каждой phase, replanning после revisions |
+| **memory-curator** | Auto-update STATUS / PLACEHOLDERS / risks / gate-fills; archive rotation | Phase completion, gate-fills, 90-day re-verification (per P-INIT-4) |
+
+### Implementation (3)
+
+| Role | Mandate | Когда invoke |
+|---|---|---|
+| **designer** | DS-keeper; UI-mocks через `ui-ux-pro-max` skill (primary) или Claude Design (fallback Wave 1+) per [P-DESIGN-1](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) | Phase touches frontend; `ui-spec:` section needs realisation |
+| **frontend-implementer** | designer-output → React+TanStack+shadcn code | После designer handoff в frontend-feature / full-stack-feature pipelines |
+| **backend-implementer** | Phase-spec backend tasks → Python+FastAPI+Pydantic code | Backend tasks per `backend-feature.yaml` template |
+
+### Quality gates (5)
+
+| Role | Mandate | Когда invoke |
+|---|---|---|
+| **reviewer-frontend** | Tokens-compliance, accessibility AA, inventory-conformance | После frontend-implementer; parallel с reviewer-backend в full-stack pipeline |
+| **reviewer-backend** | Code/API/DB/migrations review + [P-AUDIT-3](../_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) tools-allowlist conformance | После backend-implementer; tier 3+ обязательно |
+| **reviewer-security** | OWASP / secrets / DLP / dependency-scan | Tier 4 (auth/billing/migrations), perимёр Wave 0→1 gate |
+| **verifier** | Runs acceptance criteria as tests, gates merge | Pre-merge tier 3+; phase gate verification |
+| **evaluator** | LLM-as-judge для vertical-prompts golden-dataset (≥75% pass + 100% adversarial per [DECISION-11](../_meta/GRILL-DECISIONS-ORIION.md#decision-11-anti-hallucination-для-vertical-prompt-author--bw0--cw1)) | Promote vertical-prompts `draft` → `reviewed`; Wave 0 internal demo gate |
+
+### Pipeline templates (3 YAML per ADR-023 §3)
+
+Reusable orchestration в [`.claude/agents/_shared/pipeline-templates/`](../../.claude/agents/_shared/pipeline-templates/):
+- `backend-feature.yaml` — planner → backend-implementer → (reviewer-backend ∥ reviewer-security) → verifier → memory-curator → Founder
+- `frontend-feature.yaml` — planner → designer (ui-ux-pro-max primary) → frontend-implementer → reviewer-frontend → verifier → memory-curator → Founder
+- `full-stack-feature.yaml` — parallel backend+frontend tracks с converge на verifier
+
+### Non-persistent (spawned per phase)
+
+`vertical-prompt-author`, `mcp-builder`, `devops-implementer`, `golden-dataset-curator` — spawned only when phase requires; не имеют persistent memory namespace.
+
+### Handoff contract
+
+CloudEvents 1.0 compatible per [`.claude/agents/_shared/handoff-schema.json`](../../.claude/agents/_shared/handoff-schema.json) (36 $defs per Session 3 B.5). Каждый role-to-role handoff = event emit с structured payload.
+
+---
+
+## External subagent catalog (non-persistent fallback)
+
+> Используются **редко** — только когда задача выходит за scope 11 internal AI-team roles ИЛИ для one-off research/audit-work, где external specialization даёт leverage. Default-выбор = internal role per pipeline template.
 
 ### Core development
 

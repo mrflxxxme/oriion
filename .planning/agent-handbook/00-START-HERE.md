@@ -83,11 +83,12 @@
 ## Topic shortcuts
 
 - 🚀 «Начинаю работу над phase X» → [`01-CONTEXT-LOADING.md`](./01-CONTEXT-LOADING.md) + соответствующий phase-spec
-- 🤝 «Нужно делегировать часть задачи» → [`02-DELEGATION.md`](./02-DELEGATION.md)
+- 🤝 «Нужно делегировать часть задачи» → [`02-DELEGATION.md`](./02-DELEGATION.md) (11 internal roles + external catalog)
 - ❓ «Не понимаю, какое решение правильное» → [`03-ESCALATION.md`](./03-ESCALATION.md)
 - 🎯 «Заканчиваю свою часть работы» → [`04-HANDOFF.md`](./04-HANDOFF.md)
 - 📝 «Готовлю PR» → [`05-PR-WORKFLOW.md`](./05-PR-WORKFLOW.md)
 - 🐛 «Что-то не работает» → [`06-DEBUGGING.md`](./06-DEBUGGING.md)
+- ⚙️ «Как работает AI-team pipeline (handoff / failure / cost / Founder approve)» → [`07-AI-TEAM-PIPELINE.md`](./07-AI-TEAM-PIPELINE.md) + [`.claude/AGENTS.md`](../../.claude/AGENTS.md) (entry-point)
 
 ## Anti-patterns (НЕ делай так)
 
