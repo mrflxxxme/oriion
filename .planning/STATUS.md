@@ -38,12 +38,12 @@ Per session-decision (11 развилок resolved):
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
-| OQ-17 | Funding-стратегия | Founder | Required до старта разработки |
-| OQ-18 | Burn-бюджет | Founder | Required до старта разработки |
-| OQ-04 | РКН-уведомление | Founder + юрист | Required до Phase 00.2 |
-| OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa |
+| OQ-04 | РКН-уведомление | Founder + юрист | Required до Phase 00.2 (НЕ блокирует Phase 00.1) |
+| OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa (Wave 1) |
 
-> **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model).
+> **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model). OQ-17 (funding) + OQ-18 (burn-budget) закрыты как `out-of-scope` per Session-2026-05-15 — founder-personal financial decisions не tracked в project docs (AI dev cost caps живут в `.claude/agents/_shared/cost-budget.yaml`).
+
+**Phase 00.1 ready to start:** no remaining hard-blockers within project scope.
 
 Полный список — [`OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md).
 

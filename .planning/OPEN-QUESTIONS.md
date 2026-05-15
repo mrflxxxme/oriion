@@ -22,12 +22,14 @@
 | OQ-15 | Senior Frontend (Vite+React+TanStack+Canvas) | **N/A** (frontend-implementer AI role) | P-INIT-5 / Session 1 GRILL | Founder |
 | OQ-16 | Бумажные правила (40ч неделя, отпуска) | **N/A** (no human hires Wave 0-3) | P-INIT-5 / Session 1 GRILL | Founder |
 
-## Финансы
+## Финансы (project-scope only)
+
+> **Founder-personal финансовые решения** (funding strategy, burn-budget, runway, personal capital allocation, pre-seed timing) — **out-of-scope project documentation** per Session-2026-05-15 decision. Founder самостоятельно управляет этими решениями вне репозитория. Project tracks ONLY: AI dev cost caps (см. `.claude/agents/_shared/cost-budget.yaml`) + billing infrastructure (ЮKassa).
 
 | # | Вопрос | Варианты | Дедлайн | Owner |
 |---|---|---|---|---|
-| OQ-17 | Funding-стратегия | Bootstrap / FFF / pre-seed / seed | До Phase 00.1 | Founder |
-| OQ-18 | Стартовый burn-бюджет | 6 / 9 / 12 / 18 мес runway | До Phase 00.1 | Founder |
+| OQ-17 | ~~Funding-стратегия~~ | **Closed `out-of-scope` per Session-2026-05-15** — founder-personal decision, не project concern | N/A | Founder |
+| OQ-18 | ~~Стартовый burn-бюджет~~ | **Closed `out-of-scope` per Session-2026-05-15** — founder-personal decision; project tracks AI dev caps only в cost-budget.yaml | N/A | Founder |
 | OQ-19 | ЮKassa открытие | Старт процедуры (5–10 дней) | До Wave 1 (billing) | Founder + бухгалтер |
 
 ## Брендинг
@@ -60,9 +62,10 @@
 
 ## Сводка по блокирующим Wave 0
 
-**Required до Phase 00.1:** OQ-17, OQ-18
-**Required до Phase 00.2:** OQ-04
-**Required до Phase 01.10 (Wave 1):** OQ-32, OQ-33 (Business API privacy + РКН-уведомление)
+**Required до Phase 00.1:** _(none — founder-personal финансовые блокеры удалены per Session-2026-05-15; Phase 00.1 готов к старту)_
+**Required до Phase 00.2:** OQ-04 (РКН-уведомление)
+**Required до Phase 01.10 (Wave 1):** OQ-32, OQ-33 (Business API privacy + РКН-уведомление update)
 **Required до Wave 1 launch:** OQ-22, OQ-31 (friends-list + horizontal-vs-B2B positioning)
 **Не блокирует Phase 00.1 (можно параллельно):** OQ-02, OQ-03, OQ-05, OQ-09, OQ-19, OQ-21, OQ-22, OQ-25, OQ-26
 **Closed `N/A` per P-INIT-5 (solo + 11 AI model):** OQ-13, OQ-14, OQ-15, OQ-16
+**Closed `out-of-scope` per Session-2026-05-15 (founder-personal finance):** OQ-17, OQ-18

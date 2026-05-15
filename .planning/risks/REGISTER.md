@@ -91,8 +91,8 @@ R-NN. <Название>
 ## R-12. Недостаток ресурсов / scope creep / отсутствие фокуса
 
 - **Severity:** critical · **Likelihood:** high · **Owner:** Founder
-- **Митигация:** must/nice разделение per волна; Build-Measure-Learn loops; ICE prioritization; runway-management с trigger-уровнями (12+/9-12/6-9/3-6/<3 мес); decision log + kill criteria; Quarterly Strategic Review; lightweight delivery
-- **Monitoring:** monthly burn / revenue / runway; weekly progress vs plan; quarterly review
+- **Митигация:** must/nice разделение per волна; Build-Measure-Learn loops; ICE prioritization; decision log + kill criteria; Quarterly Strategic Review; lightweight delivery. **Note:** financial runway / burn-management — founder-personal decision out-of-scope project docs per Session-2026-05-15; project tracks AI dev cost caps только в `.claude/agents/_shared/cost-budget.yaml`.
+- **Monitoring:** weekly progress vs plan; quarterly strategic review; AI dev cost telemetry per cost-budget.yaml
 
 ## R-14. Pixel-art bottleneck
 

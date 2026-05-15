@@ -58,8 +58,8 @@ Bootstrap (4 файла):
    - Найти и заменить все ссылки `GRILL-DECISIONS|P-INIT-N|DECISION-N` → ссылки на конкретные ADR (`grep -r` по `.planning/`).
    - Slim `PROJECT.md`: удалить ADR-list секции (Core/UI/Backend/LLM/Security) → одна строка-ссылка на `decisions/README.md`; удалить Tariffs-таблицу → ссылка на ADR-008.
    - Обновить `decisions/README.md` — добавить новые ADR в полный список.
-2. **Закрыть OQ-17 (funding) + OQ-18 (burn-budget)** — founder decision, вне scope agent-цикла.
-3. **Стартовать Phase 00.1 (Repo & CI/CD)** — после закрытия блокеров.
+2. ~~Закрыть OQ-17 + OQ-18~~ — **closed `out-of-scope` per Session-2026-05-15** (founder-personal finance не tracked в project docs; AI dev caps живут в `cost-budget.yaml`).
+3. **Стартовать Phase 00.1 (Repo & CI/CD)** — no remaining project-scope blockers per STATUS.md.
 
 ## Files modified this session
 

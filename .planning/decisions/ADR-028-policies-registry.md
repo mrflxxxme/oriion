@@ -53,9 +53,11 @@ Vertical prompts проходят: source-citation в payload → founder REVIEW
 
 **Operationalized by:** [ADR-023 §1-2](./ADR-023-ai-team-runtime.md).
 
-### P-AUDIT-1 — Economic numbers — only in `cost-budget.yaml`
+### P-AUDIT-1 — AI dev cost numbers — only in `cost-budget.yaml`
 
-Cost/burn/runway/cap-номера не дублируются в ADR, risks, phase-specs. Единственный канонический источник — `cost-budget.yaml`.
+**AI dev cost cap-номера** (per-task / per-day / per-month / Sonnet fallback thresholds) не дублируются в ADR, risks, phase-specs. Единственный канонический источник — `.claude/agents/_shared/cost-budget.yaml`.
+
+**Founder-personal financial decisions** (funding strategy / runway / burn / personal capital allocation / pre-seed timing) — **out-of-scope project docs** per Session-2026-05-15. Не хранятся, не tracked, не блокируют project workflow. **Closes:** OQ-17, OQ-18 (закрыты как `out-of-scope`).
 
 **Operationalized by:** [ADR-023 Consequences §2](./ADR-023-ai-team-runtime.md) (cross-ref без embed).
 
