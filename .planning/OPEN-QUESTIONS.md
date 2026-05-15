@@ -41,7 +41,15 @@
 | # | Вопрос | Варианты | Дедлайн | Owner |
 |---|---|---|---|---|
 | OQ-21 | Каналы лидогенерации | Telegram-канал founder / Хабр / vc.ru / paid ads | До Wave 2 | Founder + Marketing |
-| OQ-22 | Первые friends-клиенты per vertical | Список 30+ потенциальных | До Wave 1 launch | Founder |
+| OQ-22 | Первые friends-клиенты per template | Список 30+ потенциальных (mix: generic SMB для horizontal + 5–8 agencies + 5–8 TG-creators) | До Wave 1 launch | Founder |
+| OQ-31 | **Позиционирование personal-vs-SMB** | «Твои личные ассистенты» расширяет ТЗ — теперь preset позиционируется и для personal-users. Уточнить landing-copy + ICP-сегментацию для horizontal vs B2B vertical (Solo-тариф уже поддерживает personal-mode per ADR-008). | До Wave 1 launch (landing copy) | Founder + Marketing |
+
+## Telegram Business API (Wave 1)
+
+| # | Вопрос | Варианты | Дедлайн | Owner |
+|---|---|---|---|---|
+| OQ-32 | **Business API privacy & consent UX detail** | Точные wording-и consent-screen-а + 152-ФЗ disclosure + Privacy Policy updates для Telegram Business integration per [ADR-030](./decisions/ADR-030-telegram-business-api.md) | До старта Phase 01.10 | Founder + юрист |
+| OQ-33 | **РКН-уведомление update — Business API as additional ПДн processing** | Подача обновления через ГосУслуги — Bot читает private DM-content → новые категории ПДн | До старта Phase 01.10 | Founder + юрист |
 
 ## Wave 2+ assets
 
@@ -54,5 +62,7 @@
 
 **Required до Phase 00.1:** OQ-17, OQ-18
 **Required до Phase 00.2:** OQ-04
+**Required до Phase 01.10 (Wave 1):** OQ-32, OQ-33 (Business API privacy + РКН-уведомление)
+**Required до Wave 1 launch:** OQ-22, OQ-31 (friends-list + horizontal-vs-B2B positioning)
 **Не блокирует Phase 00.1 (можно параллельно):** OQ-02, OQ-03, OQ-05, OQ-09, OQ-19, OQ-21, OQ-22, OQ-25, OQ-26
 **Closed `N/A` per P-INIT-5 (solo + 11 AI model):** OQ-13, OQ-14, OQ-15, OQ-16

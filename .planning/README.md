@@ -1,8 +1,10 @@
 # TEAMLY_RU — Project Entry-Point
 
-**TEAMLY_RU** — облачная платформа AI-команд для СМБ-сегмента РФ. Пользователь нанимает готовую команду одним кликом (5 vertical-templates), Coordinator декомпозирует задачи, агенты выполняют, результат — в Pixel Department.
+**TEAMLY_RU** — облачная платформа AI-команд для СМБ + personal-users сегмента РФ. Пользователь стартует с универсальной команды («Твои личные ассистенты»), при необходимости расширяет до vertical-команды с domain-expertise. Coordinator декомпозирует задачи (или Master-Agent в vertical-режиме per [ADR-029](./decisions/ADR-029-master-agent-vertical-templates.md)), агенты выполняют, результат — в Pixel Department.
 
-**USP:** РФ-вертикальная экспертиза (WB-Селлер, Маркетинг-агентство, Telegram-крейтор, ИП-Бухгалтерия, СМБ-Sales).
+**USP (dual messaging, per [Session-2026-05-15](./JOURNAL.md)):**
+- **Entry:** универсальный horizontal preset `productivity-core` («Твои личные ассистенты»)
+- **Depth:** 5 РФ-vertical-templates (Маркетинг-агентство, Telegram-крейтор, WB-Селлер, ИП-Бухгалтерия, СМБ-Sales) с Master-Agent layer
 
 **Tech-стек (Wave 0):** Python + FastAPI + Pydantic-AI · Vite + React + TanStack · PostgreSQL + pgvector · Native Canvas 2D · DeepSeek/YandexGPT/GigaChat (BYOK) · Yandex Cloud. Версии — [`_meta/stack.md`](./_meta/stack.md).
 

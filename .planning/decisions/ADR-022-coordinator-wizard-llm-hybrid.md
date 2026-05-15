@@ -1,6 +1,20 @@
 # ADR-022: Coordinator — Wizard (free) + LLM (trial/paid) гибрид
 
-- **Status:** Accepted
+- **Status:** Accepted (revision: 2026-05-15 — Coordinator role formally bifurcated по horizontal vs vertical preset per [ADR-029](./ADR-029-master-agent-vertical-templates.md))
+
+## Hierarchy positioning (revision 2026-05-15)
+
+Coordinator role играет разную роль в horizontal vs vertical presets:
+
+| Preset тип | Wave | Top-level | Coordinator role |
+|---|---|---|---|
+| **Horizontal** (`productivity-core`) | W0+ | **Coordinator** (no Master) | Top-level orchestrator — принимает user-prompt напрямую, декомпозирует, делегирует specialists |
+| **Vertical** (5 templates) | W1+ | **Master-Agent** (per [ADR-029](./ADR-029-master-agent-vertical-templates.md)) | Operational COO — subordinate к Master, принимает strategic-context от Master, декомпозирует в operational sub-tasks, назначает specialists |
+
+В vertical-mode Coordinator API расширяется (phase 01.1 retrofit task):
+- Принимает `strategic_context: dict` поверх `user_prompt: str`
+- Возвращает `aggregated_result` в Master-friendly Pydantic format
+- Track `parent_task_id` chain через Master → Coordinator → specialists (depth +1 vs horizontal)
 
 ## Decision
 
@@ -11,12 +25,14 @@ Landing page `/`:
 - 3-step wizard (rule-based, NOT LLM):
 
 **Step 1: «Что хотите делать?»** (visual cards с emoji)
-- 🛒 Продавать на маркетплейсах (WB / Ozon)
-- 📈 Маркетинг и контент
-- ✍️ Развивать Telegram-канал / Курсы
-- 💼 Вести бухгалтерию ИП
-- 🎯 Работа с CRM / Продажи
-- 🎨 Что-то другое
+- 🧰 Универсальные задачи (исследования, аналитика, контент) → routes к `productivity-core` (horizontal, Wave 0+)
+- 📈 Маркетинг-агентство для клиентов → routes к `agency_marketing_ru` (vertical, Wave 1+)
+- ✍️ Развивать Telegram-канал / Курсы → routes к `telegram_creator` (vertical, Wave 1+)
+- 🛒 Продавать на маркетплейсах (WB / Ozon) → routes к `wb_seller_v1` (vertical, Wave 2+)
+- 💼 Вести бухгалтерию ИП → routes к `accounting_ip` (vertical, Wave 3+)
+- 🎯 Работа с CRM / Продажи → routes к `smb_sales_ru` (vertical, Wave 3+)
+
+⚠️ **Wizard Wave 0:** только `productivity-core` доступен. Карточки для verticals показываются с лейблом «Скоро» — клик регистрирует waitlist-entry. Полный routing активируется поэтапно (W1 → 2 vertical, W2 → +WB, W3 → +ИП-Бух +СМБ-Sales).
 
 **Step 2: «Размер вашей команды?»**
 - Один я
@@ -77,11 +93,22 @@ First artifact ready → wow-moment
 
 ### Vertical-aware Coordinator prompts
 
-**Coordinator — НЕ generic, а per-vertical fine-tuned:**
+**Coordinator — НЕ generic, а per-preset fine-tuned. Промпт-контракты хранятся в [`contracts/role-prompts/`](../contracts/role-prompts/):**
 
-**WB-Селлер Coordinator:**
+| Preset | Coordinator prompt | Top-level over Coordinator |
+|---|---|---|
+| `productivity-core` (W0+) | `contracts/role-prompts/coordinator.md` | — (top-level itself) |
+| `agency_marketing_ru` (W1+) | `contracts/role-prompts/masters/agency-marketing-ru-master.md` + Coordinator inherits | Master-Agent |
+| `telegram_creator` (W1+) | similar to above | Master-Agent |
+| `wb_seller_v1` (W2+) | similar | Master-Agent |
+| `accounting_ip` (W3+) | similar | Master-Agent |
+| `smb_sales_ru` (W3+) | similar | Master-Agent |
+
+В vertical-mode Coordinator-промпт остаётся короче (operational/tactical layer), а domain-knowledge и strategic-context живут в Master-Agent промпте per [ADR-029](./ADR-029-master-agent-vertical-templates.md).
+
+**WB-Селлер Coordinator (Wave 2+, subordinate к Master-Agent):**
 ```
-Ты — Координатор команды WB-Селлера. Помогаешь владельцу магазина на WildBerries.
+Ты — Координатор команды WB-Селлера. Operational COO под Master-Agent.
 
 Знаешь:
 - WB-терминологию (FBO, FBS, артикул, поставка, остатки, выкуп, рейтинг)
@@ -103,6 +130,21 @@ First artifact ready → wow-moment
 ```
 
 Аналогично для остальных 4 vertical-templates.
+
+**Productivity-core Coordinator (Wave 0+, top-level horizontal):**
+
+Полный prompt — в [`contracts/role-prompts/coordinator.md`](../contracts/role-prompts/coordinator.md). 9-секционная глубокая структура:
+1. Role identity & mission (top-level orchestrator для horizontal preset)
+2. Behavioral instructions (decomposition heuristics, delegation patterns)
+3. Output format contracts (Pydantic CoordinatorOutput per Phase 00.5)
+4. Quality standards
+5. Anti-patterns & guardrails
+6. Few-shot examples (включая demo-сценарий «Market & content brief»)
+7. Domain-aware vocabulary (project-management, RACI, RU-business)
+8. Handoff protocols (как parent для Researcher/Writer/Analyst)
+9. Self-evaluation prompts (cycle-detection, orphan-task check, cost-cap check)
+
+Status: Proposed first-draft (Phase 00.5). Hardening pass — Phase 01.1 retro.
 
 ### Implementation
 
@@ -151,5 +193,5 @@ class Coordinator:
 ## Links
 
 - Risks: [R-25](../risks/REGISTER.md), [R-26](../risks/REGISTER.md)
-- Phase: 00.5 (initial Coordinator), 01.9 (wizard onboarding), 02.5 (full onboarding with all templates)
-- Related ADRs: ADR-002 (LLM gateway), ADR-016 (team-first), ADR-017 (vertical-templates)
+- Phase: 00.5 (initial Coordinator for horizontal productivity-core), 01.1 (Coordinator retrofit for subordinate-to-Master mode per ADR-029), 01.9 (wizard onboarding routing horizontal vs vertical), 02.5 (full onboarding с WB-vertical + Mini App)
+- Related ADRs: ADR-002 (LLM gateway), ADR-016 (team-first), [ADR-017](./ADR-017-vertical-templates.md) (vertical-templates + horizontal anchor), [ADR-029](./ADR-029-master-agent-vertical-templates.md) (Master-Agent layer over Coordinator in verticals)

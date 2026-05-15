@@ -43,11 +43,13 @@
 
 | ID | Решение |
 |---|---|
-| [ADR-017](./ADR-017-vertical-templates.md) | 5 стартовых vertical-templates как primary USP |
+| [ADR-017](./ADR-017-vertical-templates.md) | Horizontal entry (`productivity-core`) + 5 vertical-templates как primary USP (revision 2026-05-15) |
+| [ADR-029](./ADR-029-master-agent-vertical-templates.md) | Master-Agent layer для vertical-templates (Wave 1+); horizontal preset остаётся однослойным |
 | [ADR-008](./ADR-008-credits-billing.md) | Team-кредиты + ЮKassa, Solo/Команды 5/15/30 + BYOK режим |
 | [ADR-012](./ADR-012-artifacts.md) | Артефакты: Yjs для документов, S3 для ассетов |
 | [ADR-025](./ADR-025-acceptance-gate-format.md) | Acceptance-gate format: Wave→Wave transitions с hard go/no-go thresholds |
 | [ADR-026](./ADR-026-vertical-expertise-pipeline.md) | Vertical-expertise pipeline: D-pattern + anti-hallucination protocol |
+| [ADR-030](./ADR-030-telegram-business-api.md) | Telegram Business API integration в telegram-mcp v0.2 (Wave 1); Mini App в W2, Stars billing в W3+ |
 
 ## Security & operations
 
