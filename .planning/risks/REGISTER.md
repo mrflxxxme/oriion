@@ -74,7 +74,13 @@ R-NN. <Название>
 - **Severity:** medium · **Likelihood:** high · **Owner:** Founder + Product
 - **Митигация:** Network effects через vertical-templates ([ADR-017](../decisions/ADR-017-vertical-templates.md)); data lock-in (workspace memory + Знания команды); 5 vertical-templates как primary moat; value-ladder vs price war; партнёрства; community/бренд — Wave 2; IP — выборочно
 - **Monitoring:** competitive intelligence quarterly; defensible metrics (vertical-templates × active cells × ritual usage)
-- **Kill criteria для стартовой вертикали:** WB-Селлер <10% trial к Wave 3; Маркетинг-агентство <8%; Telegram-крейтор <5%; ИП-Бухгалтерия <3%; СМБ-Sales <8%
+- **Kill criteria для template-каталога** (revised 2026-05-15 — wave-shifts учтены):
+  - `productivity-core` (horizontal, W0+): <30% trial users select horizontal vs vertical → проверка к Wave 2 public beta
+  - Marketing-agency (W1+): <8% trial к Wave 3
+  - Telegram-крейтор (W1+): <5% trial к Wave 3
+  - WB-Селлер (W2+): <10% trial к Wave 3
+  - ИП-Бухгалтерия (W3+): <3% trial к Wave 4
+  - СМБ-Sales (W3+): <8% trial к Wave 4
 
 ## R-11. Низкая активация и retention / churn
 
@@ -85,8 +91,8 @@ R-NN. <Название>
 ## R-12. Недостаток ресурсов / scope creep / отсутствие фокуса
 
 - **Severity:** critical · **Likelihood:** high · **Owner:** Founder
-- **Митигация:** must/nice разделение per волна; Build-Measure-Learn loops; ICE prioritization; runway-management с trigger-уровнями (12+/9-12/6-9/3-6/<3 мес); decision log + kill criteria; Quarterly Strategic Review; lightweight delivery
-- **Monitoring:** monthly burn / revenue / runway; weekly progress vs plan; quarterly review
+- **Митигация:** must/nice разделение per волна; Build-Measure-Learn loops; ICE prioritization; decision log + kill criteria; Quarterly Strategic Review; lightweight delivery. **Note:** financial runway / burn-management — founder-personal decision out-of-scope project docs per Session-2026-05-15; project tracks AI dev cost caps только в `.claude/agents/_shared/cost-budget.yaml`.
+- **Monitoring:** weekly progress vs plan; quarterly strategic review; AI dev cost telemetry per cost-budget.yaml
 
 ## R-14. Pixel-art bottleneck
 
@@ -185,17 +191,50 @@ R-NN. <Название>
 - **Trigger re-evaluation:** sustained burn above founder-defined threshold → escalate founder, переоценить fallback policy в `cost-budget.yaml`.
 - **Monitoring:** monthly spend per role, ratio Opus/Sonnet invocations, kill-switch trigger count
 
+## R-32. Master-Agent layer cost & latency overhead (W1+ vertical-templates)
+
+- **Opened:** 2026-05-15 (per Session-2026-05-15 + [ADR-029](../decisions/ADR-029-master-agent-vertical-templates.md))
+- **Severity:** medium · **Likelihood:** medium · **Owner:** Tech Lead + Founder
+- **Scope:** Master-Agent layer добавляет +1 LLM-call per vertical task (~+15–20% tokens, +1–3 sec latency) над horizontal baseline. Cascading scenarios: Master → Coordinator → 3 parallel specialists может accidentally trigger >50 T-credit budget cap. Affects TTFV для vertical-trials (Wave 2 ≤3 min target).
+- **Митигация:** [ADR-029](../decisions/ADR-029-master-agent-vertical-templates.md) §«Cost & latency budget»: per-task budget cap 50 T-credits applies к Master+children-chain совокупно (не per agent); Wave 1 phase 01.1 acceptance criteria explicitly verify это; Master-prompts оптимизированы под short reasoning chains (strategic plan ≤500 tokens); fallback на horizontal preset при `master_failed` event.
+- **Monitoring:** p95 latency per vertical task vs horizontal baseline; Master-Agent token-cost rollup; budget-cap-trigger rate
+
+## R-33. Telegram Business API privacy / 152-ФЗ exposure
+
+- **Opened:** 2026-05-15 (per Session-2026-05-15 + [ADR-030](../decisions/ADR-030-telegram-business-api.md))
+- **Severity:** critical · **Likelihood:** low (с mitigation) → medium (без) · **Owner:** Founder + Security + юрист
+- **Scope:** Bot читает private DM-переписку пользователя через Telegram Business API (W1 phase 01.10). Утечка / unauthorized retention / leakage в LLM-логи = критический репутационный hit + потенциальная 152-ФЗ нарушение + РКН-санкции.
+- **Митигация:** [ADR-030](../decisions/ADR-030-telegram-business-api.md): explicit consent UX (3-checkbox flow + opt-in для auto-reply/reactions); ephemeral retention ≤7 days default; encryption at rest per cell-key (`pgcrypto`); 100% audit log с consent_id; РКН-уведомление update (OQ-33); 152-ФЗ disclosure в Privacy Policy (OQ-32); revoke flow ≤30s.
+- **Monitoring:** consent-flow completion rate, retention-purge job success rate, audit-log integrity check daily, DLP-trigger rate on DM content
+
+## R-34. LLM-only Analyst hallucination (Wave 0 horizontal preset)
+
+- **Opened:** 2026-05-15 (per Session-2026-05-15 — Wave 0 Analyst без Pyodide)
+- **Severity:** medium · **Likelihood:** medium · **Owner:** Tech Lead
+- **Scope:** Analyst роль в Wave 0 работает LLM-only без Pyodide code-execution. Numerical estimates (TAM/SAM, KPI projections, ROI) — pure reasoning без вычислений. Risk: hallucinated точечные числа без supporting math; пользователь принимает решения на основе фальшивых данных.
+- **Митигация:** [Phase 00.5](../roadmap/wave-0-foundation/phases/00.5-pydantic-ai-productivity-team.md) AC + [`contracts/role-prompts/analyst.md`](../contracts/role-prompts/analyst.md) explicit requirements:
+  - Все numerical claims с явными assumption-lists
+  - Range estimates вместо точечных («TAM 50–80M USD», не «TAM 67M»)
+  - Verifiable sources для всех ключевых чисел
+  - Capability-gap callouts с пометкой «Phase 02.X (Pyodide) бы дал точный расчёт»
+  - Self-eval checklist enforced в prompt
+  - Wave 2 closure: Pyodide добавляется per [ADR-020](../decisions/ADR-020-pyodide-code-execution.md); R-34 closeable когда Analyst migrated на Pyodide для quantitative tasks
+- **Monitoring:** ad-hoc audit demo-runs на наличие assumption-lists; user feedback log на «Analyst дал неверное число» категории
+
 ---
 
 ## Стратегические ставки (с kill criteria)
 
 | Ставка | Continue criteria | Kill criteria | Срок |
 |---|---|---|---|
-| WB-Селлер team как Vertical-1 | 40%+ trial из WB-вертикали к Wave 2 | <10% trial к Wave 3 | 4 мес |
-| Маркетинг-агентство как Vertical-2 | 20%+ trial к Wave 2 | <8% к Wave 3 | 6 мес |
-| Telegram-крейтор как Vertical-3 | 15%+ trial к Wave 2 | <5% к Wave 3 | 6 мес |
-| ИП-Бухгалтерия как Vertical-4 | 10%+ trial к Wave 3 | <3% к Wave 4 | 9 мес |
-| СМБ-Sales как Vertical-5 | 15%+ trial к Wave 3 | <8% к Wave 4 | 9 мес |
+| **`productivity-core` (horizontal) как Wave 0 entry-USP** | ≥30% trial-юзеров завершают «Market & content brief» сценарий + ≥30% выбирают horizontal над vertical в каталоге к Wave 2 | <15% completion / <10% horizontal-share к Wave 2 | 4 мес после Wave 0 |
+| Маркетинг-агентство как Vertical-1 (W1 anchor) | 25%+ trial к Wave 2 | <8% к Wave 3 | 6 мес |
+| Telegram-крейтор как Vertical-2 (W1) | 20%+ trial к Wave 2 (boosted by Business API DM-management) | <5% к Wave 3 | 6 мес |
+| WB-Селлер как Vertical-3 (W2 anchor) | 25%+ trial из WB-вертикали к Wave 3 | <10% trial к Wave 3 | 4 мес после Wave 2 |
+| ИП-Бухгалтерия как Vertical-4 (W3) | 10%+ trial к Wave 4 | <3% к Wave 4 | 9 мес |
+| СМБ-Sales как Vertical-5 (W3) | 15%+ trial к Wave 4 | <8% к Wave 4 | 9 мес |
+| **Master-Agent layer как vertical-pricing-rationale** | Vertical-tier conversion rate ≥1.5× horizontal-tier; cost-overhead absorbed by margin | Vertical-tier converts at same rate as horizontal (no premium-rationale) | 4 мес после Wave 1 |
+| **Telegram Business API как Wave 1 hook** | ≥30% Wave 1 friends активируют Business-bot; ≥50% retention week-4 | <10% activation / privacy incident | 4 мес после Wave 1 |
 | DeepSeek как primary LLM | Маржа платформы >40% на DeepSeek-задачах | <20% маржи; политические блокеры | 6 мес |
 | MCP-протокол как connector layer | 10+ MCP-servers активных к Wave 3 | <5 к Wave 3 | 8 мес |
 | Pixel Department как secondary USP | NPS upticks от Pixel mentions | NPS <30 + 0 упоминаний в отзывах | 4 мес после Wave 2 |

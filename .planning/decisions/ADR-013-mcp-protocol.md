@@ -65,11 +65,11 @@ Cell (workspace)
 
 | Волна | MCP-серверы |
 |---|---|
-| **Wave 0** | MCP infrastructure (client + auth + Lockbox); built-in web_search |
-| **Wave 1** | + Telegram-mcp, Yandex-Disk-mcp, IMAP-SMTP-mcp (наши) |
-| **Wave 2** | + Bitrix24-mcp, amoCRM-mcp, WB-Партнёры-mcp, Ozon-Seller-mcp (наши, для 5 vertical-templates) + GitHub-mcp, Notion-mcp, Slack-mcp (community-based) |
-| **Wave 3** | + 1C-REST-mcp, Эльба-mcp, Контур-Экстерн-mcp, Тинькофф-Бизнес-mcp; расширение community-catalog до 20+ |
-| **Wave 4** | + Custom MCP server addition UI; community marketplace draft |
+| **Wave 0** | MCP infrastructure (client + auth + Lockbox); built-in web_search + read_url |
+| **Wave 1** | + Telegram-mcp **v0.2 (Read + post + Business API per [ADR-030](./ADR-030-telegram-business-api.md))**, Yandex-Disk-mcp, IMAP-SMTP-mcp (наши) |
+| **Wave 2** | + WB-Партнёры-mcp (graduated из W0 plan), Bitrix24-mcp, amoCRM-mcp (наши) + GitHub-mcp, Notion-mcp, Slack-mcp (community-based) + **Telegram Mini App контейнер** |
+| **Wave 3** | + Ozon-Seller-mcp (для ИП-Бух / СМБ-Sales verticals — see [ADR-017](./ADR-017-vertical-templates.md) re-ordering), 1C-REST-mcp, Эльба-mcp, Контур-Экстерн-mcp, Тинькофф-Бизнес-mcp; расширение community-catalog до 20+ |
+| **Wave 4** | + Custom MCP server addition UI; community marketplace draft; Telegram Stars billing (parallel к ЮKassa per [ADR-030](./ADR-030-telegram-business-api.md)) |
 | **Wave 5+** | + Open marketplace MCP-серверов с UGC |
 
 ## Maintenance
@@ -81,5 +81,5 @@ Cell (workspace)
 ## Links
 
 - Risks: [R-05](../risks/REGISTER.md), [R-18](../risks/REGISTER.md)
-- Phase: 00.4 (MCP infrastructure), 01.x (3 первых MCP), 02.x (vertical MCP), 03.x (расширение)
-- Related ADRs: ADR-003 (Pydantic-AI), ADR-014 (capability sandboxing), ADR-017 (vertical-templates используют MCP)
+- Phase: 00.4 (MCP infrastructure), 01.10 (3 первых MCP — telegram-mcp v0.2 включает Business API), 02.x (vertical MCP + Mini App), 03.x (расширение)
+- Related ADRs: ADR-003 (Pydantic-AI), ADR-014 (capability sandboxing), ADR-017 (vertical-templates используют MCP), [ADR-030](./ADR-030-telegram-business-api.md) (Telegram Business API integration detail)

@@ -6,7 +6,7 @@
 | [00.2](./phases/00.2-custom-jwt-auth.md) | custom-jwt-auth | 2 дня | 00.1, OQ-04 (РКН) | Tech Lead |
 | [00.3](./phases/00.3-db-rls-multitenancy.md) | db-rls-cell | 5 дней | 00.1 | Senior Backend |
 | [00.4](./phases/00.4-llm-gateway.md) | llm-gateway | 5 дней | 00.1 | Tech Lead |
-| [00.5](./phases/00.5-pydantic-ai-wb-team.md) | pydantic-ai-wb-team | 5 дней | 00.3, 00.4 | Senior Backend |
+| [00.5](./phases/00.5-pydantic-ai-productivity-team.md) | pydantic-ai-productivity-team | 5 дней | 00.3, 00.4 | Senior Backend |
 | [00.6](./phases/00.6-deploy-observability.md) | deploy-observability | 3 дня | 00.1, 00.5 | DevOps |
 | [00.7](./phases/00.7-frontend-skeleton.md) | frontend-skeleton | 4 дня | 00.1, 00.2, 00.5 | Senior Frontend |
 
@@ -16,11 +16,13 @@
 00.1 (repo)
  ├─→ 00.2 (custom JWT auth)
  ├─→ 00.3 (db + cell-aware RLS)  ─┐
- └─→ 00.4 (llm gateway + MCP)  ──┴─→ 00.5 (Pydantic-AI + WB team)
+ └─→ 00.4 (llm gateway + MCP)  ──┴─→ 00.5 (Pydantic-AI + productivity-core horizontal team)
                                        │
                                        ├─→ 00.6 (deploy + observability)  ∥ parallel
                                        └─→ 00.7 (frontend skeleton)
 ```
+
+> **Revision 2026-05-15:** Phase 00.5 anchor changed: WB-Селлер vertical team → horizontal `productivity-core` team (Coordinator + Researcher + Writer + Analyst). Demo-сценарий — «Market & content brief для нового продукта». WB-Селлер team-preset переезжает в Wave 2. See [ADR-017](../../decisions/ADR-017-vertical-templates.md) revision.
 
 ## Параллельность
 
@@ -41,8 +43,11 @@
 ## Acceptance gate to Wave 1
 
 - [ ] Все 7 phases в статусе Done
-- [ ] Internal demo (WB-Селлер team end-to-end через UI) прошёл
+- [ ] Internal demo (productivity-core horizontal team end-to-end через UI на сценарии «Market & content brief») прошёл
+- [ ] 3 артефакта demo-run-а соответствуют acceptance criteria (brief.md ≥1500w, competitive-matrix.md ≥5×4, content-plan.md 10 posts)
+- [ ] End-to-end demo latency ≤120 sec p95, cost ≤30¢
 - [ ] Retro проведено
+- [ ] Role-prompts hardening backlog заполнен (для Phase 01.1)
 - [ ] Risks register обновлён
 - [ ] Wave 1 README пересмотрен
 

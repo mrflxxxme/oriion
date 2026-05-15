@@ -142,19 +142,18 @@
 
 | Token | Назначение | Status |
 |---|---|---|
-| `TBD_FRIENDS_LIST_WB_SELLERS` | Список friends WB-Селлеров для pre-alpha Wave 1 | ⏳ |
-| `TBD_FRIENDS_LIST_MARKETING_AGENCIES` | Список friends маркетинг-агентств | ⏳ |
-| `TBD_FRIENDS_LIST_TG_CREATORS` | Список friends Telegram-крейторов | ⏳ |
-| `TBD_FRIENDS_LIST_ACCOUNTING` | Список friends ИП-Бухгалтерии | ⏳ |
-| `TBD_FRIENDS_LIST_SMB_SALES` | Список friends СМБ-Sales | ⏳ |
+| `TBD_FRIENDS_LIST_GENERIC_SMB` | Список friends generic SMB / personal-users для pre-alpha Wave 1 (horizontal `productivity-core` entry) | ⏳ |
+| `TBD_FRIENDS_LIST_MARKETING_AGENCIES` | Список friends маркетинг-агентств — vertical Wave 1 | ⏳ |
+| `TBD_FRIENDS_LIST_TG_CREATORS` | Список friends Telegram-крейторов — vertical Wave 1 | ⏳ |
+| `TBD_FRIENDS_LIST_WB_SELLERS` | Список friends WB-Селлеров — vertical **Wave 2** (graduated W0→W2 per Session-2026-05-15) | ⏳ |
+| `TBD_FRIENDS_LIST_ACCOUNTING` | Список friends ИП-Бухгалтерии — vertical **Wave 3** (graduated W2→W3) | ⏳ |
+| `TBD_FRIENDS_LIST_SMB_SALES` | Список friends СМБ-Sales — vertical **Wave 3** (graduated W2→W3) | ⏳ |
 
-## Финансы (OQ-17/18)
+## Финансы (project-scope only)
 
-| Token | Назначение | Status |
-|---|---|---|
-| `TBD_BUDGET_MONTHLY` | Стартовый месячный burn (₽) | OQ-18 ⏳ |
-| `TBD_RUNWAY_MONTHS` | Runway в месяцах | OQ-17/18 ⏳ |
-| `TBD_FUNDING_SOURCE` | Bootstrap / FFF / Pre-seed / Seed | OQ-17 ⏳ |
+> Founder-personal финансовые placeholders (burn / runway / funding source) **удалены per Session-2026-05-15** — out-of-scope project docs. AI dev cost caps живут в `.claude/agents/_shared/cost-budget.yaml` (не placeholder, конкретные значения). Любые финансовые tokens в этом разделе должны касаться billing infrastructure / pricing tariffs / contractual amounts (project-facing), не personal capital management.
+
+_(empty — добавлять project-facing financial tokens по мере появления Wave 1+ billing decisions)_
 
 ## Юр.документы (зависят от OQ-03, OQ-04)
 

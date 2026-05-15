@@ -1,16 +1,26 @@
 ﻿---
 title: "Vertical: WB-Seller (Wildberries Marketplace Seller)"
 vertical_slug: wb-seller
-status: Wave 0 draft (founder = real-world expert per R-29)
-last-updated: 2026-05-13
+status: deferred to Wave 2 (per Session-2026-05-15 reorg)
+last-updated: 2026-05-15
 version: 0.1.0
-milestone: B.3 (skeleton) → C Phase 00.5 (full materialization)
+milestone: legacy W0-targeting → Wave 2 alignment pending
 ---
 
 # Vertical: WB-Seller
 
-> **Контекст:** Founder = real-world expert WB-Seller (per R-29 closure rationale в Milestone A).
-> Tone in WB-Seller контенте — knowledgeable insider, не «AI claim». Используем точную WB-терминологию.
+> **⚠️ Status revision 2026-05-15:** WB-Seller vertical-template moved from Wave 0 anchor → Wave 2 per [ADR-017 revision](../../decisions/ADR-017-vertical-templates.md) + Session-2026-05-15.
+>
+> **Architectural alignment pending Wave 2 Phase 02.X (WB-vertical materialization).** Все материалы в этой директории — prompts/, golden-dataset/, kpis.md, workflow-dag.md — построены под прежнюю архитектуру (Coordinator-only, без Master-Agent). При materialize в Wave 2 потребуется:
+> 1. **Добавить Master-Agent prompt** (`prompts/master.md`) per [ADR-029](../../decisions/ADR-029-master-agent-vertical-templates.md) — WB-Селлер CEO с domain-knowledge keeper-responsibilities.
+> 2. **Адаптировать существующий `prompts/coordinator.md`** под subordinate-COO-mode (принимает strategic_context от Master).
+> 3. **Реструктурировать workflow-dag.md** под layered orchestration (Master → Coordinator → specialists).
+> 4. **Переосмыслить golden-dataset** — часть задач (research / qa / review) теперь обрабатывает horizontal Researcher/Writer (reused), часть — WB-specific Listing Writer + Master.
+> 5. **Привести prompts к 9-секционной structure per `contracts/role-prompts/` pattern** для consistency с horizontal preset (Wave 0) и future verticals (W1).
+>
+> Текущее содержимое сохраняется как valuable prep-work (30 golden-dataset tasks + 5 adversarial probes, domain glossary, KPI thresholds, REVIEW-CHECKLIST) — все они переиспользуются после alignment.
+>
+> **Контекст:** Founder = real-world expert WB-Seller (per R-29 closure rationale в Milestone A). Tone in WB-Seller контенте — knowledgeable insider, не «AI claim». Используем точную WB-терминологию.
 
 ## ICP (Ideal Customer Profile)
 
@@ -82,12 +92,12 @@ milestone: B.3 (skeleton) → C Phase 00.5 (full materialization)
 - [DECISION-6](../../decisions/ADR-028-policies-registry.md#decision-6) — vertical Pattern D + founder = real expert WB-Seller
 - [R-29](../../decisions/ADR-028-policies-registry.md#p-init-5) — closed (founder expertise as Level-B foundation)
 - [DECISION-11](../../decisions/ADR-028-policies-registry.md#decision-11) — frontmatter contract
-- [Phase 00.5](../../roadmap/wave-0-foundation/phases/00.5-pydantic-ai-wb-team.md) — Milestone C deliverable
+- ~~Phase 00.5~~ → replaced by Wave 2 Phase 02.X (TBD) — Wave 2 WB-vertical-build phase per Session-2026-05-15. Wave 0 Phase 00.5 теперь = [`pydantic-ai-productivity-team`](../../roadmap/wave-0-foundation/phases/00.5-pydantic-ai-productivity-team.md) (horizontal preset).
 
 ## Status & next steps
 
 - ✅ Skeleton structure (Milestone B.3)
-- ⏳ Full materialization of `prompts/researcher.md` + `prompts/listing_writer.md` — Milestone C Phase 00.5
-- ⏳ 30 golden-dataset tasks — Milestone C Phase 00.5
-- ⏳ Founder review checkpoint — Milestone C Phase 00.5
-- ⏳ Friend-loop Wave 1 — после Wave 0 internal demo
+- ✅ 30 golden-dataset tasks + 5 adversarial probes (preserved as Wave 2 prep)
+- ✅ Existing prompts (coordinator / listing_writer / researcher) preserved as legacy W0-targeting materials
+- ⏳ **Wave 2 alignment pending** per ADR-029 (Master-Agent layer) — Phase 02.X (TBD при старте Wave 2)
+- ⏳ Public-beta ship — Wave 2 acceptance gate

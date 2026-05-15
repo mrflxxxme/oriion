@@ -1,10 +1,12 @@
 # TEAMLY_RU — Project Overview
 
-> Облачная платформа AI-команд для СМБ-сегмента РФ. Пользователь нанимает готовую команду одним кликом, Coordinator декомпозирует задачи, агенты выполняют, результат — в Pixel Department.
+> Облачная платформа AI-команд для СМБ + personal-users сегмента РФ. Пользователь начинает с универсальной команды («Твои личные ассистенты»), при необходимости расширяет до vertical-команды с domain-expertise. Coordinator декомпозирует задачи (или Master-Agent в vertical-режиме), агенты выполняют, результат — в Pixel Department.
 
-## Primary USP
+## Primary USP (dual messaging per [Session-decision 2026-05-15](./JOURNAL.md))
 
-РФ-вертикальная экспертиза: 5 стартовых vertical-templates — WB-Селлер, Маркетинг-агентство, Telegram-крейтор, ИП-Бухгалтерия, СМБ-Sales.
+**Entry-point:** универсальная team-команда `productivity-core` («Твои личные ассистенты») — Coordinator + Researcher + Writer + Analyst — для общих задач исследований/аналитики/контента/маркетинга.
+
+**Depth layer:** 5 vertical-templates с РФ-domain экспертизой через Master-Agent layer per [ADR-029](./decisions/ADR-029-master-agent-vertical-templates.md) — Маркетинг-агентство, Telegram-крейтор, WB-Селлер, ИП-Бухгалтерия, СМБ-Sales.
 
 ## Tech-стек (Wave 0)
 
@@ -21,15 +23,15 @@
 
 Полный стек — [`_meta/stack.md`](./_meta/stack.md).
 
-## Roadmap (6 волн)
+## Roadmap (6 волн, revision 2026-05-15)
 
 | Wave | Срок | Цель | Метрика успеха |
 |---|---|---|---|
-| **0. Foundation** | 3 нед | Internal demo: WB-Селлер team end-to-end | Demo passes |
-| **1. Core MVP** | 6 нед | Pre-alpha: 3 vertical-templates + memory + billing + RBAC | 10-15 friends, ≥3 задачи/клиент, success ≥75% |
-| **2. Pixel + каталог** | 8 нед | Public beta: 5 vertical-templates + Pixel + Pyodide + MCP-каталог | 100 регистраций/нед, TTFV ≤3 мин, конверсия ≥5% |
-| **3. Глубина** | 8 нед | GA: Vertical Rituals + «Знания команды» + corp connectors + CS | 500 платящих, MRR ≥3 млн ₽ |
-| **4. Масштаб + Partner** | 12 нед | K8s + Partner programme + dedicated namespace Pro | 2000 платящих, MRR ≥15 млн ₽ |
+| **0. Foundation** | 3 нед | Internal demo: horizontal `productivity-core` team end-to-end (Market & content brief сценарий) | Demo passes |
+| **1. Core MVP** | 6 нед | Pre-alpha: horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + memory + billing + RBAC + Telegram Business API | 10-15 friends, ≥3 задачи/клиент, success ≥75% |
+| **2. Pixel + каталог** | 9 нед (было 8) | Public beta: horizontal + 3 vertical (Marketing + Telegram + WB-Селлер) + Pixel + Pyodide + Telegram Mini App + MCP-каталог | 100 регистраций/нед, TTFV ≤3 мин, конверсия ≥5% |
+| **3. Глубина** | 10 нед (было 8) | GA: +2 vertical (ИП-Бух + СМБ-Sales с Master-Agent) + Vertical Rituals + «Знания команды» + corp connectors + CS | 500 платящих, MRR ≥3 млн ₽ |
+| **4. Масштаб + Partner** | 12 нед | K8s + Partner programme + dedicated namespace Pro + Telegram Stars billing | 2000 платящих, MRR ≥15 млн ₽ |
 | **5+. Enterprise & v2** | 12+ мес | On-premise + Firecracker + open marketplace | TBD |
 
 Детали — [`roadmap/README.md`](./roadmap/README.md).
@@ -54,17 +56,18 @@ R-29 закрыт через founder personal vertical expertise (см. [`risks/
 
 Активные blockers — [`STATUS.md`](./STATUS.md).
 
-## Стартовые vertical-templates (5 шт.)
+## Стартовые team-presets (1 horizontal + 5 vertical)
 
-| Иконка | Template | Wave | ЦА |
-|---|---|---|---|
-| 🛒 | WB-Селлер команда | W0 | Селлеры WildBerries |
-| 📈 | Маркетинг-агентство РФ | W1 | Маркетинг-агентства |
-| ✍️ | Telegram-крейтор / Курс-автор | W1 | Авторы каналов |
-| 💼 | ИП-Бухгалтерия (1С/Эльба) | W2 | ИП |
-| 🎯 | СМБ-Sales (Bitrix24/amoCRM) | W2 | СМБ с CRM |
+| Иконка | Template | Wave | ЦА | Тип |
+|---|---|---|---|---|
+| 🧰 | **Твои личные ассистенты** (`productivity-core`) | **W0 (anchor)** | SMB + солопренёры + personal-users | horizontal |
+| 📈 | Маркетинг-агентство РФ | W1 | Маркетинг-агентства | vertical (Master-Agent) |
+| ✍️ | Telegram-крейтор / Курс-автор | W1 | Авторы каналов | vertical (Master-Agent) |
+| 🛒 | WB-Селлер команда | **W2 (was W0)** | Селлеры WildBerries | vertical (Master-Agent) |
+| 💼 | ИП-Бухгалтерия (1С/Эльба) | **W3 (was W2)** | ИП | vertical (Master-Agent) |
+| 🎯 | СМБ-Sales (Bitrix24/amoCRM) | **W3 (was W2)** | СМБ с CRM | vertical (Master-Agent) |
 
-Детали — [`decisions/ADR-017-vertical-templates.md`](./decisions/ADR-017-vertical-templates.md).
+Детали — [`decisions/ADR-017-vertical-templates.md`](./decisions/ADR-017-vertical-templates.md) (горизонталь + вертикали), [`decisions/ADR-029-master-agent-vertical-templates.md`](./decisions/ADR-029-master-agent-vertical-templates.md) (Master-Agent layer).
 
 ## Архитектурные решения
 
