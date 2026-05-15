@@ -123,10 +123,11 @@ backend/src/mcp/servers/telegram_mcp/
 
 ## Links
 
-- Risks: [R-05](../risks/REGISTER.md) (data leak — critical), [R-08](../risks/REGISTER.md) (регуляторика)
+- Risks: [R-05](../risks/REGISTER.md) (data leak — critical), [R-08](../risks/REGISTER.md) (регуляторика), [R-33](../risks/REGISTER.md) (Business API privacy / 152-ФЗ exposure, opened с этим ADR)
 - Phase: 01.10 (Wave 1 MCP servers — telegram-mcp v0.2), 02.X (Wave 2 Mini App), 03.X (Stars billing)
 - Related ADRs:
   - [ADR-013](./ADR-013-mcp-protocol.md) — MCP catalog (telegram-mcp обновляется)
   - [ADR-014](./ADR-014-security.md) — DLP + capability sandboxing + encryption at rest
   - [ADR-008](./ADR-008-credits-billing.md) — Stars billing conflict / future integration
   - [ADR-017](./ADR-017-vertical-templates.md) — Telegram-крейтор + Marketing-agency verticals (consumers Business API)
+  - [ADR-029](./ADR-029-master-agent-vertical-templates.md) — Master-Agent layer (Telegram-крейтор Master-Agent — primary consumer Business API workflows; Marketing-agency Master через client-DM-management ritual)

@@ -163,7 +163,7 @@ Estimated: +5–7 дней к scope phase 01.1.
 
 ## Links
 
-- Risks: [R-02](../risks/REGISTER.md) (vertical-template quality), [R-04](../risks/REGISTER.md) (runaway costs)
+- Risks: [R-02](../risks/REGISTER.md) (vertical-template quality), [R-04](../risks/REGISTER.md) (runaway costs), [R-32](../risks/REGISTER.md) (Master-Agent cost/latency overhead, opened с этим ADR)
 - Phase: 01.1 (Marketing-agency + Telegram-крейтор Masters), 02.1 (WB-Селлер Master + Mini App), 03.1 (Master + PARA-memory integration)
 - Related ADRs:
   - [ADR-016](./ADR-016-team-first-ux.md) — team-first UX (Master-Agent остаётся в рамках «команды»)
@@ -171,3 +171,4 @@ Estimated: +5–7 дней к scope phase 01.1.
   - [ADR-022](./ADR-022-coordinator-wizard-llm-hybrid.md) — Coordinator wizard-LLM hybrid (Coordinator теперь = COO в verticals)
   - [ADR-011](./ADR-011-memory-2-level.md) — memory (Wave 3 PARA становится Master-memory)
   - [ADR-019](./ADR-019-vertical-autonomous-mode.md) — vertical rituals (триггерятся Master-Agent в Wave 3+)
+  - [ADR-030](./ADR-030-telegram-business-api.md) — Telegram Business API (consumed Telegram-крейтор Master-Agent в Wave 1; Marketing-agency Master через DM-management workflow)
