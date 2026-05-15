@@ -10,8 +10,9 @@
 --   * tasks.task_executions (task cost contributes to invoice rollups)
 --
 -- IMPORTANT: financial numbers (prices, quotas, limits) are NOT hardcoded here
--- (per P-AUDIT-1 in GRILL-DECISIONS-ORIION). Values come from admin config +
--- .planning/_meta/cost-budget.yaml at runtime.
+-- (per P-AUDIT-1 in ADR-028 policies registry). AI dev cost caps come from
+-- .claude/agents/_shared/cost-budget.yaml; user-facing pricing/quotas come
+-- from admin config at runtime.
 
 -- =============================================================================
 -- credit_balances — current credit balance per organization

@@ -4,16 +4,16 @@ title: Policies Registry & Decisions Cross-Reference
 status: Accepted
 date: 2026-05-14
 deciders: founder
-supersedes: GRILL-DECISIONS-ORIION.md (consolidated)
+supersedes: pre-Wave-0 grill-decisions notes (consolidated 2026-05-13; original session log deleted)
 ---
 
 # ADR-028 — Policies Registry & Decisions Cross-Reference
 
 ## Context
 
-В ходе milestones A–D сформировались стабильные cross-session политики (P-INIT, P-AUDIT, P-DESIGN) и серия зафиксированных решений (DECISION-1..11), которые исторически жили в крупном сессионном логе `_meta/GRILL-DECISIONS-ORIION.md`. Это нарушало single-source-of-truth: ADR оставались каноничными для архитектуры, но политики/решения цитировались из сессионного нарратива.
+В ходе milestones A–D сформировались стабильные cross-session политики (P-INIT, P-AUDIT, P-DESIGN) и серия зафиксированных решений (DECISION-1..11), которые исторически жили в крупном сессионном grill-логе (с 2026-05-13 удалён из репо). Это нарушало single-source-of-truth: ADR оставались каноничными для архитектуры, но политики/решения цитировались из сессионного нарратива.
 
-Этот ADR — формальный home для всех политик и cross-reference карта `DECISION-N → existing ADR`. Исторический сессионный лог удалён; все ссылки переадресуются сюда.
+Этот ADR — формальный home для всех политик и cross-reference карта `DECISION-N → existing ADR`. Исторический grill-лог консолидирован сюда; все cross-references на DECISION-N / P-INIT-N / P-AUDIT-N / P-DESIGN-N должны указывать на якори в этом файле.
 
 ## Decision
 

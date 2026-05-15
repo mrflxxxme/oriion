@@ -4,7 +4,7 @@
 
 ## Decision
 
-Покрывает [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) DECISION-10. Описывает, КАК код, сгенерированный AI-агентами (см. ADR-023), попадает в `main`. Заменяет tier-based review секцию из ADR-015 (revised → operational hygiene).
+Покрывает [ADR-028 policies registry](./ADR-028-policies-registry.md) DECISION-10. Описывает, КАК код, сгенерированный AI-агентами (см. ADR-023), попадает в `main`. Заменяет tier-based review секцию из ADR-015 (revised → operational hygiene).
 
 ### 1. Branching
 
@@ -105,7 +105,7 @@ GPG-sign отложен до **Wave 3** (GA-release). До Wave 3 коммиты
 
 ## Links
 
-- [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) — DECISION-10
+- [ADR-028 policies registry](./ADR-028-policies-registry.md) — DECISION-10
 - [ADR-015](./ADR-015-ai-dev-process.md) — operational hygiene (CI-gates, isolation, observability)
 - [ADR-023](./ADR-023-ai-team-runtime.md) — 11 ролей + pipeline-шаблон + handoff
 - [ADR-014](./ADR-014-security.md) — RBAC + DLP (применяется к code review)

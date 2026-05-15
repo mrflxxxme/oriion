@@ -86,7 +86,7 @@
 - ❌ **Архитектурные решения без ADR.** Don't: меняет DB на MongoDB в phase. Do: новый ADR + эскалация.
 - ❌ **Игнорирование existing patterns.** Don't: custom auth-flow. Do: следовать ADR-007.
 - ❌ **PR без Exit ritual.** Don't: merge без обновления JOURNAL+HANDOFF. Do: дописать запись + перезаписать снимок.
-- ❌ **Поиск `_meta/GRILL-DECISIONS-ORIION.md`.** Файл удалён в pre-Wave-0 audit. Все политики и cross-ref решений теперь в [ADR-028](../decisions/ADR-028-policies-registry.md).
+- ❌ **Поиск исторического `grill-decisions` сессионного лога.** Файл удалён в pre-Wave-0 audit (2026-05-13). Все политики (P-INIT-N / P-AUDIT-N / P-DESIGN-N) и cross-ref решений (DECISION-1..11) живут в [ADR-028](../decisions/ADR-028-policies-registry.md) — единственный canonical home.
 
 ## Capabilities reminder
 

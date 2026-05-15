@@ -65,7 +65,7 @@
 
 | ID | Решение |
 |---|---|
-| [ADR-028](./ADR-028-policies-registry.md) | Policies Registry — canonical home для P-INIT-1..5 / P-AUDIT-1..4 / P-DESIGN-1 + DECISION-N → ADR cross-ref (заменяет `_meta/GRILL-DECISIONS-ORIION.md`) |
+| [ADR-028](./ADR-028-policies-registry.md) | Policies Registry — canonical home для P-INIT-1..5 / P-AUDIT-1..4 / P-DESIGN-1 + DECISION-N → ADR cross-ref |
 
 ## Шаблон нового ADR
 

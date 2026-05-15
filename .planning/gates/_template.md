@@ -1,7 +1,7 @@
 ---
 # Gate template — copy and rename to wave-N-to-N+1.md
 # Schema: ./_schema/gate.schema.json
-# Per ADR-025 section 1 and GRILL-DECISIONS-ORIION section 5.1 DECISION-9.
+# Per ADR-025 section 1 (incorporates DECISION-9 — see ADR-028 §decision-9).
 #
 # Fill protocol:
 # - memory-curator auto-fills (80%): metrics_snapshot, deliverables.status,
