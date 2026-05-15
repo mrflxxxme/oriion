@@ -4,7 +4,7 @@
 
 ## Decision
 
-Покрывает [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) DECISION-6 (vertical-expertise модель) + DECISION-11 (anti-hallucination protocol). Фиксирует, как создаётся, проверяется и поддерживается контент для каждой из 5 vertical-templates ([ADR-017](./ADR-017-vertical-templates.md)).
+Покрывает [ADR-028 policies registry](./ADR-028-policies-registry.md) DECISION-6 (vertical-expertise модель) + DECISION-11 (anti-hallucination protocol). Фиксирует, как создаётся, проверяется и поддерживается контент для каждой из 5 vertical-templates ([ADR-017](./ADR-017-vertical-templates.md)).
 
 ### 1. Pattern D — AI-baseline + founder edit + friends-loop
 
@@ -113,7 +113,7 @@ memory-curator (см. ADR-023) ежедневно сканирует все `ver
 
 ## Links
 
-- [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) — DECISION-6, DECISION-11
+- [ADR-028 policies registry](./ADR-028-policies-registry.md) — DECISION-6, DECISION-11
 - [ADR-010](./ADR-010-role-versioning.md) — SemVer policy для prompt-файлов (revised — scope clarification)
 - [ADR-017](./ADR-017-vertical-templates.md) — 5 vertical-templates как primary USP
 - [ADR-023](./ADR-023-ai-team-runtime.md) — evaluator + vertical-prompt-author + memory-curator

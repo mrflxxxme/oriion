@@ -4,7 +4,7 @@
 
 ## Decision
 
-Покрывает [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) DECISION-9. Фиксирует формат файлов, которыми оформляются переходы Wave N → Wave N+1, и hard thresholds на metric-side. Wave 2-5 остаются direction-only (per DECISION-2) до прохождения соответствующего gate.
+Покрывает [ADR-028 policies registry](./ADR-028-policies-registry.md) DECISION-9. Фиксирует формат файлов, которыми оформляются переходы Wave N → Wave N+1, и hard thresholds на metric-side. Wave 2-5 остаются direction-only (per DECISION-2) до прохождения соответствующего gate.
 
 ### 1. Формат — YAML frontmatter + Markdown body
 
@@ -91,7 +91,7 @@ Gate-файл идёт через PR с reviewer-backend (валидация JSO
 
 ## Links
 
-- [GRILL-DECISIONS-ORIION](../decisions/ADR-028-policies-registry.md) — DECISION-9
+- [ADR-028 policies registry](./ADR-028-policies-registry.md) — DECISION-9
 - [ADR-023](./ADR-023-ai-team-runtime.md) — memory-curator роль (auto-fills frontmatter)
 - Roadmap waves: [.planning/roadmap/](../roadmap/)
 - Strategic bets + kill criteria: [risks/REGISTER.md](../risks/REGISTER.md#стратегические-ставки-с-kill-criteria)

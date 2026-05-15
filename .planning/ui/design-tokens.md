@@ -2,7 +2,7 @@
 
 - **Version:** 0.1.0 (Wave 0)
 - **Status:** temporary palette (final после OQ-09 Wave 2 brand refresh)
-- **Source of truth:** this file (per DECISION-4, GRILL-DECISIONS-ORIION.md §5.1)
+- **Source of truth:** this file (per DECISION-4 — see [ADR-028](../decisions/ADR-028-policies-registry.md#decision-4))
 - **Materialization:** CSS variables в `frontend/src/styles/tokens.css` — Phase 00.7 deliverable. Здесь — spec only.
 
 ---
