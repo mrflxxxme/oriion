@@ -45,6 +45,18 @@ logs/
 
 # Build artifacts
 *.tsbuildinfo
+coverage.xml
+*.lcov
+
+# Frontend build
+.vite/
+.vitest-cache/
+
+# uv (Python)
+uv.lock.bak
+
+# Docker / runtime data
+docker-compose.override.yml
 
 # Temporary files
 *.tmp
