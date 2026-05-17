@@ -26,6 +26,6 @@ def test_version_string_semver_shape() -> None:
     parts = src.__version__.split(".")
     assert len(parts) >= 2, f"Version must be at least N.N, got {src.__version__!r}"
     for part in parts[:3]:
-        assert part.isdigit() or part.split("-")[0].isdigit(), (
-            f"Version part {part!r} not numeric (allowed: '1.2.3' or '1.2.3-rc1')"
-        )
+        assert (
+            part.isdigit() or part.split("-")[0].isdigit()
+        ), f"Version part {part!r} not numeric (allowed: '1.2.3' or '1.2.3-rc1')"

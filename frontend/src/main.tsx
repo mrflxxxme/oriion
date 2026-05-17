@@ -12,9 +12,7 @@ createRoot(rootElement).render(
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <div className="text-center">
         <h1 className="text-3xl font-semibold tracking-tight">TEAMLY_RU</h1>
-        <p className="mt-2 text-sm text-neutral-500">
-          Frontend skeleton ready · Phase 00.1
-        </p>
+        <p className="mt-2 text-sm text-neutral-500">Frontend skeleton ready · Phase 00.1</p>
       </div>
     </div>
   </StrictMode>,
