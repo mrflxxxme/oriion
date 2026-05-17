@@ -60,7 +60,7 @@ dev: ## Start dev stack via docker compose (postgres + redis + minio + backend +
 	@printf '\n→ Backend:  http://localhost:8000  (docs: /docs)\n'
 	@printf '→ Frontend: http://localhost:5173\n'
 	@printf '→ Caddy:    http://localhost      (proxies above)\n'
-	@printf '→ MinIO:    http://localhost:9001 (console: oriion / oriion-dev-s3)\n\n'
+	@printf '→ MinIO:    http://localhost:9001 (credentials in .env — MINIO_ACCESS_KEY / MINIO_SECRET_KEY)\n\n'
 
 .PHONY: dev-stop
 dev-stop: ## Stop dev stack (keeps volumes)

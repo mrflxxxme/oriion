@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
-# frontend/Dockerfile — multi-stage build с dev + prod targets.
-# Dev: hot-reload via Vite dev server + volume mount.
-# Prod: static build → served by Caddy (Phase 00.6).
+# frontend/Dockerfile — Phase 00.1 dev-only build target.
+# Prod target (Vite build → Caddy static serve) returns в Phase 00.6 deliverable
+# когда `infra/caddy/Caddyfile.prod` materialized + правильный build context
+# scope установлен (потребует подъёма build context на repo root level).
 
 FROM node:20-alpine AS base
 WORKDIR /app
@@ -18,14 +19,3 @@ FROM base AS dev
 COPY package.json ./
 EXPOSE 5173
 CMD ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"]
-
-# ─────────────────────────────────────────────────────────────
-FROM base AS build
-COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund
-COPY . .
-RUN npm run build
-
-FROM caddy:2-alpine AS prod
-COPY --from=build /app/dist /srv
-COPY infra/caddy/Caddyfile.prod /etc/caddy/Caddyfile

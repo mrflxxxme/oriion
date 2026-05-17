@@ -23,7 +23,7 @@
 
 Полный реестр — [`OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md).
 
-## What just happened (this session — 16 commits)
+## What just happened (this session — 18 commits + final audit fix pass)
 
 ### Spec amendments (commit #1)
 
@@ -176,7 +176,7 @@ Bootstrap (4 файла):
   - `scripts/`: `wait_for_db.py`, `seed_dev_data.py`
   - `.github/workflows/`: `ci-backend.yml`, `ci-frontend.yml`, `ci-security.yml`
 - **MODIFIED:** `.planning/roadmap/wave-0-foundation/phases/00.1-repo-cicd.md` (trim), `.planning/JOURNAL.md` (this session entry), `.planning/HANDOFF.md` (this file), `.planning/STATUS.md` (Phase 00.1 In Progress)
-- **16 commits:** spec trim → monorepo skeleton → backend → frontend → infra → scripts → Makefile → Alembic → 3 CI workflows → pre-commit → bootstrap docs → lock files → format fixes → test_health → exit ritual
+- **18 commits:** spec trim → monorepo skeleton → backend → frontend → infra+Dockerfiles+main.py → scripts → Makefile+gitattributes → Alembic → 3 CI workflows → pre-commit → bootstrap docs → lock files → format fixes → test_health → exit ritual → post-ritual gitignore tweak → final audit fix pass
 
 ## Known caveats
 

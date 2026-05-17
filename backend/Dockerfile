@@ -33,11 +33,8 @@ EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # ─────────────────────────────────────────────────────────────
-FROM base AS prod
-# Prod target — Phase 00.6 deliverable. Сейчас skeleton для CI smoke build.
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --frozen --no-dev
-COPY src ./src
-COPY alembic.ini ./
-EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Prod target — returns Phase 00.6 deliverable. Удалён из Phase 00.1 потому
+# что (а) compose targets только `dev`, (b) prod stage требует переноса COPY
+# src ДО `uv sync` (иначе hatchling fails build local project), (c) prod
+# entrypoint должен использовать gunicorn worker pool а не --reload uvicorn.
+# Все эти решения принимает Phase 00.6 owner.

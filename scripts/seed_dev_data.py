@@ -16,12 +16,20 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
 from typing import TYPE_CHECKING, Final
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+
+_DSN_CRED_PATTERN: Final[re.Pattern[str]] = re.compile(r"://[^@/\s:]+:[^@/\s]+@")
+
+
+def _redact(message: str) -> str:
+    """Replace credentials in DSN-style URLs внутри error messages."""
+    return _DSN_CRED_PATTERN.sub("://***:***@", message)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,7 +84,9 @@ async def _main_async() -> int:
                 )
                 return 1
     except Exception as exc:  # noqa: BLE001 — broad для startup diagnostics
-        sys.stderr.write(f"✗ DB seed failed: {type(exc).__name__}: {exc}\n")
+        sys.stderr.write(
+            f"✗ DB seed failed: {type(exc).__name__}: {_redact(str(exc))}\n"
+        )
         return 1
     finally:
         await engine.dispose()

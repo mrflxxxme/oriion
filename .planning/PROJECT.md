@@ -52,9 +52,7 @@ R-29 закрыт через founder personal vertical expertise (см. [`risks/
 
 ## Текущая phase
 
-**Pre-Wave-0** → следующая: [Phase 00.1 (Repo & CI/CD)](./roadmap/wave-0-foundation/phases/00.1-repo-cicd.md).
-
-Активные blockers — [`STATUS.md`](./STATUS.md).
+**Wave 0 (Foundation) — Phase 00.1 (Repo & CI/CD) 🔄 active**, implementation complete на branch `claude/amazing-hamilton-8b9d2c` awaiting founder review + merge. Rolling status + AC verification + блокеры — [`STATUS.md`](./STATUS.md).
 
 ## Стартовые team-presets (1 horizontal + 5 vertical)
 

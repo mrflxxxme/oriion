@@ -32,10 +32,17 @@ if config.config_file_name is not None:
 # Пока target_metadata = None, autogenerate disabled до появления models.
 target_metadata = None
 
-# Allow DATABASE_URL env-var override (used by Makefile + CI)
+# Require DATABASE_URL env-var (alembic.ini sqlalchemy.url оставлен пустым
+# интенционально — защита от запуска migrations против hardcoded localhost
+# когда environment не настроен).
 _env_url = os.environ.get("DATABASE_URL")
-if _env_url:
-    config.set_main_option("sqlalchemy.url", _env_url)
+if not _env_url:
+    raise RuntimeError(
+        "DATABASE_URL не установлен. Alembic требует явный connection string "
+        "через env-var. Для local dev: `export DATABASE_URL=postgresql+asyncpg://...` "
+        "или используй `make dev` который запустит compose stack."
+    )
+config.set_main_option("sqlalchemy.url", _env_url)
 
 
 def run_migrations_offline() -> None:

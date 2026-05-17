@@ -49,7 +49,7 @@ Per session-decision (11 развилок resolved):
 
 > **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model). OQ-17 (funding) + OQ-18 (burn-budget) закрыты как `out-of-scope` per Session-2026-05-15 — founder-personal financial decisions не tracked в project docs (AI dev cost caps живут в `.claude/agents/_shared/cost-budget.yaml`).
 
-**Phase 00.1 status:** 🔄 implementation complete на branch `claude/amazing-hamilton-8b9d2c` (16 atomic commits + exit ritual), awaiting founder review + merge. Local AC2 + AC7 ✓; AC1 + AC6 deferred to founder verification (docker pull network issue); AC3/4/5 self-verify через CI.
+**Phase 00.1 status:** 🔄 implementation complete на branch `claude/amazing-hamilton-8b9d2c` (18 atomic commits, final consistency audit verdict 🟡 GO with FIXME — 4 BLOCK findings resolved inline, остальные WARN documented в PR body), awaiting founder review + merge. Local AC2 + AC7 ✓; AC1 + AC6 deferred to founder verification (docker pull network issue в dev environment); AC3/4/5 self-verify через CI.
 
 Полный список — [`OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md).
 
