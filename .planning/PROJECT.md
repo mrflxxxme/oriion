@@ -52,7 +52,9 @@ R-29 закрыт через founder personal vertical expertise (см. [`risks/
 
 ## Текущая phase
 
-**Wave 0 (Foundation) — Phase 00.1 (Repo & CI/CD) 🔄 active**, implementation complete на branch `claude/amazing-hamilton-8b9d2c` awaiting founder review + merge. Rolling status + AC verification + блокеры — [`STATUS.md`](./STATUS.md).
+**Wave 0 (Foundation) — Phase 00.1 ✅ Complete** (merged 2026-05-17 via PR #25). **Next:** Phase 00.2 (Custom JWT auth) — gated by OQ-04; parallel-ready: Phase 00.3 (DB + RLS + Cell schema) + Phase 00.4 (LLM gateway + MCP).
+
+Rolling status + AC verification + блокеры — [`STATUS.md`](./STATUS.md).
 
 ## Стартовые team-presets (1 horizontal + 5 vertical)
 

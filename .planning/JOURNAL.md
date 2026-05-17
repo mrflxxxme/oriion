@@ -69,3 +69,17 @@ Append-only журнал AI-агентских сессий. Одна запис
 - Decisions: no new ADR. Phase 00.1 strictly executes existing ADR-001/015/024/027/028. Reaffirmed: остаёмся на Yandex Cloud (рассмотрены альтернативы: VK Cloud, Selectel, Timeweb — отклонены на MVP scale из-за marginal cost savings vs архитектурный refactor); cloud provisioning отложен Phase 00.6 как manual YC runbook (no Terraform Wave 0).
 - Next: (a) Final consistency audit (4 parallel subagents: Code Reviewer + security-reviewer + memory-curator + architect). (b) Founder push + PR open (tier 4 per ADR-027 — security workflows + CI infra). (c) Founder local-verify AC1/AC6 на своей машине OR в CI runner; revision-commits если нужно. (d) После merge → старт Phase 00.2 (Custom JWT auth) — required OQ-04 РКН close, parallel-ready с Phase 00.3 (DB + RLS + Cell schema) и Phase 00.4 (LLM gateway + MCP).
 - Refs: branch `claude/amazing-hamilton-8b9d2c`; plan `C:\Users\KUklonskiy\.claude\plans\start-phase-00-1-of-dazzling-moore.md`; phase spec [`roadmap/wave-0-foundation/phases/00.1-repo-cicd.md`](./roadmap/wave-0-foundation/phases/00.1-repo-cicd.md).
+
+## 2026-05-17 (post-merge) · post-00.1-memory-curator · @claude-opus
+- Scope: post-merge memory-curator pass для Phase 00.1 completion. STATUS / HANDOFF / JOURNAL / PROJECT обновлены чтобы next session мог seamlessly start Phase 00.2 / 00.3 / 00.4 без re-discovery.
+- Done:
+  - **PR #25 merged** 2026-05-17T16:28:03Z → merge-commit `b192c6b` на main. 21 atomic commits всего (18 Phase 00.1 impl + 1 audit-fix + 2 CI fix passes).
+  - **CI verdict:** all 6 status checks PASS на финальном run (ci-backend lint+typecheck+test+security+license / ci-frontend / 3 ci-security jobs / gitleaks). AC3/AC4/AC5 CI-verified inline.
+  - **Security debt уже закрыт в Phase 00.1 PR** (не deferred Phase 00.2): python-jose → PyJWT[crypto], passlib → argon2-cffi (per ADR-014); FastAPI 0.115 → 0.129, starlette 0.46 → 0.52 (fixes CVE-2025-54121, CVE-2025-62727); pytest 8.3 → 9.0 (fixes CVE-2025-71176).
+  - **CI infra fixes (in-PR):** pip-audit `--skip-editable` (was failing на local editable package not on PyPI); trivy-action `@0.28.0` → `@master` (version 0.28.0 не существует).
+  - **STATUS.md:** Phase 00.1 → ✅ Complete; final AC scoreboard; OQ-04 explicitly tagged как 00.2 blocker; 00.3/00.4 parallel-ready listed; target-dates table: 00.1 finished 2 дня раньше plan (-2 нед buffer).
+  - **PROJECT.md:** Current phase pointer updated to "Phase 00.1 Complete; Next: 00.2 (gated OQ-04), parallel 00.3/00.4".
+  - **HANDOFF.md:** rewritten для next session — bootstrap-4 read list, Phase 00.2/00.3/00.4 starter pointers, prerequisites checklist, no remaining audit findings active.
+- Decisions: no new ADR. Phase 00.1 security debt resolved without ADR-014 amendment (PyJWT + argon2-cffi already в ADR-014's preference list).
+- Next: founder verifies AC1 + AC6 локально (выйдет за рамки этой curator-сессии). Затем next AI-agent session открывает либо Phase 00.2 (если OQ-04 closed) либо Phase 00.3/00.4 в parallel.
+- Refs: PR [oriion#25](https://github.com/mrflxxxme/oriion/pull/25); merge-commit `b192c6b`; branch `claude/post-00.1-memory-curator`.

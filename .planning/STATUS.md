@@ -30,26 +30,30 @@ Per session-decision (11 развилок resolved):
 
 ## Текущая активная фаза
 
-**Phase 00.1 (Repo & CI/CD)** — 🔄 implementation complete в branch `claude/amazing-hamilton-8b9d2c`, awaiting founder review + merge + local AC1/AC6 verification.
+**Phase 00.1 (Repo & CI/CD)** — ✅ **Complete** (merged 2026-05-17 via [PR #25](https://github.com/mrflxxxme/oriion/pull/25), merge-commit `b192c6b`).
 
-**Progress (Session-2026-05-17):**
-- ✅ AC2 (coverage ≥70%) — local-verified backend 100% + frontend 100% on utils.ts
-- ✅ AC7 (lint + typecheck) — local-verified backend ruff+mypy + frontend eslint+prettier+tsc
-- ⚠️ AC1 + AC6 — deferred (Docker pull network issue в dev environment); founder verifies post-clone
-- 📋 AC3 + AC4 + AC5 — self-verify через CI workflows при открытии PR (gated by branch protection per ADR-027)
+**Final AC scoreboard:**
+- ✅ **AC2** (coverage ≥ 70%) — local-verified backend 100% (8 tests, 16/16 stmts), frontend utils.ts 100% (5 tests)
+- ✅ **AC3** (3 CI workflows ≤ 8 min) — all 6 status checks PASS on PR (ci-backend / ci-frontend / ci-security 3 jobs / gitleaks / trivy / grype)
+- ✅ **AC4** (gitleaks blocks AWS key) — gitleaks job green; full repo scanned
+- ✅ **AC5** (license-check blocks GPL/AGPL/LGPL) — pip-licenses + license-checker-rseidelsohn run, 0 forbidden licenses
+- ✅ **AC7** (lint + typecheck) — backend ruff + ruff-format + mypy --strict; frontend eslint + prettier + tsc -b — all green локально + в CI
+- ⚠️ **AC1** (dev-bootstrap ≤ 600s) + **AC6** (compose healthchecks ≤ 180s) — **founder action**: верифицировать локально на машине со стабильным Docker Hub access (`cp .env.example .env && time docker compose -f infra/docker-compose.dev.yml up -d --build`). Session attempt failed на network EOF errors, не related к spec.
 
-**Следующая phase:** Phase 00.2 (Custom JWT auth) — depends on 00.1 merge + OQ-04 РКН close. Parallel-ready: 00.3 (DB + RLS + Cell schema) + 00.4 (LLM gateway + MCP) — only depend on 00.1 merge.
+**Следующая фаза:** Phase 00.2 (Custom JWT auth) — depends on OQ-04 (РКН-уведомление) close. **Parallel-ready без блокеров:** Phase 00.3 (DB + RLS + Cell schema) + Phase 00.4 (LLM gateway + MCP). Founder может стартовать 00.3 или 00.4 first если OQ-04 ещё открыт.
 
 ## Active blockers
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
-| OQ-04 | РКН-уведомление | Founder + юрист | Required до Phase 00.2 (НЕ блокирует Phase 00.1) |
+| OQ-04 | РКН-уведомление | Founder + юрист | **Required до Phase 00.2** (auth = ПДн обработка) |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa (Wave 1) |
 
 > **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model). OQ-17 (funding) + OQ-18 (burn-budget) закрыты как `out-of-scope` per Session-2026-05-15 — founder-personal financial decisions не tracked в project docs (AI dev cost caps живут в `.claude/agents/_shared/cost-budget.yaml`).
 
-**Phase 00.1 status:** 🔄 implementation complete на branch `claude/amazing-hamilton-8b9d2c` (18 atomic commits, final consistency audit verdict 🟡 GO with FIXME — 4 BLOCK findings resolved inline, остальные WARN documented в PR body), awaiting founder review + merge. Local AC2 + AC7 ✓; AC1 + AC6 deferred to founder verification (docker pull network issue в dev environment); AC3/4/5 self-verify через CI.
+## Phase 00.2 prerequisites (HIGH security debt — must clear перед auth merge)
+
+⚠️ **Security debt уже закрыт в Phase 00.1 PR** — `python-jose` (CVE-2024-33663/33664) заменён на `PyJWT[crypto]`, `passlib` заменён на `argon2-cffi` per [ADR-014](./decisions/ADR-014-security.md). Auth code в Phase 00.2 уже может использовать чистые deps.
 
 Полный список — [`OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md).
 
@@ -81,8 +85,8 @@ Per session-decision (11 развилок resolved):
 
 | Дата | Milestone | Delta vs prior |
 |---|---|---|
-| 2026-05-19 | Wave 0 Phase 00.1 start | unchanged |
-| 2026-06-09 | Wave 0 complete → Internal demo (horizontal `productivity-core`) | unchanged |
+| 2026-05-17 | Wave 0 Phase 00.1 **started + merged** (2 дня раньше plan) | **-2 нед** |
+| 2026-06-09 | Wave 0 complete → Internal demo (horizontal `productivity-core`) | unchanged (compensates с 00.1 early-merge buffer) |
 | 2026-07-21 | Wave 1 complete → Pre-alpha с 10–15 friends (3 templates) | unchanged |
 | ~2026-09-22 | Wave 2 complete → Public beta (4 templates + Pixel + Mini App) | **+1 нед** vs prior 2026-09-15 |
 | ~2026-12-01 | Wave 3 complete → GA-release (6 templates + Rituals + PARA) | **+3 нед** vs prior 2026-11-10 |
