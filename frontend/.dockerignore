@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.vite
+.vitest-cache
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.git
