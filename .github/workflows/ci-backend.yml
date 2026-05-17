@@ -112,8 +112,10 @@ jobs:
 
       - name: pip-audit (CVE scan)
         working-directory: backend
-        # --skip-editable: skip local project (teamly-backend) — not on PyPI
-        run: uv run pip-audit --strict --skip-editable
+        # --skip-editable: skip local project (teamly-backend) — not on PyPI.
+        # --strict NOT used: treats skip-editable как error. Default exit
+        # behavior still fails CI если найдены CVE в audited packages.
+        run: uv run pip-audit --skip-editable
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: backend
