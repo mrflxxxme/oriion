@@ -1,0 +1,6 @@
+dist
+coverage
+node_modules
+.vite
+.vitest-cache
+*.tsbuildinfo
