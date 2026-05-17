@@ -6,8 +6,8 @@
 
 | Wave | Status | Anchor target |
 |---|---|---|
-| Pre-Wave-0 | 🔄 In progress | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
-| Wave 0 (Foundation) | ⏳ Pending | Horizontal `productivity-core` team — internal demo «Market & content brief» |
+| Pre-Wave-0 | ✅ Complete | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
+| Wave 0 (Foundation) | 🔄 In progress | Horizontal `productivity-core` team — internal demo «Market & content brief» |
 | Wave 1 (Core MVP) | ⏳ Pending | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + Telegram Business API |
 | Wave 2 (Pixel + каталог) | ⏳ Pending | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent first-instances |
 | Wave 3 (Глубина) | ⏳ Pending | +ИП-Бух + СМБ-Sales vertical + Vertical Rituals + PARA Workspace |
@@ -30,9 +30,15 @@ Per session-decision (11 развилок resolved):
 
 ## Текущая активная фаза
 
-**Pre-Wave-0** — подготовка к Phase 00.1 (Repo & CI/CD).
+**Phase 00.1 (Repo & CI/CD)** — 🔄 implementation complete в branch `claude/amazing-hamilton-8b9d2c`, awaiting founder review + merge + local AC1/AC6 verification.
 
-**Следующая phase:** [Phase 00.1 (Repo & CI/CD)](./roadmap/wave-0-foundation/phases/00.1-repo-cicd.md). Owner: DevOps + Tech Lead. Duration: 3 дня.
+**Progress (Session-2026-05-17):**
+- ✅ AC2 (coverage ≥70%) — local-verified backend 100% + frontend 100% on utils.ts
+- ✅ AC7 (lint + typecheck) — local-verified backend ruff+mypy + frontend eslint+prettier+tsc
+- ⚠️ AC1 + AC6 — deferred (Docker pull network issue в dev environment); founder verifies post-clone
+- 📋 AC3 + AC4 + AC5 — self-verify через CI workflows при открытии PR (gated by branch protection per ADR-027)
+
+**Следующая phase:** Phase 00.2 (Custom JWT auth) — depends on 00.1 merge + OQ-04 РКН close. Parallel-ready: 00.3 (DB + RLS + Cell schema) + 00.4 (LLM gateway + MCP) — only depend on 00.1 merge.
 
 ## Active blockers
 
@@ -43,7 +49,7 @@ Per session-decision (11 развилок resolved):
 
 > **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model). OQ-17 (funding) + OQ-18 (burn-budget) закрыты как `out-of-scope` per Session-2026-05-15 — founder-personal financial decisions не tracked в project docs (AI dev cost caps живут в `.claude/agents/_shared/cost-budget.yaml`).
 
-**Phase 00.1 ready to start:** no remaining hard-blockers within project scope.
+**Phase 00.1 status:** 🔄 implementation complete на branch `claude/amazing-hamilton-8b9d2c` (16 atomic commits + exit ritual), awaiting founder review + merge. Local AC2 + AC7 ✓; AC1 + AC6 deferred to founder verification (docker pull network issue); AC3/4/5 self-verify через CI.
 
 Полный список — [`OPEN-QUESTIONS.md`](./OPEN-QUESTIONS.md).
 
