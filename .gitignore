@@ -30,6 +30,7 @@ htmlcov/
 .tox/
 venv/
 .venv/
+coverage/
 
 # Node
 node_modules/
