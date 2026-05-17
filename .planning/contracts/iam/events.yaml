@@ -82,3 +82,47 @@ events:
         user_id:                { type: string, format: uuid }
         deleted_at:             { type: string, format: date-time }
         retention_policy_days:  { type: integer, minimum: 0 }
+
+  - type: oriion.iam.user.email_verification_requested.v1
+    description: A new email-verification token was issued; the plaintext was sent over email.
+    data:
+      type: object
+      required: [user_id, email, token_id, expires_at]
+      properties:
+        user_id:    { type: string, format: uuid }
+        email:      { type: string, format: email }
+        token_id:   { type: string, format: uuid, description: ID of the iam.email_verification_tokens row. Plaintext is NEVER in this event. }
+        expires_at: { type: string, format: date-time }
+
+  - type: oriion.iam.user.password_reset_requested.v1
+    description: A new password-reset token was issued; the plaintext was sent over email.
+    data:
+      type: object
+      required: [user_id, token_id, reset_chain_id, expires_at]
+      properties:
+        user_id:        { type: string, format: uuid }
+        token_id:       { type: string, format: uuid }
+        reset_chain_id: { type: string, format: uuid }
+        expires_at:     { type: string, format: date-time }
+
+  - type: oriion.iam.user.password_reset_completed.v1
+    description: User consumed a reset token and set a new password. All sessions for the user are revoked.
+    data:
+      type: object
+      required: [user_id, reset_chain_id, completed_at]
+      properties:
+        user_id:        { type: string, format: uuid }
+        reset_chain_id: { type: string, format: uuid }
+        completed_at:   { type: string, format: date-time }
+
+  - type: oriion.iam.user.consent_recorded.v1
+    description: A consent (pdn / marketing / tos) was granted or revoked.
+    data:
+      type: object
+      required: [user_id, kind, version, action, recorded_at]
+      properties:
+        user_id:     { type: string, format: uuid }
+        kind:        { type: string, enum: [pdn, marketing, tos] }
+        version:     { type: string }
+        action:      { type: string, enum: [granted, revoked] }
+        recorded_at: { type: string, format: date-time }

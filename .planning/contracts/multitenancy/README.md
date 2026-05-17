@@ -102,10 +102,40 @@ See [`events.yaml`](./events.yaml). Notable consumers:
   stack (consumes user identity).
 - [ADR-014](../../decisions/ADR-014-security.md) — RLS + secrets posture.
 
+## Service contract — symbols consumed by other contexts
+
+Added by the architect-PR (2026-05-17) to make the cross-context dependency
+from `iam` to `multitenancy` explicit. Real implementations ship from Phase
+00.3; stubs in `backend/src/_stubs/multitenancy.py` while phases 00.2 / 00.3
+run in parallel.
+
+```python
+# backend/src/multitenancy/services/workspace_service.py (real impl — Phase 00.3)
+class WorkspaceProvisionResult(BaseModel):
+    workspace_id: UUID
+    cell_id: UUID
+
+async def provision_initial_workspace(user_id: UUID) -> WorkspaceProvisionResult:
+    """Seed the user's first workspace + initial trial cell.
+
+    Called synchronously by iam.auth_service.register() AFTER the user row is
+    persisted and BEFORE the email-verification token is issued (so the user
+    has a valid {workspace_id, cell_id} on first login).
+
+    Invariants:
+      - Exactly one workspace + one cell per user from this call.
+      - Workspace name = user's email-localpart (mutable later by user).
+      - Cell tier = 'trial' (per ADR-009); trial_expires_at = now() + 14 days.
+      - Idempotent on (user_id) — re-invocation returns existing IDs.
+    """
+```
+
 ## Phase references
 
-- **Phase 00.3** — DB + RLS bootstrap (creates `multitenancy` schema, applies
-  this DDL, wires the `app.current_user_id` middleware).
+- **Phase 00.3** — DB + RLS bootstrap (creates `multitenancy` tables, RLS
+  policies; produces real impl of `provision_initial_workspace`). NOTE: the
+  schema bootstrap (CREATE SCHEMA, extensions, `_shared` trigger) is **NOT**
+  Phase 00.3 anymore — done in architect-PR `_shared/0001_init.py`.
 - **Phase 00.4** — Cell provisioning workflow per ADR-009 (billing webhook →
   cell-provisioner).
 - **Phase 00.5** — WB-Seller vertical scaffolding uses `vertical_template_slug
@@ -113,7 +143,7 @@ See [`events.yaml`](./events.yaml). Notable consumers:
 
 ## Implementation notes (non-authoritative)
 
-- Alembic migrations under `backend/alembic/versions/multitenancy/`.
+- Alembic migrations under `backend/migrations/versions/multitenancy/`.
 - Cross-context FKs (to `iam.users`, `rbac.system_roles`) are declared in
   table comments and validated by integration tests; we do not create
   physical FOREIGN KEY constraints across context schemas to preserve the
