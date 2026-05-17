@@ -1,0 +1,97 @@
+# Pre-commit hooks — local feedback loop перед commit.
+# CI gates повторяют те же проверки (см. .github/workflows/ci-*.yml) —
+# pre-commit это early-warning, не replacement для CI.
+#
+# Setup (once на dev machine):
+#   uv run pre-commit install
+# или:
+#   pip install pre-commit && pre-commit install
+#
+# Run на all files:
+#   pre-commit run --all-files
+#
+# Bypass (emergency only — CI всё равно поймает):
+#   git commit --no-verify
+
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # ─── generic file hygiene ───────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$  # markdown trailing spaces — hard linebreaks
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-case-conflict
+
+  # ─── Python: ruff (lint + format) ───────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(backend|scripts)/.*\.py$
+      - id: ruff-format
+        files: ^(backend|scripts)/.*\.py$
+
+  # ─── secrets scan ───────────────────────────────────────────────
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # ─── markdown lint ──────────────────────────────────────────────
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        args: [--config, .markdownlint.json]
+        exclude: ^(\.planning|\.claude|backend/migrations/README\.md)/
+
+  # ─── local hooks (require monorepo cd) ──────────────────────────
+  - repo: local
+    hooks:
+      - id: mypy-backend
+        name: mypy strict (backend/src)
+        entry: bash -c 'cd backend && uv run mypy --strict src'
+        language: system
+        files: ^backend/src/.*\.py$
+        pass_filenames: false
+        require_serial: true
+
+      - id: eslint-frontend
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/(src|eslint\.config\.js).*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+        require_serial: true
+
+      - id: prettier-frontend
+        name: prettier --check (frontend)
+        entry: bash -c 'cd frontend && npm run format:check'
+        language: system
+        files: ^frontend/(src|.*\.(json|md|css))
+        pass_filenames: false
+        require_serial: true
+
+      - id: typecheck-frontend
+        name: tsc --noEmit (frontend)
+        entry: bash -c 'cd frontend && npm run typecheck'
+        language: system
+        files: ^frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+        require_serial: true

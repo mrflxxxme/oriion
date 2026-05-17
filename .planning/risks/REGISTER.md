@@ -42,13 +42,13 @@ R-NN. <Название>
 ## R-05. Утечка данных через агента / инсайдера / коннектор
 
 - **Severity:** critical · **Likelihood:** medium · **Owner:** Security + Tech Lead
-- **Митигация:** [ADR-014](../decisions/ADR-014-security.md): RBAC 5 уровней, DLP-сканер на выходе MCP-tools, изоляция memory от tool-output, операционная гигиена (zero standing access, JIT-доступ, шифрование backup, audit ПДн, 2FA, immutable log, ISO/SOC roadmap); Pyodide мitigates для analytics (всё в браузере клиента, [ADR-020](../decisions/ADR-020-pyodide-code-execution.md)); Cell-level isolation ([ADR-009](../decisions/ADR-009-multitenancy-3-levels.md))
+- **Митигация:** [ADR-014](../decisions/ADR-014-security.md): RBAC 5 уровней, DLP-сканер на выходе MCP-tools, изоляция memory от tool-output, операционная гигиена (zero standing access, JIT-доступ, шифрование backup, audit ПДн, 2FA, immutable log, ISO/SOC roadmap); Pyodide мitigates для analytics (всё в браузере клиента, [ADR-020](../decisions/ADR-020-pyodide-code-execution.md)); Cell-level isolation ([ADR-009](../decisions/ADR-009-multitenancy-3-levels.md)); **deployed Phase 00.1 (Session-2026-05-17):** secrets scanning (gitleaks + trufflehog в CI и pre-commit), `.env` gitignored, dev secrets явно изолированы от staging/prod через PLACEHOLDERS.md
 - **Monitoring:** rate DLP-срабатываний, alert на массовую выборку ПДн, audit log review weekly
 
 ## R-06. Ошибки/конфликты AI-агентов разработки
 
 - **Severity:** medium · **Likelihood:** high · **Owner:** Tech Lead
-- **Митигация:** [ADR-015](../decisions/ADR-015-ai-dev-process.md): Tier-based ревью, CI-gates (SAST/secrets/license/SBOM), AI изолирован от prod, worktree-per-task, cost caps, специализированные роли (Planner/Coder/Tester/Reviewer/Security-Auditor/DevOps)
+- **Митигация:** [ADR-015](../decisions/ADR-015-ai-dev-process.md): Tier-based ревью, CI-gates (SAST/secrets/license/SBOM), AI изолирован от prod, worktree-per-task, cost caps, специализированные роли (Planner/Coder/Tester/Reviewer/Security-Auditor/DevOps); **deployed Phase 00.1 (Session-2026-05-17):** supply-chain CI gates — pip-audit (Python CVE) + npm audit (Node CVE) + pip-licenses + license-checker-rseidelsohn (forbid GPL/AGPL/LGPL) + Trivy filesystem scan + Syft SBOM + Grype vuln scan + Bandit static analysis
 - **Monitoring:** PR acceptance rate, bug introduction rate (30-day window), AI cost per PR
 
 ## R-07. Резкие пики/спады нагрузки

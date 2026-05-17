@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/*
+ * Phase 00.1 — baseline Tailwind v4 entrypoint.
+ *
+ * Design tokens (color scales, spacing, radii, font ramps) materialize
+ * в Phase 00.7 как ``@theme`` блок ниже + отдельный ``tokens.css`` импорт.
+ * До тех пор используем дефолты Tailwind v4 (neutral palette).
+ */
+
+@theme {
+  /* placeholder — Phase 00.7 заполнит design tokens из .planning/ui/ */
+}

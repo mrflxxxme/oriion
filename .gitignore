@@ -30,6 +30,7 @@ htmlcov/
 .tox/
 venv/
 .venv/
+coverage/
 
 # Node
 node_modules/
@@ -45,7 +46,25 @@ logs/
 
 # Build artifacts
 *.tsbuildinfo
+coverage.xml
+*.lcov
+
+# Frontend build
+.vite/
+.vitest-cache/
+
+# uv (Python)
+uv.lock.bak
+
+# Docker / runtime data
+docker-compose.override.yml
 
 # Temporary files
 *.tmp
 *.bak
+
+# Claude Code / oh-my-claudecode internal state — never committed
+.omc/
+.claude-flow/
+.swarm/
+.hive-mind/

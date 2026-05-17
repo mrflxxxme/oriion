@@ -1,0 +1,135 @@
+name: ci-backend
+
+# AC3: timeout-minutes ≤ 8 enforced
+# AC2: coverage ≥ 70% via pytest-cov --cov-fail-under
+# AC5: license-check step blocks GPL/AGPL/LGPL deps
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/workflows/ci-backend.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/**'
+      - '.github/workflows/ci-backend.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: lint + typecheck + test + security + license
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: oriion
+          POSTGRES_PASSWORD: oriion-dev
+          POSTGRES_DB: oriion_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U oriion -d oriion_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@localhost:5432/oriion_test
+      TEST_DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@localhost:5432/oriion_test
+      REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.4"
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install Python 3.12
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        working-directory: backend
+        run: uv sync --frozen 2>/dev/null || uv sync
+
+      - name: Enable pgvector + pg_trgm + unaccent extensions
+        env:
+          PGPASSWORD: oriion-dev
+        run: |
+          psql -h localhost -U oriion -d oriion_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          psql -h localhost -U oriion -d oriion_test -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+          psql -h localhost -U oriion -d oriion_test -c "CREATE EXTENSION IF NOT EXISTS unaccent;"
+
+      - name: Ruff lint + format check
+        working-directory: backend
+        run: |
+          uv run ruff check src tests
+          uv run ruff format --check src tests
+
+      - name: Mypy strict
+        working-directory: backend
+        run: uv run mypy --strict src
+
+      - name: Pytest + coverage [AC2 ≥ 70%]
+        working-directory: backend
+        run: |
+          uv run pytest \
+            --cov=src \
+            --cov-fail-under=70 \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -m "not integration"
+
+      - name: Bandit (security linter)
+        working-directory: backend
+        run: uv run bandit -r src -c pyproject.toml
+
+      - name: pip-audit (CVE scan)
+        working-directory: backend
+        # --skip-editable: skip local project (teamly-backend) — not on PyPI.
+        # --strict NOT used: treats skip-editable как error. Default exit
+        # behavior still fails CI если найдены CVE в audited packages.
+        run: uv run pip-audit --skip-editable
+
+      - name: License check — forbid GPL/AGPL/LGPL [AC5]
+        working-directory: backend
+        run: |
+          uv run pip-licenses \
+            --fail-on="GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0;LGPL-2.0;LGPL-2.1;LGPL-3.0" \
+            --format=markdown \
+            --with-license-file \
+            --no-license-path
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4
+        with:
+          file: backend/coverage.xml
+          flags: backend
+          fail_ci_if_error: false

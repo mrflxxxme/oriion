@@ -1,0 +1,40 @@
+# Caddyfile.dev — dev reverse proxy для TEAMLY_RU local stack
+#
+# - / → frontend dev server (Vite HMR через ws)
+# - /api/* → backend FastAPI (uvicorn с hot-reload)
+# - /minio/* → MinIO console (optional dev access)
+#
+# Prod-конфиг (TLS + Let's Encrypt) живёт в infra/Caddyfile.prod (Phase 00.6).
+
+{
+    auto_https off
+    admin off
+}
+
+:80 {
+    # Backend API
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy backend:8000
+    }
+
+    # MinIO console (dev convenience)
+    handle /minio/* {
+        uri strip_prefix /minio
+        reverse_proxy minio:9001
+    }
+
+    # Frontend Vite dev server (catch-all с websocket support для HMR)
+    handle {
+        reverse_proxy frontend:5173 {
+            header_up Connection {>Connection}
+            header_up Upgrade {>Upgrade}
+        }
+    }
+
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+}

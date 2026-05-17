@@ -71,8 +71,8 @@
 |---|---|---|
 | `TBD_GITHUB_ORG` | GitHub organization name | ⏳ |
 | `TBD_GITHUB_REPO` | Main repo name (например, teamly-ru) | ⏳ |
-| `TBD_GITLAB_SELFHOST_URL` | URL self-hosted GitLab mirror | ⏳ (поднять в Wave 0.1) |
-| `TBD_GITLAB_REPO` | Mirror repo URL | ⏳ |
+| `TBD_GITLAB_SELFHOST_URL` | URL self-hosted GitLab mirror | ⏳ deferred Wave 1+ per Phase 00.1 trim (Session-2026-05-17) |
+| `TBD_GITLAB_REPO` | Mirror repo URL | ⏳ deferred Wave 1+ |
 
 ## ЮKassa (OQ-19)
 

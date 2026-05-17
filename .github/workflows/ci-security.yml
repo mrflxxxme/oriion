@@ -1,0 +1,97 @@
+name: ci-security
+
+# AC3: timeout-minutes ≤ 8 enforced per job
+# AC4: gitleaks job blocks PRs с embedded secrets (e.g. AKIA[0-9A-Z]{16})
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
+jobs:
+  secrets-scan:
+    name: secrets — gitleaks + trufflehog
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks [AC4]
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: TruffleHog (verified secrets only)
+        uses: trufflesecurity/trufflehog@v3.84.2
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+  filesystem-scan:
+    name: filesystem — trivy
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan (vulnerabilities + misconfigs + secrets)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy SARIF to GitHub Security tab
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  sbom-and-grype:
+    name: SBOM (syft) + vuln scan (grype)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM (Syft)
+        id: sbom
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: true
+          upload-artifact-retention: 30
+
+      - name: Vulnerability scan (Grype)
+        uses: anchore/scan-action@v5
+        with:
+          sbom: sbom.spdx.json
+          severity-cutoff: high
+          fail-build: true
+          output-format: sarif
+
+      - name: Upload Grype SARIF to GitHub Security tab
+        if: ${{ !cancelled() }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

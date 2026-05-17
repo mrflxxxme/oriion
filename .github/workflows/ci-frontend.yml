@@ -1,0 +1,80 @@
+name: ci-frontend
+
+# AC3: timeout-minutes ≤ 8 enforced
+# AC2: coverage ≥ 70% via vitest --coverage threshold config
+# AC5: license-check step blocks GPL/AGPL/LGPL deps
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: lint + typecheck + test + audit + license
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps (npm ci)
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: ESLint (max-warnings=0)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Prettier — format check
+        working-directory: frontend
+        run: npm run format:check
+
+      - name: TypeScript strict typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Vitest + coverage [AC2 ≥ 70%]
+        working-directory: frontend
+        run: npm test
+
+      - name: Vite build smoke (catches build-time errors)
+        working-directory: frontend
+        run: npm run build
+
+      - name: npm audit (high+ severity)
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      - name: License check — forbid GPL/AGPL/LGPL [AC5]
+        working-directory: frontend
+        run: npm run license-check
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4
+        with:
+          file: frontend/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false

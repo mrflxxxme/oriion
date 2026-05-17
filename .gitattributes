@@ -1,0 +1,45 @@
+# Line endings — нормализованы на LF для cross-platform consistency.
+# Critical: Makefile + shell scripts + YAML CI workflows ОБЯЗАНЫ быть LF.
+
+* text=auto eol=lf
+
+# Explicit overrides — никогда CRLF, никогда auto
+Makefile      text eol=lf
+*.sh          text eol=lf
+*.bash        text eol=lf
+*.zsh         text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+Dockerfile    text eol=lf
+.dockerignore text eol=lf
+*.py          text eol=lf
+*.ts          text eol=lf
+*.tsx         text eol=lf
+*.js          text eol=lf
+*.jsx         text eol=lf
+*.mjs         text eol=lf
+*.cjs         text eol=lf
+*.json        text eol=lf
+*.toml        text eol=lf
+*.md          text eol=lf
+*.css         text eol=lf
+*.html        text eol=lf
+Caddyfile*    text eol=lf
+
+# Binary — никогда не diff'ятся
+*.png         binary
+*.jpg         binary
+*.jpeg        binary
+*.gif         binary
+*.ico         binary
+*.svg         text
+*.woff        binary
+*.woff2       binary
+*.pdf         binary
+*.zip         binary
+*.tar         binary
+*.gz          binary
+
+# Lock files — generated, no need для merge conflict resolution UI
+package-lock.json -diff
+uv.lock           -diff
