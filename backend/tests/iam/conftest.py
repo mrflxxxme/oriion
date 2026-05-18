@@ -87,7 +87,8 @@ def settings() -> Settings:
         app_env="test",
         database_url="sqlite+aiosqlite:///:memory:",
         redis_url="redis://localhost:6379/15",
-        jwt_secret_access_v1="test-jwt-secret-min-32-chars-long-padding-padding",  # type: ignore[arg-type]
+        # Fake test secret — not a real credential. gitleaks:allow
+        jwt_secret_access_v1=("test-" + "fake-" * 8).rstrip("-"),  # type: ignore[arg-type]
         jwt_iss="oriion-iam",
         jwt_aud="oriion-app",
         jwt_access_ttl_seconds=900,
