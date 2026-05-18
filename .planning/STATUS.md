@@ -40,13 +40,26 @@ Per session-decision (11 развилок resolved):
 - ✅ **AC7** (lint + typecheck) — backend ruff + ruff-format + mypy --strict; frontend eslint + prettier + tsc -b — all green локально + в CI
 - ⚠️ **AC1** (dev-bootstrap ≤ 600s) + **AC6** (compose healthchecks ≤ 180s) — **founder action**: верифицировать локально на машине со стабильным Docker Hub access (`cp .env.example .env && time docker compose -f infra/docker-compose.dev.yml up -d --build`). Session attempt failed на network EOF errors, не related к spec.
 
-**Следующая фаза:** Phase 00.2 (Custom JWT auth) — depends on OQ-04 (РКН-уведомление) close. **Parallel-ready без блокеров:** Phase 00.3 (DB + RLS + Cell schema) + Phase 00.4 (LLM gateway + MCP). Founder может стартовать 00.3 или 00.4 first если OQ-04 ещё открыт.
+**Следующая фаза:** Phase 00.2 (Custom JWT auth). **3-way parallel разблокирован** для phases 00.2 + 00.3 + 00.4 после landing'а architect-PR (2026-05-17). OQ-04 — submitted (dev unblocked; финальное подтверждение РКН — до prod-launch). Founder стартует 3 worktrees: `claude/phase-00-2-jwt-auth`, `claude/phase-00-3-db-rls`, `claude/phase-00-4-llm-gateway`. После merge всех 3-х PR — отдельная integration session `claude/phase-00-2-5-integration`.
+
+## Architect-PR (2026-05-17) — pre-Phase-00.2 contract extension
+
+Чтобы открыть 3-way parallel execution для Wave-0 phases 00.2 / 00.3 / 00.4 без race conditions и contract gaps, отдельный architect-PR (branch `claude/dazzling-satoshi-0a293d`) landed:
+
+- **`contracts/iam/schema.sql`** расширен 3 таблицами: `iam.consents` (FZ-152 ledger, версия pinned at grant), `iam.email_verification_tokens` (single-use, 24h TTL, SHA-256 hashed), `iam.password_reset_tokens` (single-use, 1h TTL, chain-revoke pattern по аналогии с refresh tokens).
+- **`contracts/iam/api.yaml`** расширен 4 новыми endpoint'ами (`/auth/verify-email`, `/auth/resend-verification`, `/auth/forgot-password`, `/auth/reset-password`). `RegisterRequest` теперь требует `consent_pdn: true` (else 422 `iam.consent.pdn_missing`); response — новый `RegisterResponse` schema с `{user_id, workspace_id, cell_id}`. Anti-enumeration инвариант на forgot/resend (всегда 202).
+- **`contracts/iam/events.yaml`** расширен 4 CloudEvents: `user.email_verification_requested.v1`, `user.password_reset_requested.v1`, `user.password_reset_completed.v1`, `user.consent_recorded.v1`.
+- **`contracts/iam/README.md`** обновлён 4 новыми инвариантами (consent pdn mandatory, verification token TTL/hashing, reset chain-revoke, anti-enumeration).
+- **`backend/migrations/versions/_shared/0001_init.py`** — новая foundation migration (поглощает scope ранее назначенный Phase 00.3): создаёт extensions (pgcrypto, citext, uuid-ossp, vector, pg_stat_statements), 12 bounded-context schemas, `_shared.set_updated_at()` trigger function, `oriion_app` NOLOGIN role с USAGE grants. Каждая phase'овая первая migration MUST set `down_revision = "_shared_0001_init"`.
+- **`backend/alembic.ini`** `version_locations` расширен 12-ю bounded-context subdirs (+ `.gitkeep` файлами).
+
+**Impact на Phase 00.3 scope:** schema-bootstrap step (CREATE SCHEMA + extensions + `_shared` trigger) **больше НЕ в скоупе 00.3** — done в architect-PR. 00.3 стартует прямо с multitenancy DDL.
 
 ## Active blockers
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
-| OQ-04 | РКН-уведомление | Founder + юрист | **Required до Phase 00.2** (auth = ПДн обработка) |
+| OQ-04 | РКН-уведомление | Founder + юрист | **Submitted** — dev unblocked. Final РКН confirmation required до prod-launch; dev/test работает на mock-данных, реальная обработка ПДн запрещена до closure. |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa (Wave 1) |
 
 > **Note:** OQ-13/14/15/16 (hiring) закрыты как `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home) (solo founder + 11 AI model). OQ-17 (funding) + OQ-18 (burn-budget) закрыты как `out-of-scope` per Session-2026-05-15 — founder-personal financial decisions не tracked в project docs (AI dev cost caps живут в `.claude/agents/_shared/cost-budget.yaml`).

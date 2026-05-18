@@ -139,9 +139,100 @@ COMMENT ON TABLE  iam.oauth_links IS 'External IdP linkages. Tokens encrypted AE
 COMMENT ON COLUMN iam.oauth_links.access_token_encrypted IS 'Ciphertext only. Plaintext MUST NOT be logged or persisted.';
 
 -- ---------------------------------------------------------------------
+-- Table: consents
+-- Purpose:
+--   FZ-152 / GDPR consent ledger. One row per (user, kind) grant. The
+--   `pdn` consent is mandatory before register completes (enforced at
+--   service layer — DB allows historical rows for soft-deleted users).
+--   Revocation is soft (revoked_at). Version is pinned at grant time so
+--   future Privacy Policy revisions do not retroactively change what the
+--   user agreed to.
+-- ---------------------------------------------------------------------
+CREATE TABLE iam.consents (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid NOT NULL REFERENCES iam.users(id) ON DELETE CASCADE,
+    kind            text NOT NULL
+        CHECK (kind IN ('pdn','marketing','tos')),
+    version         text NOT NULL,
+    ip              inet,
+    user_agent      text,
+    granted_at      timestamptz NOT NULL DEFAULT now(),
+    revoked_at      timestamptz
+);
+
+CREATE INDEX consents_user_kind_active_idx
+    ON iam.consents (user_id, kind)
+    WHERE revoked_at IS NULL;
+
+CREATE INDEX consents_user_id_idx ON iam.consents (user_id);
+
+COMMENT ON TABLE  iam.consents IS
+    'FZ-152 / GDPR consent ledger. pdn is mandatory before register; revocation is soft.';
+COMMENT ON COLUMN iam.consents.version IS
+    'Privacy Policy / consent-form version pinned at grant time. Never mutated.';
+
+-- ---------------------------------------------------------------------
+-- Table: email_verification_tokens
+-- Purpose:
+--   Single-use email-ownership proof tokens. Plaintext is sent via email
+--   only; storage holds SHA-256 hex hash so a DB read alone cannot complete
+--   verification. Expires after 24h. used_at marks consumption.
+-- ---------------------------------------------------------------------
+CREATE TABLE iam.email_verification_tokens (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid NOT NULL REFERENCES iam.users(id) ON DELETE CASCADE,
+    token_hash      text NOT NULL,
+    expires_at      timestamptz NOT NULL,
+    used_at         timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX email_verification_tokens_hash_uidx
+    ON iam.email_verification_tokens (token_hash);
+CREATE INDEX email_verification_tokens_user_active_idx
+    ON iam.email_verification_tokens (user_id, expires_at)
+    WHERE used_at IS NULL;
+
+COMMENT ON TABLE iam.email_verification_tokens IS
+    'Single-use email-verification tokens. SHA-256 hashed before storage; plaintext only over email.';
+
+-- ---------------------------------------------------------------------
+-- Table: password_reset_tokens
+-- Purpose:
+--   Single-use password-reset tokens. Plaintext sent via email only; storage
+--   holds SHA-256 hex hash. Expires after 1h. Reuse of a consumed token
+--   triggers chain-revoke of every outstanding reset token for the user
+--   (mirrors refresh-token rotation pattern). Belongs to a `reset_chain_id`
+--   so chain-revoke can be implemented without scanning all rows.
+-- ---------------------------------------------------------------------
+CREATE TABLE iam.password_reset_tokens (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             uuid NOT NULL REFERENCES iam.users(id) ON DELETE CASCADE,
+    token_hash          text NOT NULL,
+    reset_chain_id      uuid NOT NULL,
+    expires_at          timestamptz NOT NULL,
+    used_at             timestamptz,
+    revoked_at          timestamptz,
+    created_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX password_reset_tokens_hash_uidx
+    ON iam.password_reset_tokens (token_hash);
+CREATE INDEX password_reset_tokens_user_id_idx
+    ON iam.password_reset_tokens (user_id);
+CREATE INDEX password_reset_tokens_chain_idx
+    ON iam.password_reset_tokens (reset_chain_id);
+CREATE INDEX password_reset_tokens_user_active_idx
+    ON iam.password_reset_tokens (user_id, expires_at)
+    WHERE used_at IS NULL AND revoked_at IS NULL;
+
+COMMENT ON TABLE iam.password_reset_tokens IS
+    'Single-use password-reset tokens. Reuse of a used token revokes the entire reset_chain_id.';
+
+-- ---------------------------------------------------------------------
 -- Updated_at trigger pattern (applied via shared function in `_shared.sql`).
 -- Listed here as a reminder for the implementer; actual function definition
--- lives in the global migration bootstrap.
+-- lives in the global migration bootstrap (see _shared/0001_init.py).
 -- ---------------------------------------------------------------------
 -- CREATE TRIGGER users_set_updated_at        BEFORE UPDATE ON iam.users        FOR EACH ROW EXECUTE FUNCTION _shared.set_updated_at();
 -- CREATE TRIGGER oauth_links_set_updated_at  BEFORE UPDATE ON iam.oauth_links  FOR EACH ROW EXECUTE FUNCTION _shared.set_updated_at();

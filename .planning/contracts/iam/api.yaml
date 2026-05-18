@@ -19,6 +19,8 @@ servers:
 tags:
   - name: auth
     description: Registration, login, token rotation, logout.
+  - name: verification
+    description: Email verification and password reset.
   - name: sessions
     description: Session listing and revocation.
   - name: oauth
@@ -48,19 +50,34 @@ paths:
                   password: correct-horse-battery-staple
                   display_name: Анна
                   locale: ru-RU
+                  consent_pdn: true
+                  consent_marketing: false
       responses:
         '201':
-          description: User created.
+          description: |
+            User created. Initial workspace + cell are provisioned synchronously
+            (see `multitenancy` contract). Response also carries the user's
+            first email-verification token only via email — never in this body.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/User' }
+              schema: { $ref: '#/components/schemas/RegisterResponse' }
         '409':
           description: Email already in use.
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Error' }
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: |
+            Validation failed. Includes the case where `consent_pdn` was not
+            granted (FZ-152 requirement); body carries `code: iam.consent.pdn_missing`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Registration rate-limit exceeded for this (ip, email).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /auth/login:
     post:
@@ -128,6 +145,102 @@ paths:
       responses:
         '204':
           description: Logged out.
+
+  /auth/verify-email:
+    post:
+      tags: [verification]
+      summary: Consume a single-use email-verification token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VerifyEmailRequest' }
+      responses:
+        '200':
+          description: Email verified. `iam.users.email_verified_at` set to now().
+        '410':
+          description: Token expired, already used, or never existed.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/resend-verification:
+    post:
+      tags: [verification]
+      summary: Request a fresh email-verification token.
+      description: |
+        Anti-enumeration: always returns 202 regardless of whether the email
+        exists. If a user with that email exists and is not yet verified, a
+        new token is issued and emailed; previously-issued unused tokens for
+        that user are revoked.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResendVerificationRequest' }
+      responses:
+        '202':
+          description: Request accepted. No enumeration signal in body.
+        '429':
+          description: Rate-limit exceeded.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/forgot-password:
+    post:
+      tags: [verification]
+      summary: Request a password-reset token by email.
+      description: |
+        Anti-enumeration: always returns 202 regardless of whether the email
+        exists. If a user with that email exists, a new reset token (single-use,
+        1h TTL) is issued and emailed; previously-issued unused tokens for that
+        user are revoked.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForgotPasswordRequest' }
+      responses:
+        '202':
+          description: Request accepted. No enumeration signal in body.
+        '429':
+          description: Rate-limit exceeded.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/reset-password:
+    post:
+      tags: [verification]
+      summary: Consume a password-reset token and set a new password.
+      description: |
+        Single-use. Reuse of a previously-consumed token triggers chain-revoke
+        of every outstanding reset token for that user (mirrors refresh-token
+        rotation pattern) and emits `oriion.iam.session.revoked.v1` with
+        `reason=security_incident` for active sessions of the user.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetPasswordRequest' }
+      responses:
+        '200':
+          description: Password reset. All existing sessions for the user are revoked.
+        '410':
+          description: Token expired, already used, or chain-revoked.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Validation failed (e.g. new password too weak).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /auth/oauth/{provider}/callback:
     post:
@@ -250,12 +363,66 @@ components:
 
     RegisterRequest:
       type: object
-      required: [email, password]
+      required: [email, password, consent_pdn]
       properties:
+        email:             { type: string, format: email }
+        password:          { type: string, minLength: 12 }
+        display_name:      { type: string }
+        locale:            { type: string, default: ru-RU }
+        consent_pdn:
+          type: boolean
+          description: |
+            FZ-152 personal-data processing consent. MUST be `true` —
+            register returns 422 with `code: iam.consent.pdn_missing`
+            otherwise. The consent version in effect at grant time is
+            recorded in `iam.consents.version`.
+        consent_marketing:
+          type: boolean
+          default: false
+          description: Optional consent for marketing communications. Independently revocable.
+
+    RegisterResponse:
+      type: object
+      required: [user_id, workspace_id, cell_id, email]
+      properties:
+        user_id:      { type: string, format: uuid }
+        workspace_id: { type: string, format: uuid }
+        cell_id:      { type: string, format: uuid }
         email:        { type: string, format: email }
-        password:     { type: string, minLength: 12 }
-        display_name: { type: string }
-        locale:       { type: string, default: ru-RU }
+        email_verification_sent:
+          type: boolean
+          description: |
+            `true` if a verification email was queued/sent. In dev mode with
+            `REQUIRE_EMAIL_VERIFICATION=false` the value may still be `true`
+            (token written to email outbox) but the user is allowed to log in
+            without verifying.
+
+    VerifyEmailRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: The single-use plaintext token delivered via email.
+
+    ResendVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token:        { type: string, description: The single-use plaintext reset token delivered via email. }
+        new_password: { type: string, minLength: 12 }
 
     LoginRequest:
       type: object

@@ -49,6 +49,27 @@ the `user_id` and never reach into `iam` tables directly.
    retention horizon for downstream subscribers.
 5. OAuth provider tokens are stored **encrypted** (AES-256-GCM, KMS key per
    environment). Plaintext MUST NOT be logged.
+6. **Consent (`pdn`)** is **mandatory** before `POST /auth/register` completes
+   (FZ-152 art. 9). Missing or `false` value MUST yield 422 with
+   `code: iam.consent.pdn_missing`. The Privacy Policy / consent-form
+   `version` in effect at grant time is pinned in `iam.consents.version`
+   and never mutated retroactively. Revocation is soft (`revoked_at`).
+   Every consent grant/revoke MUST emit `oriion.iam.user.consent_recorded.v1`
+   AND write an immutable row to `audit.audit_log` via
+   `audit.emit_audit_event(action='iam.consent.granted'|'iam.consent.revoked', actor_id=user_id, payload={kind, version})`.
+7. **Email-verification tokens** are single-use, expire in **24h**, and stored
+   as **SHA-256 hex hashes** — plaintext goes only over email. Re-requesting
+   a token revokes any prior unused tokens for the same user.
+8. **Password-reset tokens** are single-use, expire in **1h**, stored as
+   SHA-256 hashes, and belong to a `reset_chain_id`. Presenting a token
+   whose `used_at IS NOT NULL` is a reuse attack: the implementer MUST
+   revoke every token sharing the same `reset_chain_id` AND revoke every
+   active session for the user (emitting `oriion.iam.session.revoked.v1`
+   with `reason=security_incident`).
+9. **Anti-enumeration**: `POST /auth/forgot-password` and
+   `POST /auth/resend-verification` MUST always respond with `202 Accepted`
+   regardless of whether the email exists. Rate-limit responses (429) are
+   acceptable; any other status reveals account existence.
 
 ## RLS
 
@@ -64,7 +85,22 @@ This context is **referenced by**:
 - `rbac` — `role_assignments.user_id` → `iam.users.id`
 - `tasks`, `billing`, `agents` — `created_by_user_id`, `actor_user_id`, etc.
 
-This context **references**: none. `iam` is the root of the user graph.
+This context **references** (architect-PR 2026-05-17):
+- `multitenancy.provision_initial_workspace(user_id) -> {workspace_id, cell_id}` — called
+  **synchronously** by `POST /auth/register` to seed the user's first workspace + cell.
+  IDs are returned in `RegisterResponse`. The 00.2 worktree imports a stub at
+  `backend/src/_stubs/multitenancy.py`; the real impl ships from Phase 00.3 at
+  `backend/src/multitenancy/services/workspace_service.py`; Phase 00.2.5 integration
+  swaps the import.
+- `audit.emit_audit_event(...)` — called for every auth-action (register / login /
+  logout / refresh / consent.granted|revoked / email_verified / password_reset.*).
+  Stub at `backend/src/_stubs/audit.py`; real impl from Phase 00.3 at
+  `backend/src/audit/services/audit_service.py`.
+
+These cross-context calls were introduced by the architect-PR to support the
+full-scope auth flow (consent recording + first-workspace provisioning at register).
+Before architect-PR, `iam` had no outgoing dependencies; this is now a deliberate
+exception, scoped to the register/auth-event path only.
 
 ## Events emitted
 
@@ -88,15 +124,26 @@ See [`events.yaml`](./events.yaml). Notable consumers:
 
 ## Phase references
 
-- **Phase 00.2** — Auth implementation (registration, login, refresh, logout).
-- **Phase 00.3** — DB + RLS bootstrap (creates the `iam` schema and applies
-  the DDL from `schema.sql` via Alembic in `backend/alembic/versions/iam/`).
+- **Architect-PR (pre-00.2)** — Extended this contract with `consents`,
+  `email_verification_tokens`, `password_reset_tokens` tables + 4 new
+  endpoints (verify-email / resend-verification / forgot-password /
+  reset-password) + 4 new CloudEvents + `_shared` Alembic bootstrap
+  migration (extensions + schema namespacing + `set_updated_at()` trigger
+  function). This absorbs Phase 00.3's bootstrap step so Phases 00.2 /
+  00.3 / 00.4 can run in 3-way parallel.
+- **Phase 00.2** — Auth implementation (registration with consent + initial
+  workspace provisioning, login, refresh-rotation, logout, email
+  verification, password reset, `/users/me`). Owns
+  `backend/migrations/versions/iam/`.
+- **Phase 00.3** — Multitenancy + audit + RLS (no longer owns schema
+  bootstrap — done in architect-PR). Owns `backend/migrations/versions/{multitenancy,audit}/`
+  and `backend/src/_shared/db/rls.py`.
 - **Phase 00.5** — WB-Seller vertical scaffolding consumes user identity for
   attribution / audit but does not extend the `iam` schema.
 
 ## Implementation notes (non-authoritative)
 
-- Alembic migrations live under `backend/alembic/versions/iam/` per ADR-024 §4.
+- Alembic migrations live under `backend/migrations/versions/iam/` per ADR-024 §4.
 - The `_shared.set_updated_at()` trigger function is defined in the global
   migration bootstrap; this context just wires triggers per table.
 - Access-token format is JWT (HS256 in Wave 0 with rotating secret; RS256 in
