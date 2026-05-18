@@ -106,6 +106,19 @@ jobs:
             --cov-report=term-missing \
             -m "not integration"
 
+      # Per-phase coverage gate: Phase 00.2 AC9 demands ≥85% on src/iam
+      # specifically. Without this, the global 70% gate hides regressions
+      # in the iam bounded context once other contexts (multitenancy,
+      # audit, llm_gateway, …) start adding less-covered code.
+      - name: Pytest iam-specific coverage [Phase 00.2 AC9 ≥ 85%]
+        working-directory: backend
+        run: |
+          uv run pytest tests/iam \
+            --cov=src.iam \
+            --cov-fail-under=85 \
+            --cov-report=term-missing \
+            -m "not integration"
+
       - name: Bandit (security linter)
         working-directory: backend
         run: uv run bandit -r src -c pyproject.toml

@@ -52,7 +52,7 @@ R-29 закрыт через founder personal vertical expertise (см. [`risks/
 
 ## Текущая phase
 
-**Wave 0 (Foundation) — Phase 00.1 ✅ Complete** (merged 2026-05-17 via PR #25). **Architect-PR (2026-05-17)** landed `iam` contract extension (consents + email/password-reset tokens + 4 new endpoints + 4 new CloudEvents) + `_shared` Alembic bootstrap (absorbs Phase 00.3 schema-bootstrap step) → unblocks **3-way parallel** for **Phase 00.2** (Custom JWT auth, full-scope) + **Phase 00.3** (multitenancy + audit + RLS) + **Phase 00.4** (LLM gateway + MCP). OQ-04 submitted (dev unblocked). Integration via separate **Phase 00.2.5** session after 3 PRs merge.
+**Wave 0 (Foundation) — Phase 00.1 ✅ Complete** (merged 2026-05-17 via PR #25). **Architect-PR (2026-05-17)** landed `iam` contract extension (consents + email/password-reset tokens + 4 new endpoints + 4 new CloudEvents) + `_shared` Alembic bootstrap (absorbs Phase 00.3 schema-bootstrap step) → unblocked **3-way parallel** for Phase 00.2 / 00.3 / 00.4. **Phase 00.2 ✅ Complete** (Custom JWT auth, full-scope, merged 2026-05-18 via PR #28; 14 atomic commits, AC1-AC10 green, src.iam coverage 86.69%). **Phase 00.3** (multitenancy + audit + RLS) + **Phase 00.4** (LLM gateway + MCP) — 🔄 In parallel (founder spawns separately). OQ-04 submitted (dev unblocked). Integration via separate **Phase 00.2.5** session after 00.3 + 00.4 merge.
 
 Rolling status + AC verification + блокеры — [`STATUS.md`](./STATUS.md).
 
