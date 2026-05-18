@@ -112,3 +112,43 @@ Append-only журнал AI-агентских сессий. Одна запис
   - D12 Coverage ≥85% for `backend/src/iam/`.
 - Next: founder reviews + merges this architect-PR → spawns 3 worktrees per HANDOFF.md «Next steps» section → after 3 PRs merge, opens Phase 00.2.5 integration session.
 - Refs: branch `claude/dazzling-satoshi-0a293d`; plan `C:\Users\KUklonskiy\.claude\plans\start-phase-00-2-of-dreamy-truffle.md`; phase specs `roadmap/wave-0-foundation/phases/00.{2,3,4}-*.md`; contracts `contracts/iam/*` + `contracts/multitenancy/*`.
+
+## 2026-05-18 · gifted-feistel-55966b · @claude-opus
+- Scope: Phase 00.2 — Custom JWT auth (full-scope per architect-PR §D3) implementation in the first of three parallel worktrees opened on the architect-PR foundation.
+- Done (14 atomic commits on `claude/gifted-feistel-55966b`):
+  - `chore(deps)`: structlog + email-validator added to `backend/pyproject.toml`.
+  - `feat(_shared)`: Settings (pydantic-settings; new env vars JWT_SECRET_ACCESS_V1, JWT_ISS, JWT_AUD, JWT_ACCESS_TTL_SECONDS, REFRESH_TTL_SECONDS, REQUIRE_EMAIL_VERIFICATION, CONSENT_VERSION_CURRENT, RATE_LIMIT_WINDOW_SECONDS, APP_ENV); structlog configurator (console in dev/test, JSON in prod/staging); AsyncEngine + get_db dependency; redis.asyncio singleton + get_redis; DeclarativeBase. `.env.example` extended.
+  - `feat(_stubs)`: multitenancy.provision_initial_workspace (uuid5 deterministic) and audit.emit_audit_event (structlog tag) — contract-locked stubs replaced in Phase 00.2.5.
+  - `feat(iam,migrations)`: 6 alembic migrations matching `contracts/iam/schema.sql` 1:1 (users / oauth_links / consents / sessions+refresh_tokens / email_verification_tokens / password_reset_tokens). Each migration chains onto `_shared_0001_init` and GRANTs DML to `oriion_app`.
+  - `feat(iam) models`: SQLAlchemy 2.x `User, OAuthLink, Consent, Session, RefreshToken, EmailVerificationToken, PasswordResetToken` with schema=iam, partial indexes, CHECK constraints, cascade relationships.
+  - `feat(iam) schemas+exceptions`: Pydantic 2.x request/response models per `contracts/iam/api.yaml` (extra='forbid'; password min_length=12). `IamError` + 11 subclasses each carrying RFC 7807 code + status_code + title; `RateLimitExceeded` carries `retry_after` for the response header.
+  - `feat(iam) password_service`: PasswordHasher(t=3, m=64MB, p=4) production / DI override for fast test hasher.
+  - `feat(iam) token_service`: HS256 JWT issue/verify with claims sub/sid/jti/iat/exp/iss/aud/type; Redis blacklist via `SET blacklist:jwt:{jti} 1 EX <ttl>`; opaque refresh tokens (`secrets.token_urlsafe(32)`) hashed via SHA-256 hex for storage; 256-bit entropy validated in tests.
+  - `feat(iam) rate_limit_service`: Lua INCR+EXPIRE-on-first-hit atomic; per-scope thresholds (login/register 5/15min, forgot/resend 3/15min anti-spam, refresh 30/min, verify/reset 10/min); email normalised (strip+lower) before mixing into key.
+  - `feat(iam) repositories`: 6 thin SQLAlchemy session wrappers (User/Session/RefreshToken/Consent/EmailVerification/PasswordReset) — no business logic.
+  - `feat(iam) consent_service`: FZ-152 ledger with version pinning + emits oriion.iam.user.consent_recorded.v1 + audit event on every grant/revoke.
+  - `feat(iam) email_service`: EmailSender Protocol + 3 impls (Console / NoOp / InMemory). No `iam.email_outbox` table (would require contract extension).
+  - `feat(iam) events.py`: 11 CloudEvents emit_* matching `contracts/iam/events.yaml` 1:1. Wave 0 sink = structlog tagged cloudevent=True (swap to Redis Streams in Wave 1+).
+  - `feat(iam) auth_service`: orchestrates register / login / logout / rotate_refresh (OWASP single-use chain-revoke) / verify_email / resend_verification (anti-enum) / forgot_password (anti-enum) / reset_password (chain-revoke + revoke ALL sessions on reuse per invariant 8).
+  - `feat(iam) middleware`: `get_current_user` FastAPI dependency — parses Bearer, verifies JWT (incl. Redis blacklist), loads User, raises TokenInvalid on missing/deleted user. `get_current_user_id` convenience helper.
+  - `feat(iam) routers + deps + main`: 8 auth endpoints under `/api/v1/auth/*` + GET/PATCH `/api/v1/users/me` + DI factories chaining Settings→Redis→AsyncSession→services + IamError handler emitting RFC 7807 application/problem+json with code/status/instance/Retry-After.
+  - `test(iam)`: 76 unit tests under `tests/iam/unit/` covering all 10 phase-spec ACs. Includes FakeRedis (in-process Lua-script emulator), InMemoryEmailSender (test fixture), fast Argon2 hasher (t=1/m=1KB/p=1) for sub-second suite. Coverage on `src.iam` = **86.69%** (gate AC9 ≥85% passed).
+- Decisions resolved (this session via /grill-me before execution; 10 branches): see plan `C:\Users\KUklonskiy\.claude\plans\start-phase-00-2-per-resilient-noodle.md` — endpoint scope=10 (skip /auth/sessions + OAuth), URL prefix=/api/v1, email-sender=Console+InMemory (no DB outbox), test=hybrid unit+integration, JWT claims sub/sid/jti+blacklist, rate-limit per (ip,email) with email anti-spam variants, argon2 defaults + DI test-fast, CloudEvents=log-only envelope, 6 migrations with oauth_links separate, branch retained `gifted-feistel-55966b`.
+- AC scoreboard (against `.planning/roadmap/wave-0-foundation/phases/00.2-custom-jwt-auth.md`):
+  - AC1 register → 201 with workspace+cell IDs ✅ (test_register_201 + test_register_happy_path)
+  - AC2 login → TokenPair ✅ (test_login_200 + test_login_returns_token_pair)
+  - AC3 /me requires JWT ✅ (test_get_me_401_without_auth + test_get_me_200_with_override)
+  - AC4 revoked JWT → 401 ✅ (test_blacklist_and_verify_raises_token_revoked)
+  - AC5 refresh chain-revoke ✅ (test_refresh_reuse_revokes_chain + test_refresh_chain_revoke_401)
+  - AC6 consent recorded ✅ (test_register_happy_path asserts consent_repo.record awaited)
+  - AC7 email verification gate ✅ (test_login_email_not_verified_when_gate_on)
+  - AC8 6-я login → 429 ✅ (test_login_6th_attempt_is_blocked_with_retry_after + test_register_rate_limit_429_with_retry_after)
+  - AC9 coverage ≥85% ✅ (86.69% on src.iam)
+  - AC10 audit emission per auth-event ✅ (auth_service emits via _stubs.audit; test_all_emit_functions_run_without_raising)
+- Known caveats / deferred to 00.2.5 integration:
+  - Repository layer is exercised at <60% via mocks — remaining branches covered by integration tests against real Postgres in 00.2.5 (per Q4 hybrid plan).
+  - `alembic upgrade head` not run on Windows due to pre-existing alembic.ini cp1251 decode issue (Phase 00.1 artefact, not introduced here) — migrations validated via Python AST import; chain is unbroken.
+  - `oauth_links` is DDL-only; Wave 1 owns OAuth code.
+  - `iam.sessions` GET/DELETE endpoints intentionally skipped (Q1 scope=10).
+- Next: founder reviews + merges this PR alongside 00.3 + 00.4 → Phase 00.2.5 integration session deletes `backend/src/_stubs/` and rewires imports to real impls from 00.3 + runs full E2E smoke against real Postgres+Redis.
+- Refs: branch `claude/gifted-feistel-55966b`; plan `C:\Users\KUklonskiy\.claude\plans\start-phase-00-2-per-resilient-noodle.md`; phase-spec `.planning/roadmap/wave-0-foundation/phases/00.2-custom-jwt-auth.md`; session-context `.planning/_session-context/2026-05-17-architect-pr-3-way-parallel.md` Step 1a; contracts `.planning/contracts/iam/*`.

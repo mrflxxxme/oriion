@@ -1,0 +1,6 @@
+# gitleaks false-positive allowlist (fingerprint format: commit:file:rule:line)
+# Test fixtures with synthetic JWT secrets are not real credentials. The
+# current source (since 5be4ba5) uses a low-entropy constructed string;
+# this entry is kept so the original Phase 00.2 test commit (9179b9f)
+# does not retroactively fail the `--first-parent` PR diff scan.
+9179b9fd5cea58cc08b37f557796dc120a95a669:backend/tests/iam/conftest.py:generic-api-key:90

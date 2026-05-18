@@ -30,6 +30,8 @@ Per session-decision (11 развилок resolved):
 
 ## Текущая активная фаза
 
+**Phase 00.2 (Custom JWT auth, full-scope)** — ✅ **Code-complete** on branch `claude/gifted-feistel-55966b` (2026-05-18). Pending PR review + merge alongside parallel 00.3 + 00.4. 14 atomic commits; **AC1-AC10 all green**; src.iam coverage **86.69%** (AC9 gate ≥85%); 76 unit tests pass; ruff + mypy --strict clean. Full breakdown in [`HANDOFF.md`](./HANDOFF.md). After merge of 00.2 + 00.3 + 00.4 — Phase 00.2.5 integration session swaps `backend/src/_stubs/` for real impls.
+
 **Phase 00.1 (Repo & CI/CD)** — ✅ **Complete** (merged 2026-05-17 via [PR #25](https://github.com/mrflxxxme/oriion/pull/25), merge-commit `b192c6b`).
 
 **Final AC scoreboard:**

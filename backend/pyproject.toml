@@ -21,6 +21,8 @@ dependencies = [
     "httpx>=0.28,<0.29",
     "PyJWT[crypto]>=2.10,<3.0",
     "argon2-cffi>=23.1,<24.0",
+    "structlog>=24.4,<25.0",
+    "email-validator>=2.2,<3.0",
 ]
 
 [dependency-groups]
@@ -70,6 +72,18 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S", "ARG"]
+# Domain-exception names follow phase-spec naming (no Error suffix) per ADR-024
+# contract conformance — exceptions surface as error codes, not class names.
+"**/exceptions.py" = ["N818"]
+# FastAPI idiom: Depends() / Header() in argument defaults is the canonical pattern.
+"**/routers/**" = ["B008"]
+"**/middleware.py" = ["B008"]
+"**/deps.py" = ["B008"]
+# Protocol implementations + anti-enum stubs intentionally ignore some args
+# (NoOpEmailSender drops token/expires_at; resend/forgot ignore user_agent
+# since rate-limit is keyed on email only).
+"**/email_service.py" = ["ARG002"]
+"**/auth_service.py" = ["ARG002"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -101,6 +115,11 @@ python_files = ["test_*.py"]
 addopts = "--strict-markers -ra"
 markers = [
     "integration: integration tests requiring docker-compose stack (deselect with '-m \"not integration\"')",
+]
+# Promote warnings to errors so the suite never silently grows noise.
+# Add narrow ignores below if a third-party deprecation can't be avoided.
+filterwarnings = [
+    "error",
 ]
 
 [tool.coverage.run]
