@@ -72,6 +72,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S", "ARG"]
+# Domain-exception names follow phase-spec naming (no Error suffix) per ADR-024
+# contract conformance — exceptions surface as error codes, not class names.
+"**/exceptions.py" = ["N818"]
 
 [tool.ruff.format]
 quote-style = "double"
