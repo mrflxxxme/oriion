@@ -75,6 +75,15 @@ ignore = [
 # Domain-exception names follow phase-spec naming (no Error suffix) per ADR-024
 # contract conformance — exceptions surface as error codes, not class names.
 "**/exceptions.py" = ["N818"]
+# FastAPI idiom: Depends() / Header() in argument defaults is the canonical pattern.
+"**/routers/**" = ["B008"]
+"**/middleware.py" = ["B008"]
+"**/deps.py" = ["B008"]
+# Protocol implementations + anti-enum stubs intentionally ignore some args
+# (NoOpEmailSender drops token/expires_at; resend/forgot ignore user_agent
+# since rate-limit is keyed on email only).
+"**/email_service.py" = ["ARG002"]
+"**/auth_service.py" = ["ARG002"]
 
 [tool.ruff.format]
 quote-style = "double"

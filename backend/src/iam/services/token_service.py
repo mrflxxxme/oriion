@@ -79,9 +79,7 @@ class TokenService:
             self._settings.jwt_secret_access_v1.get_secret_value(),
             algorithm="HS256",
         )
-        return IssuedAccessToken(
-            token=token, jti=jti, expires_at=exp_dt, expires_in=ttl
-        )
+        return IssuedAccessToken(token=token, jti=jti, expires_at=exp_dt, expires_in=ttl)
 
     async def verify_access_token(self, token: str) -> AccessTokenClaims:
         """Decode + validate JWT and Redis blacklist.

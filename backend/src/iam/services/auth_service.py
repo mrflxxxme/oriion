@@ -1,0 +1,501 @@
+"""Auth orchestration — composes everything in iam.services + repositories.
+
+Public methods:
+    register                      — POST /auth/register
+    login                         — POST /auth/login
+    logout                        — POST /auth/logout
+    rotate_refresh                — POST /auth/refresh
+    verify_email                  — POST /auth/verify-email
+    resend_verification           — POST /auth/resend-verification (anti-enum 202)
+    forgot_password               — POST /auth/forgot-password     (anti-enum 202)
+    reset_password                — POST /auth/reset-password
+
+All cross-context calls go through stubs (multitenancy / audit); Phase 00.2.5
+swaps imports to real impls landed by Phase 00.3.
+"""
+
+from __future__ import annotations
+
+import secrets
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
+
+from src._stubs.audit import emit_audit_event
+from src._stubs.multitenancy import provision_initial_workspace
+from src.iam import events
+from src.iam.exceptions import (
+    ConsentMissing,
+    EmailAlreadyRegistered,
+    EmailNotVerified,
+    InvalidCredentials,
+    RateLimitExceeded,
+    TokenNotFound,
+    TokenRotationError,
+)
+from src.iam.repositories.consent_repository import ConsentRepository
+from src.iam.repositories.email_verification_repository import (
+    EmailVerificationTokenRepository,
+)
+from src.iam.repositories.password_reset_repository import PasswordResetTokenRepository
+from src.iam.repositories.refresh_token_repository import RefreshTokenRepository
+from src.iam.repositories.session_repository import SessionRepository
+from src.iam.repositories.user_repository import UserRepository
+from src.iam.schemas import (
+    LoginCommand,
+    RegisterCommand,
+    RegisterResult,
+    TokenPair,
+    UserResponse,
+)
+from src.iam.services.consent_service import ConsentService
+from src.iam.services.email_service import EmailSender
+from src.iam.services.password_service import PasswordService
+from src.iam.services.rate_limit_service import RateLimitService
+from src.iam.services.token_service import TokenService
+
+# Token TTLs per contract README invariants 7+8
+EMAIL_VERIFICATION_TTL_SECONDS = 24 * 3600  # 24h
+PASSWORD_RESET_TTL_SECONDS = 3600  # 1h
+
+
+def _hash_token_plaintext(plaintext: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
+
+
+def _new_token_plaintext() -> str:
+    return secrets.token_urlsafe(32)
+
+
+class AuthService:
+    def __init__(
+        self,
+        *,
+        user_repo: UserRepository,
+        session_repo: SessionRepository,
+        refresh_repo: RefreshTokenRepository,
+        consent_repo: ConsentRepository,
+        email_verif_repo: EmailVerificationTokenRepository,
+        password_reset_repo: PasswordResetTokenRepository,
+        password_service: PasswordService,
+        token_service: TokenService,
+        rate_limit_service: RateLimitService,
+        consent_service: ConsentService,
+        email_sender: EmailSender,
+        require_email_verification: bool,
+        refresh_ttl_seconds: int,
+        access_ttl_seconds: int,
+    ) -> None:
+        self._user_repo = user_repo
+        self._session_repo = session_repo
+        self._refresh_repo = refresh_repo
+        self._consent_repo = consent_repo
+        self._email_verif_repo = email_verif_repo
+        self._password_reset_repo = password_reset_repo
+        self._password_service = password_service
+        self._token_service = token_service
+        self._rate_limit_service = rate_limit_service
+        self._consent_service = consent_service
+        self._email_sender = email_sender
+        self._require_email_verification = require_email_verification
+        self._refresh_ttl_seconds = refresh_ttl_seconds
+        self._access_ttl_seconds = access_ttl_seconds
+
+    # ── register ────────────────────────────────────────────────────────
+
+    async def register(self, cmd: RegisterCommand) -> RegisterResult:
+        if not cmd.consent_pdn:
+            raise ConsentMissing()
+
+        # Rate-limit per (ip, email)
+        if cmd.ip:
+            verdict = await self._rate_limit_service.check_and_increment(
+                scope="register", ip=cmd.ip, email=cmd.email
+            )
+            if not verdict.allowed:
+                raise RateLimitExceeded(retry_after=verdict.retry_after)
+
+        if await self._user_repo.find_by_email(cmd.email):
+            raise EmailAlreadyRegistered()
+
+        password_hash = self._password_service.hash(cmd.password)
+        user = await self._user_repo.create(
+            email=cmd.email,
+            password_hash=password_hash,
+            display_name=cmd.display_name,
+            locale=cmd.locale,
+        )
+
+        # FZ-152 consent recording
+        await self._consent_service.record(
+            user_id=user.id, kind="pdn", ip=cmd.ip, user_agent=cmd.user_agent
+        )
+        if cmd.consent_marketing:
+            await self._consent_service.record(
+                user_id=user.id,
+                kind="marketing",
+                ip=cmd.ip,
+                user_agent=cmd.user_agent,
+            )
+
+        # Provision first workspace via stub (00.3 real impl in 00.2.5)
+        provision = await provision_initial_workspace(user.id)
+
+        # Issue email-verification token
+        plaintext = _new_token_plaintext()
+        token_hash = _hash_token_plaintext(plaintext)
+        expires_at = datetime.now(UTC) + timedelta(seconds=EMAIL_VERIFICATION_TTL_SECONDS)
+        verif_row = await self._email_verif_repo.create(
+            user_id=user.id, token_hash=token_hash, expires_at=expires_at
+        )
+        await self._email_sender.send_verification_email(
+            to=user.email, token=plaintext, expires_at=expires_at
+        )
+
+        # Audit + CloudEvents
+        registered_at = user.created_at or datetime.now(UTC)
+        await events.emit_user_registered(
+            user_id=user.id, email=user.email, registered_at=registered_at
+        )
+        await events.emit_email_verification_requested(
+            user_id=user.id,
+            email=user.email,
+            token_id=verif_row.id,
+            expires_at=expires_at,
+        )
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=user.id,
+            action="iam.user.registered",
+            resource_type="user",
+            resource_id=user.id,
+            payload={"email": user.email, "workspace_id": str(provision.workspace_id)},
+            ip=cmd.ip,
+            user_agent=cmd.user_agent,
+        )
+
+        return RegisterResult(
+            user_id=user.id,
+            workspace_id=provision.workspace_id,
+            cell_id=provision.cell_id,
+            email=user.email,
+            email_verification_sent=True,
+        )
+
+    # ── login ───────────────────────────────────────────────────────────
+
+    async def login(self, cmd: LoginCommand) -> TokenPair:
+        if cmd.ip:
+            verdict = await self._rate_limit_service.check_and_increment(
+                scope="login", ip=cmd.ip, email=cmd.email
+            )
+            if not verdict.allowed:
+                raise RateLimitExceeded(retry_after=verdict.retry_after)
+
+        user = await self._user_repo.find_by_email(cmd.email)
+        if user is None or user.password_hash is None:
+            raise InvalidCredentials()
+
+        if not self._password_service.verify(user.password_hash, cmd.password):
+            raise InvalidCredentials()
+
+        if self._require_email_verification and user.email_verified_at is None:
+            raise EmailNotVerified()
+
+        return await self._issue_token_pair(user_id=user.id, ip=cmd.ip, user_agent=cmd.user_agent)
+
+    async def _issue_token_pair(
+        self,
+        *,
+        user_id: UUID,
+        ip: str | None,
+        user_agent: str | None,
+        rotation_chain_id: UUID | None = None,
+    ) -> TokenPair:
+        session = await self._session_repo.create(
+            user_id=user_id,
+            ip=ip,
+            user_agent=user_agent,
+            ttl_seconds=self._refresh_ttl_seconds,
+        )
+        access = self._token_service.issue_access_token(user_id=user_id, session_id=session.id)
+        refresh = self._token_service.generate_refresh_token()
+        chain_id = rotation_chain_id or uuid4()
+        await self._refresh_repo.create(
+            session_id=session.id,
+            token_hash=refresh.token_hash,
+            rotation_chain_id=chain_id,
+            expires_at=refresh.expires_at,
+        )
+        await events.emit_session_created(
+            session_id=session.id,
+            user_id=user_id,
+            expires_at=session.expires_at,
+            ip=ip,
+        )
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=user_id,
+            action="iam.auth.login",
+            resource_type="session",
+            resource_id=session.id,
+            payload=None,
+            ip=ip,
+            user_agent=user_agent,
+        )
+        return TokenPair(
+            access_token=access.token,
+            refresh_token=refresh.plaintext,
+            expires_in=access.expires_in,
+        )
+
+    # ── logout ──────────────────────────────────────────────────────────
+
+    async def logout(
+        self,
+        refresh_token: str,
+        access_jti: UUID | None = None,
+        access_remaining_ttl: int | None = None,
+    ) -> None:
+        token_hash = self._token_service.hash_refresh_token(refresh_token)
+        row = await self._refresh_repo.find_by_hash(token_hash)
+        if row is None:
+            return  # logout is idempotent
+
+        await self._session_repo.revoke(row.session_id)
+        await self._refresh_repo.revoke_chain(row.rotation_chain_id)
+        if access_jti is not None and access_remaining_ttl is not None:
+            await self._token_service.blacklist_jti(access_jti, access_remaining_ttl)
+        await events.emit_session_revoked(session_id=row.session_id, reason="user_action")
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=UUID(int=0),  # actor unknown post-logout; replaced in 00.3 audit
+            action="iam.auth.logout",
+            resource_type="session",
+            resource_id=row.session_id,
+            payload=None,
+        )
+
+    # ── rotate_refresh (OWASP chain-revoke) ─────────────────────────────
+
+    async def rotate_refresh(
+        self, refresh_token: str, *, ip: str | None, user_agent: str | None
+    ) -> TokenPair:
+        if ip:
+            verdict = await self._rate_limit_service.check_and_increment(scope="refresh", ip=ip)
+            if not verdict.allowed:
+                raise RateLimitExceeded(retry_after=verdict.retry_after)
+
+        token_hash = self._token_service.hash_refresh_token(refresh_token)
+        old = await self._refresh_repo.find_by_hash(token_hash)
+        if old is None:
+            raise TokenRotationError("refresh token not found")
+
+        # Reuse detection: a token presented twice → chain-revoke entire branch
+        if old.used_at is not None or old.revoked_at is not None:
+            await self._refresh_repo.revoke_chain(old.rotation_chain_id)
+            await self._session_repo.revoke(old.session_id)
+            await events.emit_session_revoked(session_id=old.session_id, reason="security_incident")
+            await emit_audit_event(
+                actor_type="system",
+                actor_id=UUID(int=0),
+                action="iam.auth.refresh_reuse_detected",
+                resource_type="session",
+                resource_id=old.session_id,
+                payload={"rotation_chain_id": str(old.rotation_chain_id)},
+                ip=ip,
+                user_agent=user_agent,
+            )
+            raise TokenRotationError("refresh token already used — chain revoked")
+
+        session = await self._session_repo.find_by_id(old.session_id)
+        if session is None or session.revoked_at is not None:
+            raise TokenRotationError("session revoked")
+
+        # Issue replacement pair on the same rotation_chain_id
+        access = self._token_service.issue_access_token(
+            user_id=session.user_id, session_id=session.id
+        )
+        new_refresh = self._token_service.generate_refresh_token()
+        new_row = await self._refresh_repo.create(
+            session_id=session.id,
+            token_hash=new_refresh.token_hash,
+            rotation_chain_id=old.rotation_chain_id,
+            expires_at=new_refresh.expires_at,
+        )
+        await self._refresh_repo.mark_used_and_link(old.id, new_row.id)
+        await events.emit_refresh_rotated(
+            old_token_id=old.id,
+            new_token_id=new_row.id,
+            rotation_chain_id=old.rotation_chain_id,
+        )
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=session.user_id,
+            action="iam.auth.refresh",
+            resource_type="session",
+            resource_id=session.id,
+            payload=None,
+            ip=ip,
+            user_agent=user_agent,
+        )
+        return TokenPair(
+            access_token=access.token,
+            refresh_token=new_refresh.plaintext,
+            expires_in=access.expires_in,
+        )
+
+    # ── verify-email ────────────────────────────────────────────────────
+
+    async def verify_email(self, plaintext_token: str) -> None:
+        token_hash = _hash_token_plaintext(plaintext_token)
+        row = await self._email_verif_repo.find_active_by_hash(token_hash)
+        if row is None or row.expires_at < datetime.now(UTC):
+            raise TokenNotFound()
+        await self._email_verif_repo.mark_used(row.id)
+        await self._user_repo.mark_email_verified(row.user_id)
+        verified_at = datetime.now(UTC)
+        await events.emit_email_verified(user_id=row.user_id, verified_at=verified_at)
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=row.user_id,
+            action="iam.user.email_verified",
+            resource_type="user",
+            resource_id=row.user_id,
+            payload=None,
+        )
+
+    # ── resend-verification (anti-enum 202) ─────────────────────────────
+
+    async def resend_verification(
+        self, email: str, *, ip: str | None, user_agent: str | None
+    ) -> None:
+        if ip:
+            verdict = await self._rate_limit_service.check_and_increment(
+                scope="resend", ip=ip, email=email
+            )
+            if not verdict.allowed:
+                raise RateLimitExceeded(retry_after=verdict.retry_after)
+
+        user = await self._user_repo.find_by_email(email)
+        if user is None or user.email_verified_at is not None:
+            return  # anti-enum: do not signal existence
+
+        await self._email_verif_repo.revoke_unused_for_user(user.id)
+        plaintext = _new_token_plaintext()
+        expires_at = datetime.now(UTC) + timedelta(seconds=EMAIL_VERIFICATION_TTL_SECONDS)
+        row = await self._email_verif_repo.create(
+            user_id=user.id,
+            token_hash=_hash_token_plaintext(plaintext),
+            expires_at=expires_at,
+        )
+        await self._email_sender.send_verification_email(
+            to=user.email, token=plaintext, expires_at=expires_at
+        )
+        await events.emit_email_verification_requested(
+            user_id=user.id,
+            email=user.email,
+            token_id=row.id,
+            expires_at=expires_at,
+        )
+
+    # ── forgot-password (anti-enum 202) ─────────────────────────────────
+
+    async def forgot_password(self, email: str, *, ip: str | None, user_agent: str | None) -> None:
+        if ip:
+            verdict = await self._rate_limit_service.check_and_increment(
+                scope="forgot", ip=ip, email=email
+            )
+            if not verdict.allowed:
+                raise RateLimitExceeded(retry_after=verdict.retry_after)
+
+        user = await self._user_repo.find_by_email(email)
+        if user is None:
+            return  # anti-enum
+
+        await self._password_reset_repo.revoke_unused_for_user(user.id)
+        plaintext = _new_token_plaintext()
+        expires_at = datetime.now(UTC) + timedelta(seconds=PASSWORD_RESET_TTL_SECONDS)
+        chain_id = uuid4()
+        row = await self._password_reset_repo.create(
+            user_id=user.id,
+            token_hash=_hash_token_plaintext(plaintext),
+            reset_chain_id=chain_id,
+            expires_at=expires_at,
+        )
+        await self._email_sender.send_password_reset_email(
+            to=user.email, token=plaintext, expires_at=expires_at
+        )
+        await events.emit_password_reset_requested(
+            user_id=user.id,
+            token_id=row.id,
+            reset_chain_id=chain_id,
+            expires_at=expires_at,
+        )
+
+    # ── reset-password ──────────────────────────────────────────────────
+
+    async def reset_password(self, plaintext_token: str, new_password: str) -> None:
+        token_hash = _hash_token_plaintext(plaintext_token)
+        row = await self._password_reset_repo.find_by_hash(token_hash)
+        if row is None or row.revoked_at is not None or row.expires_at < datetime.now(UTC):
+            raise TokenNotFound()
+
+        # Reuse detection: a consumed token presented again → chain-revoke
+        if row.used_at is not None:
+            await self._password_reset_repo.revoke_chain(row.reset_chain_id)
+            await self._session_repo.revoke_all_for_user(row.user_id)
+            await emit_audit_event(
+                actor_type="system",
+                actor_id=row.user_id,
+                action="iam.auth.reset_reuse_detected",
+                resource_type="user",
+                resource_id=row.user_id,
+                payload={"reset_chain_id": str(row.reset_chain_id)},
+            )
+            raise TokenNotFound()
+
+        new_hash = self._password_service.hash(new_password)
+        await self._user_repo.update_password_hash(row.user_id, new_hash)
+        await self._password_reset_repo.mark_used(row.id)
+        # Per invariant 8: revoke every active session for the user
+        await self._session_repo.revoke_all_for_user(row.user_id)
+        completed_at = datetime.now(UTC)
+        await events.emit_password_reset_completed(
+            user_id=row.user_id,
+            reset_chain_id=row.reset_chain_id,
+            completed_at=completed_at,
+        )
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=row.user_id,
+            action="iam.user.password_reset",
+            resource_type="user",
+            resource_id=row.user_id,
+            payload=None,
+        )
+
+    # ── /users/me helpers (kept here so router stays thin) ──────────────
+
+    async def get_user_profile(self, user_id: UUID) -> UserResponse:
+        user = await self._user_repo.find_by_id(user_id)
+        if user is None:
+            raise InvalidCredentials()
+        return UserResponse.model_validate(user)
+
+    async def update_user_profile(
+        self,
+        user_id: UUID,
+        *,
+        display_name: str | None = None,
+        locale: str | None = None,
+        timezone: str | None = None,
+    ) -> UserResponse:
+        await self._user_repo.update_profile(
+            user_id,
+            display_name=display_name,
+            locale=locale,
+            timezone=timezone,
+        )
+        return await self.get_user_profile(user_id)
