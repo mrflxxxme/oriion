@@ -1,6 +1,29 @@
 ﻿# ADR-024: Bounded-context contracts — 10 контекстов в `contracts/` + CloudEvents 1.0 + naming corrections
 
-- **Status:** Accepted
+- **Status:** Accepted (amendment 2026-05-19, see «Naming bridge: organization → workspace»)
+
+## Naming bridge: organization → workspace (2026-05-19)
+
+> Adopted in pre-Phase-00.3 contract extension. Resolves the mismatch between
+> the `multitenancy.organizations` DDL (pre-rename) and the `workspace_id`
+> public API surface that the architect-PR introduced.
+
+| Layer | Before (deprecated) | After (canonical) |
+|---|---|---|
+| `multitenancy` table | `multitenancy.organizations` | `multitenancy.workspaces` |
+| `multitenancy.cells.*` FK | `organization_id` | `workspace_id` |
+| `llm_gateway.byok_keys.*` FK | `organization_id` | `workspace_id` |
+| `llm_gateway.llm_usage_log.*` FK | `organization_id` | `workspace_id` |
+| `rbac.role_assignments.scope_type` enum | `'organization'` | `'workspace'` |
+| RLS Postgres GUC | `app.current_organization_id` | `app.current_workspace_id` |
+| API path | `/organizations/...` | `/workspaces/...` |
+| CloudEvent type | `oriion.multitenancy.organization.*` | `oriion.multitenancy.workspace.*` |
+| Pydantic class | `Organization` | `Workspace` |
+
+Implementers MUST use the canonical names in new code. Legacy term appears only
+in archived `_session-context/*.md` files (immutable historical record).
+
+
 
 ## Decision
 

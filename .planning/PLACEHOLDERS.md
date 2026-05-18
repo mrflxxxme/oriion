@@ -91,8 +91,17 @@
 | `TBD_YANDEX_GPT_API_KEY` | YandexGPT API key | ⏳ | Через Yandex Cloud SA |
 | `TBD_YANDEX_GPT_CATALOG_ID` | Yandex Cloud Catalog ID | ⏳ | = `TBD_YC_FOLDER_ID_PROD` обычно |
 | `TBD_GIGACHAT_AUTH_KEY` | GigaChat auth key (Сбер) | ⏳ | developers.sber.ru/gigachat |
-| `TBD_BRAVE_SEARCH_API_KEY` | Brave Search API key | ⏳ | для web_search built-in |
+| `TBD_BRAVE_SEARCH_API_KEY` | Brave Search API key | ⏳ | для web_search built-in (mcp/tools/web_search.py) |
+| `TBD_YANDEX_SEARCH_API_KEY` | Yandex Search API key | ⏳ | альтернативный backend для web_search built-in (РФ-friendly) |
 | `TBD_EXA_API_KEY` | Exa neural search API key | ⏳ (опц., Wave 2+) | |
+
+## BYOK + KMS (Phase 00.4 — LLM Gateway encryption)
+
+| Token | Назначение | Status | Note |
+|---|---|---|---|
+| `TBD_BYOK_MASTER_KEY_B64` | Master AES-256 key (32-byte base64) для `LocalAESKMS` (Wave 0 dev/test) | ⏳ | Генерится локально: `openssl rand -base64 32`. NEVER в репо, только `.env`. Phase 00.6 swap на Yandex KMS — этот placeholder retire'ится. |
+| `TBD_YANDEX_CLOUD_KMS_KEY_ID` | Yandex Cloud KMS master key ID для `YandexKMS` impl (Phase 00.6+) | ⏳ | Создаётся в Yandex Cloud Console → KMS → New key. Format: `abjXXXXXXXXXXXX`. |
+| `TBD_FX_RATE_USD_TO_RUB_OVERRIDE` | FX rate override для тестов / dev | ⏳ | Default `100.0` в `.env.example`. Wave 1+ заменяется live CBR feed. |
 
 ## Email (OQ-28 закрыто, identifier'ы зависят от настройки)
 

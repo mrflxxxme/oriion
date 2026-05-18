@@ -1,8 +1,13 @@
 spec: cloudevents/1.0
 context: multitenancy
 description: |
-  Domain events emitted by the `multitenancy` bounded context (organizations,
+  Domain events emitted by the `multitenancy` bounded context (workspaces,
   cells, cell membership). CloudEvents 1.0 envelope per ADR-024 §3.
+
+  NOTE (2026-05-19): the `organization`/`organization_id` terms were renamed
+  to `workspace`/`workspace_id` as part of the pre-Phase-00.3 contract
+  extension. Legacy event types are not used in production yet (Wave 0) and
+  the rename is therefore breaking-free.
 
 defaults:
   specversion: "1.0"
@@ -10,24 +15,24 @@ defaults:
   datacontenttype: application/json
 
 events:
-  - type: oriion.multitenancy.organization.created.v1
-    description: A new organization was provisioned.
+  - type: oriion.multitenancy.workspace.created.v1
+    description: A new workspace (billing tenant) was provisioned.
     data:
       type: object
-      required: [organization_id, slug, plan_tier, created_by_user_id]
+      required: [workspace_id, slug, plan_tier, created_by_user_id]
       properties:
-        organization_id:     { type: string, format: uuid }
+        workspace_id:        { type: string, format: uuid }
         slug:                { type: string }
         plan_tier:           { type: string, enum: [free, starter, pro, enterprise] }
         created_by_user_id:  { type: string, format: uuid }
 
-  - type: oriion.multitenancy.organization.plan_changed.v1
+  - type: oriion.multitenancy.workspace.plan_changed.v1
     description: Subscription plan tier transitioned.
     data:
       type: object
-      required: [organization_id, old_plan, new_plan, changed_at]
+      required: [workspace_id, old_plan, new_plan, changed_at]
       properties:
-        organization_id: { type: string, format: uuid }
+        workspace_id:    { type: string, format: uuid }
         old_plan:        { type: string, enum: [free, starter, pro, enterprise] }
         new_plan:        { type: string, enum: [free, starter, pro, enterprise] }
         changed_at:      { type: string, format: date-time }
@@ -36,10 +41,10 @@ events:
     description: A new cell (AI team workspace) was created.
     data:
       type: object
-      required: [cell_id, organization_id, created_at]
+      required: [cell_id, workspace_id, created_at]
       properties:
         cell_id:                 { type: string, format: uuid }
-        organization_id:         { type: string, format: uuid }
+        workspace_id:            { type: string, format: uuid }
         vertical_template_slug:  { type: string, nullable: true }
         created_at:              { type: string, format: date-time }
 

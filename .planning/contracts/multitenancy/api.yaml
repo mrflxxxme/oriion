@@ -1,18 +1,21 @@
 openapi: 3.1.0
 info:
   title: Oriion Multitenancy API
-  version: 0.1.0-draft
-  summary: Organizations, cells, and cell membership management.
+  version: 0.2.0-draft
+  summary: Workspaces, cells, and cell membership management.
   description: |
     Authoritative API contract for the `multitenancy` bounded context per
     ADR-024. The cell is the primary tenancy boundary for billing, RLS, and
     quotas (ADR-009).
 
+    NOTE (2026-05-19): renamed `organization` → `workspace` in DDL + API.
+    Wave 0 has no public traffic so the rename is breaking-free.
+
 servers:
   - url: https://api.oriion.app
 
 tags:
-  - name: organizations
+  - name: workspaces
     description: Billing / legal tenant management.
   - name: cells
     description: Workspace (AI team) lifecycle.
@@ -23,29 +26,29 @@ security:
   - BearerAuth: []
 
 paths:
-  /organizations:
+  /workspaces:
     post:
-      tags: [organizations]
-      summary: Create a new organization.
+      tags: [workspaces]
+      summary: Create a new workspace.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/OrganizationCreate' }
+            schema: { $ref: '#/components/schemas/WorkspaceCreate' }
       responses:
         '201':
           description: Created.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Organization' }
+              schema: { $ref: '#/components/schemas/Workspace' }
         '409':
           description: Slug already in use.
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Error' }
     get:
-      tags: [organizations]
-      summary: List organizations the authenticated user has membership in.
+      tags: [workspaces]
+      summary: List workspaces the authenticated user has membership in.
       parameters:
         - { name: limit,  in: query, schema: { type: integer, default: 50, maximum: 200 } }
         - { name: cursor, in: query, schema: { type: string } }
@@ -54,14 +57,14 @@ paths:
           description: OK.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/OrganizationPage' }
+              schema: { $ref: '#/components/schemas/WorkspacePage' }
 
-  /organizations/{org_id}/cells:
+  /workspaces/{workspace_id}/cells:
     parameters:
-      - { name: org_id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: workspace_id, in: path, required: true, schema: { type: string, format: uuid } }
     post:
       tags: [cells]
-      summary: Create a cell in the given organization.
+      summary: Create a cell in the given workspace.
       requestBody:
         required: true
         content:
@@ -75,7 +78,7 @@ paths:
               schema: { $ref: '#/components/schemas/Cell' }
     get:
       tags: [cells]
-      summary: List cells visible to the caller within the organization.
+      summary: List cells visible to the caller within the workspace.
       parameters:
         - { name: limit,  in: query, schema: { type: integer, default: 50, maximum: 200 } }
         - { name: cursor, in: query, schema: { type: string } }
@@ -188,7 +191,7 @@ components:
       bearerFormat: JWT
 
   schemas:
-    Organization:
+    Workspace:
       type: object
       required: [id, slug, display_name, plan_tier, created_at]
       properties:
@@ -202,7 +205,7 @@ components:
         created_at:     { type: string, format: date-time }
         updated_at:     { type: string, format: date-time }
 
-    OrganizationCreate:
+    WorkspaceCreate:
       type: object
       required: [display_name]
       properties:
@@ -211,19 +214,19 @@ components:
         billing_email: { type: string, format: email }
         plan_tier:     { type: string, enum: [free, starter, pro, enterprise], default: free }
 
-    OrganizationPage:
+    WorkspacePage:
       type: object
       required: [items]
       properties:
-        items:       { type: array, items: { $ref: '#/components/schemas/Organization' } }
+        items:       { type: array, items: { $ref: '#/components/schemas/Workspace' } }
         next_cursor: { type: string, nullable: true }
 
     Cell:
       type: object
-      required: [id, organization_id, slug, display_name, created_at]
+      required: [id, workspace_id, slug, display_name, created_at]
       properties:
         id:                       { type: string, format: uuid }
-        organization_id:          { type: string, format: uuid }
+        workspace_id:             { type: string, format: uuid }
         slug:                     { type: string }
         display_name:             { type: string }
         vertical_template_slug:   { type: string, nullable: true, example: wb-seller }

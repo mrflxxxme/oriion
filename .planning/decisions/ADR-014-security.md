@@ -1,6 +1,21 @@
 # ADR-014: Security — RBAC + DLP + изоляция memory от tool-output + операционная гигиена
 
-- **Status:** Accepted
+- **Status:** Accepted (amendments 2026-05-19, see «Wave 0 security decisions»)
+
+## Wave 0 security decisions (2026-05-19)
+
+> Adopted in the pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR).
+
+1. **3-GUC default-deny RLS posture.** Per ADR-009 amendment 2026-05-19: `app.current_user_id` + `app.current_workspace_id` + `app.current_cell_id` set per transaction via FastAPI dependency `get_tenant_db_session`. Missing GUC → `NULL` → policy evaluates FALSE → zero rows visible. Integration tests assert default-deny (`tests/multitenancy/test_rls_isolation.py`).
+2. **KMSProvider Protocol — Wave 0 → Wave 1 migration path:**
+    - **Wave 0:** `LocalAESKMS` impl. AES-256-GCM with master key from env `BYOK_MASTER_KEY_B64` (32-byte base64). DEK envelope wrap done in-process. NOT production-grade — dev/test only.
+    - **Phase 00.6+:** `YandexKMS` impl. Real envelope encryption via Yandex KMS API (`TBD_YANDEX_CLOUD_KMS_KEY_ID`). DEK wrapped by Yandex KMS master key, never exits HSM.
+    - DI selection via env `KMS_BACKEND=local|yandex` (default `local`).
+    - BYOK keys never logged in plaintext — only `key_fingerprint` (sha256[:8]) surfaced in responses.
+3. **Audit log append-only enforcement.** `audit.audit_log` UPDATE/DELETE blocked by trigger raising exception. Partitioned by month with `default` catch-all partition (Wave 0; pg_partman Wave 1+). 3-year retention per FZ-152.
+4. **CloudEvents — log-only Wave 0.** All domain events emitted via structlog `cloudevent=True` tag (matches Phase 00.2 pattern); Wave 1+ swap to Redis Streams `XADD` keeps emit API stable.
+
+
 
 ## Decision
 

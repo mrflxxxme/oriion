@@ -1,6 +1,22 @@
 # ADR-018: DeepSeek как primary LLM-стек
 
-- **Status:** Accepted
+- **Status:** Accepted (amendment 2026-05-19, see «Wave 0 RU-currency model»)
+
+## Wave 0 RU-currency model (2026-05-19)
+
+> Adopted in pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR). Product launches on the RU market; customer-facing billing is **RUB**.
+
+1. **Three-currency row in `llm_usage_log`:**
+    - `cost_usd numeric(10,6)` — provider native cost (source-of-truth for provider invoice reconciliation; DeepSeek, OpenAI, Anthropic all bill USD).
+    - `cost_rub numeric(12,4)` — customer-facing settlement (`cost_usd × fx_rate_usd_to_rub`).
+    - `fx_rate_usd_to_rub numeric(10,6)` — FX snapshot pinned at request-time so historical rows remain consistent even when FX drifts.
+2. **FX-rate source.** Wave 0: env constant `FX_RATE_USD_TO_RUB` (default `100.0`, overridable). Phase 00.6 deploy phase: Yandex Cloud config (`TBD_FX_RATE_USD_TO_RUB_OVERRIDE`). Wave 1+: live FX feed (CBR API) cached 1h.
+3. **`billing.credit_transactions` (SKELETON inline).** Customer-side settlement entirely in RUB: `amount_rub` + `amount_credits` + `balance_after_credits` + audit `fx_rate_usd_to_rub`. Wave 0: `1 credit == 1 RUB` (no conversion table); Wave 2+ pricing_table introduces dynamic conversion.
+4. **Atomic 3-field write contract.** `record_llm_cost(...)` writes `cost_usd`, `cost_rub`, `fx_rate_usd_to_rub` to `llm_usage_log` AND `amount_rub` + `fx_rate_usd_to_rub` to `credit_transactions` in a single transaction. Invariant: `SUM(credit_transactions.amount_rub) == SUM(llm_usage_log.cost_rub)` per cell. Verified by `test_cost_ledger_sum_match`.
+5. **Provider USD pricing table.** `pricing_service.PROVIDER_PRICING_USD_PER_1K_TOKENS` keeps DeepSeek/Yandex/GigaChat USD prices per provider docs. Yandex/GigaChat invoices arrive in RUB — we record their native RUB as `cost_rub` directly and back-derive `cost_usd = cost_rub / fx_rate` (still atomic, just reversed source).
+6. **BYOK soft-quota stays USD.** `byok_keys.monthly_quota_usd` matches the provider-side billing unit (DeepSeek/OpenAI bill USD). Workspace UI shows RUB-equivalent at current FX rate.
+
+
 
 ## Decision
 
