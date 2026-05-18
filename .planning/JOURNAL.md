@@ -83,3 +83,32 @@ Append-only журнал AI-агентских сессий. Одна запис
 - Decisions: no new ADR. Phase 00.1 security debt resolved without ADR-014 amendment (PyJWT + argon2-cffi already в ADR-014's preference list).
 - Next: founder verifies AC1 + AC6 локально (выйдет за рамки этой curator-сессии). Затем next AI-agent session открывает либо Phase 00.2 (если OQ-04 closed) либо Phase 00.3/00.4 в parallel.
 - Refs: PR [oriion#25](https://github.com/mrflxxxme/oriion/pull/25); merge-commit `b192c6b`; branch `claude/post-00.1-memory-curator`.
+
+## 2026-05-17 · dazzling-satoshi-0a293d · @claude-opus
+- Scope: architect-PR pre-Phase-00.2 — extend `iam` contract for full-scope auth + land `_shared` Alembic bootstrap (absorbs Phase 00.3 schema-bootstrap step). Unblocks 3-way parallel execution of Phases 00.2 / 00.3 / 00.4.
+- Done (single PR, ~10 commits planned):
+  - **`contracts/iam/schema.sql`**: +3 tables — `iam.consents` (FZ-152 ledger, kind ∈ {pdn,marketing,tos}, version pinned at grant, soft revoke), `iam.email_verification_tokens` (single-use, 24h TTL, SHA-256 hex hash, plaintext only over email), `iam.password_reset_tokens` (single-use, 1h TTL, `reset_chain_id` with reuse-detection chain-revoke mirroring refresh-token pattern).
+  - **`contracts/iam/api.yaml`**: +4 endpoints (`POST /auth/verify-email`, `POST /auth/resend-verification`, `POST /auth/forgot-password`, `POST /auth/reset-password`); `RegisterRequest` now requires `consent_pdn: bool` (422 `iam.consent.pdn_missing` if false) + optional `consent_marketing`; new `RegisterResponse` schema with `{user_id, workspace_id, cell_id, email, email_verification_sent}`; +tag `verification`; anti-enumeration enforced via always-202 on forgot/resend.
+  - **`contracts/iam/events.yaml`**: +4 CloudEvents v1 (`user.email_verification_requested`, `user.password_reset_requested`, `user.password_reset_completed`, `user.consent_recorded`). Naming follows existing pattern `oriion.iam.<aggregate>.<action>.v1`; deliberately did NOT add `email_verified.v1` because it already exists in line 26.
+  - **`contracts/iam/README.md`**: +4 invariants (#6 consent pdn mandatory + version pin, #7 verification tokens TTL/hashing, #8 reset chain-revoke + session kill, #9 anti-enumeration); Phase references updated (architect-PR + corrected 00.3 ownership note).
+  - **`backend/migrations/versions/_shared/0001_init.py`** (NEW, 130 lines): bootstrap migration with branch_label `_shared`, down_revision `None`. Creates 5 extensions (pgcrypto, citext, uuid-ossp, vector, pg_stat_statements), 12 bounded-context schemas, `_shared.set_updated_at()` trigger function, `oriion_app` NOLOGIN role + USAGE grants. Idempotent guards everywhere. Downgrade drops in reverse (extensions deliberately NOT dropped — may be shared cluster-wide).
+  - **`backend/migrations/versions/{iam,multitenancy,audit,billing,llm_gateway,rbac,agents,tasks,artifacts,memory,mcp}/.gitkeep`** (NEW, 11 placeholder files): so empty bounded-context dirs are git-tracked and Alembic doesn't fail on missing paths.
+  - **`backend/alembic.ini`**: `version_locations` extended to 12 bounded-context subdirs (was: only `migrations/versions`). Removed Phase-00.3 TODO comment (done here).
+  - **`.planning/STATUS.md`**: full architect-PR section added; OQ-04 → submitted (dev unblocked); 3-way parallel unblocked language; «Следующая фаза» rewritten.
+  - **`.planning/HANDOFF.md`**: rewritten — Last-updated header, pre-grill discoveries (6 contradictions resolved), architect-PR deliverables list, 3-way parallel startup commands (3 worktrees + integration session), exit ritual checklist.
+  - **`.planning/PROJECT.md`**: current-phase pointer updated to architect-PR landed → 3-way parallel ready.
+  - **this JOURNAL entry**.
+- Decisions resolved during grill (no new ADRs; deferred to contract authority per ADR-024):
+  - D1 OQ-04 submitted (founder confirmed).
+  - D2 3-way parallel (00.2+00.3+00.4) via contract-first stubs.
+  - D3 Phase 00.2 full-scope (8 endpoints, verification, reset, consent, audit, ≥85% coverage).
+  - D4 SMTP stub (console + DB outbox); `REQUIRE_EMAIL_VERIFICATION=false` in dev.
+  - D5 Architect-PR in current branch; founder spawns 3 new sessions after merge.
+  - D6 Branch names: `claude/phase-00-2-jwt-auth` / `phase-00-3-db-rls` / `phase-00-4-llm-gateway`.
+  - D8 Separate Phase 00.2.5 integration session.
+  - D9 `_shared` bootstrap absorbed into architect-PR (was Phase 00.3 scope).
+  - D10 Hashing: argon2id only (contract authoritative; spec's bcrypt is stale).
+  - D11 TTL/rate-limits per spec defaults (access 15min HS256, refresh 7d opaque+SHA-256 hash + rotation chain, rate-limit 5/15min per (ip,email)).
+  - D12 Coverage ≥85% for `backend/src/iam/`.
+- Next: founder reviews + merges this architect-PR → spawns 3 worktrees per HANDOFF.md «Next steps» section → after 3 PRs merge, opens Phase 00.2.5 integration session.
+- Refs: branch `claude/dazzling-satoshi-0a293d`; plan `C:\Users\KUklonskiy\.claude\plans\start-phase-00-2-of-dreamy-truffle.md`; phase specs `roadmap/wave-0-foundation/phases/00.{2,3,4}-*.md`; contracts `contracts/iam/*` + `contracts/multitenancy/*`.
