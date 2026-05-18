@@ -116,6 +116,11 @@ addopts = "--strict-markers -ra"
 markers = [
     "integration: integration tests requiring docker-compose stack (deselect with '-m \"not integration\"')",
 ]
+# Promote warnings to errors so the suite never silently grows noise.
+# Add narrow ignores below if a third-party deprecation can't be avoided.
+filterwarnings = [
+    "error",
+]
 
 [tool.coverage.run]
 source = ["src"]

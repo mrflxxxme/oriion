@@ -56,7 +56,9 @@ async def test_verify_expired_token_raises_token_expired(
 async def test_verify_wrong_signature_raises_token_invalid(
     token_service: TokenService,
 ) -> None:
-    bad = jwt.encode({"sub": "x"}, "different-secret", algorithm="HS256")
+    # 32+ char wrong secret avoids PyJWT InsecureKeyLengthWarning
+    wrong_secret = ("wrong-" + "secret-" * 6).rstrip("-")
+    bad = jwt.encode({"sub": "x"}, wrong_secret, algorithm="HS256")
     with pytest.raises(TokenInvalid):
         await token_service.verify_access_token(bad)
 
