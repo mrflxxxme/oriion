@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | OQ-02 | ООО vs ИП на УСН | ООО (для ЮKassa B2B, реестра ПО) / ИП на УСН (дешевле, проще) | До открытия ЮKassa | Founder |
 | OQ-03 | Юрист на retainer'е | Зарцын / ЕПАМ / Бранан Legal / разовые консультации | До Wave 1 (запуск trial) | Founder |
-| OQ-04 | Уведомление РКН об операторе ПДн | Обязательно по закону | До Phase 00.2 | Founder + юрист |
+| OQ-04 | Уведомление РКН об операторе ПДн | Обязательно по закону | До prod-launch (submitted, dev unblocked) | Founder + юрист |
 | OQ-05 | Регистрация товарного знака | Роспатент, 6 мес процедура | До публичной беты (Wave 2) | Founder + патентный поверенный |
 
 ## Команда
@@ -63,7 +63,7 @@
 ## Сводка по блокирующим Wave 0
 
 **Required до Phase 00.1:** _(none — founder-personal финансовые блокеры удалены per Session-2026-05-15; Phase 00.1 готов к старту)_
-**Required до Phase 00.2:** OQ-04 (РКН-уведомление)
+**Required до prod-launch:** OQ-04 (final РКН confirmation; dev unblocked — РКН-уведомление submitted)
 **Required до Phase 01.10 (Wave 1):** OQ-32, OQ-33 (Business API privacy + РКН-уведомление update)
 **Required до Wave 1 launch:** OQ-22, OQ-31 (friends-list + horizontal-vs-B2B positioning)
 **Не блокирует Phase 00.1 (можно параллельно):** OQ-02, OQ-03, OQ-05, OQ-09, OQ-19, OQ-21, OQ-22, OQ-25, OQ-26

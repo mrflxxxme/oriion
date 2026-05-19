@@ -1,15 +1,14 @@
 """WorkspaceService + provision_initial_workspace.
 
 The public free function ``provision_initial_workspace`` is the symbol
-consumed by ``iam.auth_service.register()`` (currently wired to the stub
-in ``src._stubs.multitenancy``). Phase 00.2.5 will swap the import to this
-module — return type ``WorkspaceProvisionResult`` is identical.
+consumed by ``iam.auth_service.register()`` (wired here as of Phase 00.2.5
+integration, PR #32).
 
-The Wave-0 stub takes only ``user_id``; this real implementation takes
-``(session, user_id, email_localpart)`` because we need a live DB session
-to insert rows and the email-localpart to derive the workspace slug. The
-00.2.5 integration phase owns the call-site refactor (wires the session
-+ email through ``AuthService.register``).
+Signature: ``(session, user_id, email_localpart) -> WorkspaceProvisionResult``.
+Needs a live DB session to insert rows and the email-localpart to derive
+the workspace slug. ``AuthService.register`` passes its request-scoped
+``AsyncSession`` through so the workspace + cell INSERTs commit atomically
+with the user row.
 
 Logic per contracts/multitenancy/README.md "Service contract":
   1. INSERT workspace (slug=email_localpart sanitized, display_name=email_localpart,
@@ -52,8 +51,8 @@ logger = structlog.get_logger(__name__)
 class WorkspaceProvisionResult(BaseModel):
     """Returned by provision_initial_workspace.
 
-    Shape matches src._stubs.multitenancy.WorkspaceProvisionResult exactly
-    so the 00.2.5 import-swap is invisible to callers.
+    Result shape: workspace_id + cell_id. Consumed by
+    ``AuthService.register`` to populate the ``RegisterResult`` response.
     """
 
     workspace_id: UUID

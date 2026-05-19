@@ -1,6 +1,6 @@
 ﻿# ADR-024: Bounded-context contracts — 10 контекстов в `contracts/` + CloudEvents 1.0 + naming corrections
 
-- **Status:** Accepted (amendment 2026-05-19, see «Naming bridge: organization → workspace»)
+- **Status:** Accepted (amendments 2026-05-19: «Naming bridge: organization → workspace» + «Sanctioned cross-context exceptions»)
 
 ## Naming bridge: organization → workspace (2026-05-19)
 
@@ -105,6 +105,51 @@ Phase-spec **не дублирует** DDL/OpenAPI. Если phase добавл�
 - **Naming drift устранён:** `agent_archetypes` / `agent_archetype_id` / `system_roles` фиксируются раз и навсегда. ADR-001 (revised), ADR-021 (revised), ADR-010 (revised) cross-ref сюда.
 - **Bounded-context coupling explicit:** если backend service A читает таблицу из context B — это видно в `contracts/<A>/README.md` секции «External dependencies». RBAC и cross-cutting concerns не размазываются.
 - **Migration ownership:** каждый `alembic/versions/<context>/` — domain-specific. При extract-to-microservice (Wave 5+) контекст переезжает целиком.
+
+## Sanctioned cross-context exceptions (amendment 2026-05-19)
+
+The strict "no cross-context model imports" rule has **one explicit, narrow
+exception** discovered during Phase 00.4 implementation and ratified by the
+PR #30 architecture audit:
+
+### Exception #1 — `llm_gateway → billing.models.CreditTransaction`
+
+- **Importing file:** `backend/src/llm_gateway/services/billing_service.py:26`
+- **Imported symbol:** `from src.billing.models import CreditTransaction`
+- **Justification:** llm-gateway invariant #7 (per
+  `contracts/llm-gateway/README.md:59`) requires **atomic 3-currency write**
+  across `llm_gateway.llm_usage_log` (cost_usd + cost_rub + fx_rate) **and**
+  `billing.credit_transactions` (amount_rub + amount_credits +
+  balance_after_credits) in a single transaction. Splitting the write via
+  an outbox / port boundary would either lose atomicity (eventual
+  consistency on the cost ledger — unacceptable for prod billing) or
+  require a distributed transaction (out of Wave 0 scope).
+- **Audit history:** flagged as architecture H1 by the PR #30 audit;
+  re-confirmed as sanctioned by the PR #32 architecture audit + the
+  cross-phase pre-Phase-05 architecture audit. This amendment makes it
+  explicit so future agents don't re-litigate the same trade-off.
+- **Wave-1 follow-up candidates** (when extracting llm_gateway to a
+  microservice or splitting billing/credits into a separate context):
+  1. Move `CreditTransaction` write into `llm_gateway.repositories.cost_ledger`
+     as a private symbol; `billing` reads from the same row but doesn't own
+     the write path
+  2. Adopt an outbox pattern with a "credit_consumption_requested" event
+     + idempotent processor in billing
+  3. Distributed transaction via 2PC (only if/when the contexts physically
+     split across services)
+
+### Adding new sanctioned exceptions
+
+Any new cross-context model import must:
+1. Be approved by an audit (PR-scoped or cross-phase) with explicit
+   architectural justification
+2. Be added to this amendment list with importing-file:line + Wave-1
+   refactor candidates
+3. Have the corresponding `contracts/<importing-context>/README.md`
+   updated to mention the dependency in its "External dependencies" section
+
+The default remains **no cross-context model imports**. The exception list is
+narrow on purpose.
 
 ## Links
 

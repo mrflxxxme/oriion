@@ -39,7 +39,7 @@
 
 | Аспект | Правило |
 |---|---|
-| Branching | `feature/<phase-id>-<slug>` для фаз, `fix/<slug>` для багов, `hotfix/<slug>` для prod |
+| Branching | `claude/<adjective-noun-hash>` для AI-led sessions (default, e.g. `claude/heuristic-rhodes-f7a3ef`) или `feature/<phase-id>-<slug>` для human-led фаз; `fix/<slug>` для багов; `hotfix/<slug>` для prod. Phase-id живёт в PR title (`[NN.M] ...`), не в имени ветки |
 | Commits | Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:` |
 | Атомарность | Один commit = одно логическое изменение. Squash при merge — опция при необходимости |
 | PR title | `[Phase-<id>] <краткое описание>` или `[Fix] <описание>` |

@@ -6,7 +6,8 @@
 | [00.2](./phases/00.2-custom-jwt-auth.md) | custom-jwt-auth | 2 дня | 00.1, OQ-04 (РКН) | Tech Lead |
 | [00.3](./phases/00.3-db-rls-multitenancy.md) | db-rls-cell | 5 дней | 00.1 | Senior Backend |
 | [00.4](./phases/00.4-llm-gateway.md) | llm-gateway | 5 дней | 00.1 | Tech Lead |
-| [00.5](./phases/00.5-pydantic-ai-productivity-team.md) | pydantic-ai-productivity-team | 5 дней | 00.3, 00.4 | Senior Backend |
+| [00.2.5](./phases/00.2.5-integration.md) | integration | 1 день | 00.2 + 00.3 + 00.4 | Tech Lead |
+| [00.5](./phases/00.5-pydantic-ai-productivity-team.md) | pydantic-ai-productivity-team | 5 дней | 00.2.5 | Senior Backend |
 | [00.6](./phases/00.6-deploy-observability.md) | deploy-observability | 3 дня | 00.1, 00.5 | DevOps |
 | [00.7](./phases/00.7-frontend-skeleton.md) | frontend-skeleton | 4 дня | 00.1, 00.2, 00.5 | Senior Frontend |
 

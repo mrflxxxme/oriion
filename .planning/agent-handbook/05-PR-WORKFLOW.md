@@ -28,7 +28,7 @@
    - Next: <что должен сделать следующий agent>
    - Refs: PR #NNN, phase ID
    ```
-   При >300 строк журнал откатывается в `dev-log/archive/JOURNAL-YYYYQN.md` (создаётся при необходимости).
+   При >300 строк журнал откатывается в `dev-log/archive/JOURNAL-YYYYQN.md` (директория создаётся при первой архивации; не нужна заранее).
 
 2. **Перезаписать [`../HANDOFF.md`](../HANDOFF.md)** — снимок текущего state для следующей сессии (current phase, in-progress work, blockers, must-read files, рекомендации по next-action). История — через `git log HANDOFF.md`.
 
@@ -42,11 +42,17 @@
 
 | Тип | Naming |
 |---|---|
-| Phase task | `feature/<phase-id>-<slug>` (e.g. `feature/00.4-llm-gateway`) |
+| Phase task (AI-led session, default) | `claude/<adjective-noun-hash>` (e.g. `claude/heuristic-rhodes-f7a3ef`) — Claude-Code-generated short id |
+| Phase task (human-led) | `feature/<phase-id>-<slug>` (e.g. `feature/00.4-llm-gateway`) |
 | Bugfix | `fix/<slug>` (e.g. `fix/auth-token-expiry`) |
 | Hotfix (prod) | `hotfix/<slug>` |
 | Chore (config/docs) | `chore/<slug>` |
 | Refactor | `refactor/<slug>` |
+
+The `claude/<slug>` form is the documented practice for Claude-Code AI
+sessions and is semantically equivalent to `feature/<phase-id>-<slug>` —
+the PR title carries the phase-id (e.g. `[00.4] feat: ...`) so the phase
+binding is in the PR, not the branch.
 
 ## Commit conventions (Conventional Commits)
 
@@ -168,7 +174,7 @@ Per tier-based ruleset (см. conventions.md):
 ## Linked artifacts
 
 - Issue: #NNN
-- Handoff: `.planning/handoffs/YYYY-MM-DD-slug.md`
+- Handoff: HANDOFF.md refresh + JOURNAL.md +1 (per Exit ritual)
 - Updated docs: <list>
 ```
 
@@ -295,6 +301,6 @@ Settings в GitHub:
 |---|---|---|---|
 | Fix typo in doc | `chore/...` | 1 | Auto-merge |
 | Add unit test | `test/...` | 2 | 1 AI |
-| Add new endpoint | `feature/...` | 3 | 1 AI + 1 human |
-| Change auth flow | `feature/...` | 4 | 2 AI + 2 human |
+| Add new endpoint | `claude/...` or `feature/...` | 3 | 1 AI + 1 human |
+| Change auth flow | `claude/...` or `feature/...` | 4 | 2 AI + 2 human |
 | Prod bug fix | `hotfix/...` | 5 | 1 AI + 1 senior expedited |

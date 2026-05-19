@@ -18,7 +18,7 @@ events:
       properties:
         assignment_id: { type: string, format: uuid }
         user_id:       { type: string, format: uuid }
-        scope_type:    { type: string, enum: [organization, cell] }
+        scope_type:    { type: string, enum: [workspace, cell] }
         scope_id:      { type: string, format: uuid }
         role_slug:     { type: string, example: editor }
         assigned_by:   { type: string, format: uuid, nullable: true }
@@ -33,7 +33,7 @@ events:
       properties:
         assignment_id: { type: string, format: uuid }
         user_id:       { type: string, format: uuid }
-        scope_type:    { type: string, enum: [organization, cell] }
+        scope_type:    { type: string, enum: [workspace, cell] }
         scope_id:      { type: string, format: uuid }
         role_slug:     { type: string }
         revoked_by:    { type: string, format: uuid }
@@ -47,7 +47,7 @@ events:
       properties:
         assignment_id: { type: string, format: uuid }
         user_id:       { type: string, format: uuid }
-        scope_type:    { type: string, enum: [organization, cell] }
+        scope_type:    { type: string, enum: [workspace, cell] }
         scope_id:      { type: string, format: uuid }
         role_slug:     { type: string }
         expired_at:    { type: string, format: date-time }
