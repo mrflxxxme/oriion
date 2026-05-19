@@ -2,9 +2,9 @@
 
 Public surface:
   * AuditService — class wrapping the repository for DI use
-  * emit_audit_event(...) — module-level coroutine, contract-locked to
-    src/_stubs/audit.py::emit_audit_event (Phase 00.2.5 swap is a pure
-    import-replacement). Strict superset signature: adds optional
-    ``session`` / ``workspace_id`` / ``cell_id`` kwargs that callers in
-    00.3 / 00.4 already-in-tx code paths use.
+  * emit_audit_event(...) — module-level coroutine. Optional
+    ``session`` / ``workspace_id`` / ``cell_id`` kwargs let callers in
+    iam / multitenancy / llm_gateway that already own a transactional
+    session INSERT into audit.audit_log inside the same TX as their
+    domain write.
 """

@@ -1,26 +1,7 @@
 """AuditService + module-level emit_audit_event.
 
-Signature contract
-==================
-``emit_audit_event(...)`` is a **strict superset** of the stub at
-``src/_stubs/audit.py::emit_audit_event``:
-
-  stub signature (Phase 00.2 / Wave 0 transition):
-      async def emit_audit_event(
-          actor_type: str,
-          actor_id: UUID,
-          action: str,
-          resource_type: str,
-          resource_id: UUID | None = None,
-          payload: dict[str, Any] | None = None,
-          ip: str | None = None,
-          user_agent: str | None = None,
-      ) -> None
-
-  real impl adds keyword-only extras (defaulted so all stub callers still
-  work) plus relaxes ``resource_type`` to optional so non-resource events
-  (e.g. ``iam.session.created`` w/ resource_type='session' but also pure
-  control-plane events without one) compose cleanly:
+Signature
+=========
 
       async def emit_audit_event(
           actor_type: str,
@@ -37,16 +18,19 @@ Signature contract
           cell_id: UUID | None = None,
       ) -> None
 
-  The compatibility test (``test_emit_audit_event_stub_compat.py``) asserts
-  every stub parameter — name + default semantics — is present here.
+The ``resource_type`` arg is optional so non-resource events (e.g. pure
+control-plane events without one) compose cleanly. Caller-supplied
+``session`` + ``workspace_id`` / ``cell_id`` enable INSERT into
+``audit.audit_log`` inside the caller's TX (see Behaviour below).
 
 Behaviour
 =========
 * If ``session`` is provided: INSERT into ``audit.audit_log`` via
   ``AuditRepository`` in the caller's transaction. Caller commits.
 * If ``session`` is None: fall back to a structlog record tagged
-  ``audit_event=True`` (matches Phase 00.2 stub behaviour exactly so
-  pre-00.2.5 callers keep working).
+  ``audit_event=True``. The structlog-only path is the explicit "no
+  active TX in this codepath" mode (some background workers, retries,
+  and Phase 00.6 deploy paths legitimately have no session in scope).
 * In **both** modes we also call ``emit_cloudevent`` so observability
   consumers see the event regardless of DB write path.
 
@@ -182,18 +166,18 @@ async def emit_audit_event(
 ) -> None:
     """Emit an audit event.
 
-    Signature is a strict superset of ``src._stubs.audit.emit_audit_event``
-    so Phase 00.2.5 swap is a pure import replacement.
+    See module docstring for the full signature contract + behaviour.
 
     Args:
         actor_type: ``user`` | ``agent`` | ``system``.
         actor_id: UUID of the actor. System events pass a synthetic UUID
-            (callers' responsibility — DDL allows NULL but Phase 00.2 stub
-            requires UUID, so we keep that contract here).
+            (callers' responsibility — DDL allows NULL but the public
+            contract requires UUID for the unauthenticated-but-tracked
+            paths to surface explicitly).
         action: Dotted action name, e.g. ``iam.user.registered``.
         resource_type: Optional resource kind (e.g. ``user``, ``workspace``).
-            Stub had this as required ``str``; we relax to optional so 00.4
-            control-plane events can omit it.
+            Optional so control-plane events without a single resource
+            target can omit it.
         resource_id: Optional UUID of the resource the action touched.
         payload: Optional JSON-serialisable extra context.
         ip: Optional client IP (stored as inet).

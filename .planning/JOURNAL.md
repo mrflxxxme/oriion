@@ -45,10 +45,10 @@ Append-only журнал AI-агентских сессий. Одна запис
   9. **Wave 3 timebox:** 8 → 10 нед (+ИП-Бух + СМБ-Sales verticals + Master-Agents).
   10. **Downstream dates:** Wave 4 → 2027-02-22 (+3 нед vs prior).
   11. **Role-prompts contract pattern:** `contracts/role-prompts/` — 9-секционная глубокая структура (~2500–3200 слов / роль), YAML-frontmatter; coordinator/researcher/writer/analyst materialized в Wave 0; vertical Masters — в Wave 1+.
-- Decisions: новые [ADR-029](.planning/decisions/ADR-029-master-agent-vertical-templates.md), [ADR-030](.planning/decisions/ADR-030-telegram-business-api.md). Revised: ADR-013 (MCP wave-table), ADR-017 (horizontal anchor + wave-reorder), ADR-022 (Coordinator hierarchy bifurcation horizontal vs vertical).
+- Decisions: новые [ADR-029](./decisions/ADR-029-master-agent-vertical-templates.md), [ADR-030](./decisions/ADR-030-telegram-business-api.md). Revised: ADR-013 (MCP wave-table), ADR-017 (horizontal anchor + wave-reorder), ADR-022 (Coordinator hierarchy bifurcation horizontal vs vertical).
 - Commits: `760991f` (main reorg, 22 files), follow-up commit (consistency fixes — gates/wave-0-to-1, phase 00.6 AC2, verticals/README, glossary, risks/REGISTER, PLACEHOLDERS, ADR cross-refs, verticals/wb-seller deferred-status).
-- Next: founder подтверждает все decisions через `git push` + PR review → старт Phase 00.1 (Repo & CI/CD) per [STATUS.md](.planning/STATUS.md). Phase 01.1 retro spec'ается с включением role-prompts hardening pass (per AC14 phase 00.5).
-- Refs: branch `claude/frosty-raman-c9aaee`; session-prompts/role-prompts в `.planning/contracts/role-prompts/`.
+- Next: founder подтверждает все decisions через `git push` + PR review → старт Phase 00.1 (Repo & CI/CD) per [STATUS.md](./STATUS.md). Phase 01.1 retro spec'ается с включением role-prompts hardening pass (per AC14 phase 00.5).
+- Refs: branch `claude/frosty-raman-c9aaee`; session-prompts/role-prompts в [`./contracts/role-prompts/`](./contracts/role-prompts/).
 
 ## 2026-05-17 · amazing-hamilton-8b9d2c · @claude-opus
 - Scope: Phase 00.1 (Repo & CI/CD) — monorepo skeleton + dev stack + CI workflows + pre-commit + bootstrap docs. Goal: cold-start dev env ≤ 600s, любой агент/разработчик стартует за <10 минут.
@@ -187,3 +187,44 @@ Append-only журнал AI-агентских сессий. Одна запис
 - Decisions: 12 grill-resolved (cherry-pick orphan docs, hybrid SAVEPOINT+commit_required isolation, testcontainers→stub→E2E→coverage order, minimum debt scope, pgvector image, naive email_localpart, 5-agent audit composition, keep worktree branch, **scope correction: E2E adjusted to wired surface (auth) — full LLM matrix-via-HTTP is Phase 00.5 work because main.py doesn't include llm/multitenancy/mcp routers yet**, uniform ≥85% CI gate, EXTENSION-first session fixture, 6-8 atomic commits). Full plan: `C:\Users\KUklonskiy\.claude\plans\phase-00-2-5-integration-squishy-llama.md`.
 - Next: founder reviews + merges PR `[00.2.5]`. Then Phase 00.5 multi-agent tools + verticals scaffolding — main.py wiring of LLM + multitenancy + MCP routers, provider DI assembly inside lifespan, replace test_llm_chat_endpoint_is_not_yet_wired with full provider matrix E2E, scaffold productivity-core Master-Agent per ADR-029.
 - Refs: branch `claude/heuristic-rhodes-f7a3ef`; plan file `phase-00-2-5-integration-squishy-llama.md`; launch checklist + post-merge audit at `.planning/_session-context/PHASE-00-2-5-LAUNCH-CHECKLIST.md` + `.planning/_session-context/POST-MERGE-AUDIT-2026-05-19.md`.
+
+
+## 2026-05-19 В· pre-phase-05-audit В· @claude-opus
+- Scope: Founder-requested pre-Phase-00.5 cross-phase audit + navigation cleanup вЂ” ensure repo is complete + integrity + adequacy + alignment + contradiction-free + navigation-optimized before Phase 00.5 begins.
+- Done:
+  - 5-agent independent audit swarm in parallel (Compliance + Architecture + Test-Adequacy + Info-Architect + Roadmap-Reviewer; deliberately different composition from per-PR audits вЂ” emphasises navigation + next-phase readiness). Top-level verdict PASS-WITH-FIXES; 0 BLOCK, 16 distinct HIGH-class findings, 4 fixed in-loop, 6 deferred to Phase 00.5 / Wave 1 with named ACs.
+  - In-loop fixes (16 files modified, 7 created, 1 deleted, 13 archived):
+    * `_stubs/` docstring drift across 4 backend src files (workspace_service + audit/__init__.py + audit/services/__init__.py + audit/services/audit_service.py)
+    * `contracts/billing/schema.sql` + `contracts/rbac/{api,events}.yaml` вЂ” legacy `organization` в†’ `workspace` (9+ substitutions)
+    * `roadmap/wave-0-foundation/phases/00.1-repo-cicd.md:3` вЂ” Status flipped вњ… Complete
+    * `OPEN-QUESTIONS.md:11+66` вЂ” OQ-04 deadline modernised
+    * `agent-handbook/07-AI-TEAM-PIPELINE.md` вЂ” 2 broken `ADR-025-gate-format.md` в†’ `ADR-025-acceptance-gate-format.md`
+    * `JOURNAL.md:48+50+51` вЂ” broken `(.planning/...)` relative-root markdown links fixed (typo-class corrections; append-only invariant preserved)
+    * `agent-handbook/04-HANDOFF.md` вЂ” rewrote 6 refs to deleted `.planning/handoffs/` dir; documented single-rolling HANDOFF.md as canonical
+    * `agent-handbook/05-PR-WORKFLOW.md` вЂ” branch-naming table ratifies `claude/<slug>` for AI-led sessions; PR template `Handoff:` field updated
+    * `_meta/conventions.md:42` вЂ” branch convention aligned
+    * `PROJECT.md` РўРµРєСѓС‰Р°СЏ phase вЂ” full rewrite to reflect Phase 00.1/00.2/00.3/00.4/00.2.5 вњ… Complete
+    * `decisions/ADR-024-bounded-context-contracts.md` вЂ” "Sanctioned cross-context exceptions" amendment (documents `llm_gateway в†’ billing.models` per llm-gateway invariant #7)
+    * `roadmap/wave-0-foundation/PHASES.md` вЂ” added Phase 00.2.5 row
+    * Deleted `verticals/wb-seller/golden-dataset/tasks/.gitkeep` (stale; 30 real files in dir)
+  - Structural changes (per founder grill Q's resolved via AskUserQuestion):
+    * Created canonical `roadmap/wave-0-foundation/phases/00.2.5-integration.md` retrospective spec
+    * Created `_session-context/README.md` (chronological index + naming convention + lifecycle)
+    * Archived completed-phase audits to `_session-context/archive/`: PR #30 audit + post-merge audit + PR #32 audit + launch checklist + architect-PR doc (5 multi-section dirs/files)
+    * Created 5 missing-README files: contracts/role-prompts/, gates/_schema/, verticals/wb-seller/{prompts, golden-dataset/{adversarial, tasks}}/
+  - STATUS.md + HANDOFF.md updated (exit ritual).
+- Decisions: 8 (4 grill + 4 structural). Full plan + grill records: this audit's AUDIT-REPORT.md.
+- Findings deferred to Phase 00.5 with explicit acceptance criteria:
+  * H1 (Architecture+Compliance+Test triple-confirmed) вЂ” RLS-on-register bootstrap requires SECURITY DEFINER OR role re-wire OR set_tenant_context before INSERT chain; `set_tenant_context` is dead code in production (zero callers) until Phase 00.5 wires GUC middleware
+  * F-01 вЂ” Phase 00.1 AC6 dev-bootstrap test (retroactive)
+  * F-02 вЂ” byok_flow_full + cost_ledger_sum_match migrate from in-memory fakes to real testcontainers PG
+  * F-03 вЂ” Phase 00.4 AC10 BudgetExceeded zero tests
+  * F-04/F-05 вЂ” chat_stream + GigaChat OAuth `_ensure_token` coverage
+  * F-07 вЂ” pick ONE router-test convention (mini-app vs main.py-app) and document
+- Findings deferred to Wave 1+ with explicit tracking:
+  * Slug-based cross-tenant linkage in provision_initial_workspace (PR #32 H-DEFER-1 carryover)
+  * TOCTOU SSRF in mcp/tools/read_url.py (PR #30 carryover)
+  * BYOK provider matrix expansion beyond OpenAI/Anthropic (per ADR-008's 9 promised)
+- Next: founder reviews + merges this audit PR в†’ decides RLS approach (3 options surfaced in HANDOFF.md "Founder action") в†’ opens Phase 00.5 session.
+- Refs: branch `claude/pre-phase-05-audit`; audit at `.planning/_session-context/AUDIT-2026-05-19-PRE-PHASE-05/`; archived PR audits at `.planning/_session-context/archive/`.
+

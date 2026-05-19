@@ -61,7 +61,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [organization, cell]
+            enum: [workspace, cell]
         - name: scope_id
           in: query
           required: true
@@ -98,7 +98,7 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Error' }
         '422':
-          description: Scope/role mismatch (e.g. organization-only role assigned at cell scope).
+          description: Scope/role mismatch (e.g. workspace-only role assigned at cell scope).
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -131,7 +131,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [organization, cell]
+            enum: [workspace, cell]
         - name: scope_id
           in: query
           required: true
@@ -147,7 +147,7 @@ paths:
                 properties:
                   scope_type:
                     type: string
-                    enum: [organization, cell]
+                    enum: [workspace, cell]
                   scope_id:
                     type: string
                     format: uuid
@@ -199,7 +199,7 @@ components:
       properties:
         id:           { type: string, format: uuid }
         user_id:      { type: string, format: uuid }
-        scope_type:   { type: string, enum: [organization, cell] }
+        scope_type:   { type: string, enum: [workspace, cell] }
         scope_id:     { type: string, format: uuid }
         role_id:      { type: string, format: uuid }
         role_slug:    { type: string, example: editor }
@@ -212,7 +212,7 @@ components:
       required: [user_id, scope_type, scope_id, role_id]
       properties:
         user_id:    { type: string, format: uuid }
-        scope_type: { type: string, enum: [organization, cell] }
+        scope_type: { type: string, enum: [workspace, cell] }
         scope_id:   { type: string, format: uuid }
         role_id:    { type: string, format: uuid }
         expires_at: { type: string, format: date-time, nullable: true }

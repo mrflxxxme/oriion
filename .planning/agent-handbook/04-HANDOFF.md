@@ -2,9 +2,15 @@
 
 > **Цель:** работа не теряется при switch'е agent / session / phase. Каждое завершение задачи оставляет следы для следующего agent'а.
 
+## Single-file rolling handoff (canonical pattern, 2026-05-14 reorg)
+
+Проект использует **один rolling-файл `.planning/HANDOFF.md`**, перезаписываемый каждой завершённой сессией как часть Exit ritual (см. [`05-PR-WORKFLOW.md`](./05-PR-WORKFLOW.md)). История доступна через `git log HANDOFF.md`. Append-only журнал сессий — отдельно в [`../JOURNAL.md`](../JOURNAL.md).
+
+Преимущества rolling-pattern перед старой `.planning/handoffs/YYYY-MM-DD-<slug>.md` директорией: один и тот же файл всегда читается next-агентом (no guessing what's latest), git-history даёт авто-archive, no orphan files.
+
 ## Когда нужен handoff
 
-### Полный handoff (формальный)
+### Полный handoff (формальный) — обязательный Exit ritual
 
 - Завершил phase
 - Завершил sprint / day's work
@@ -19,7 +25,7 @@
 
 ## Полный handoff template
 
-Создавай файл в `.planning/handoffs/YYYY-MM-DD-<slug>.md`:
+Перезаписывай `.planning/HANDOFF.md` (single rolling file) этим шаблоном:
 
 ```markdown
 # Handoff: <тема> · YYYY-MM-DD · <agent_name>
@@ -112,8 +118,9 @@
 | Где | Что |
 |---|---|
 | Commit message | Что сделано, кому ссылки, TBD-tokens |
-| `.planning/handoffs/YYYY-MM-DD-slug.md` | Полный handoff (session-end) |
+| `.planning/HANDOFF.md` | Полный handoff (session-end, single rolling file) |
 | `.planning/STATUS.md` | Текущее состояние проекта (rolling) |
+| `.planning/JOURNAL.md` | Append-only журнал сессий (post-merge entry per session) |
 | `OPEN-QUESTIONS.md` | Если открыт новый OQ |
 | `risks/REGISTER.md` | Если новый risk discovered |
 | ADR (new или revised) | Если архитектурное решение |
@@ -132,9 +139,9 @@
 
 1. Read [`../README.md`](../README.md) (3KB) — ориентация
 2. Read [`../STATUS.md`](../STATUS.md) (4KB) — где мы
-3. Read **latest** `.planning/handoffs/*.md` (если есть)
+3. Read [`../HANDOFF.md`](../HANDOFF.md) — последний snapshot (single rolling file)
 4. Read **active** phase-spec из `roadmap/`
-5. Continue от «Next steps» в handoff
+5. Continue от «Next steps» в HANDOFF.md
 
 **Не пере-делай работу, которую предыдущий agent уже сделал.** Доверяй handoff, проверяй только pillar changes.
 
@@ -157,7 +164,7 @@ Do: explicit Blocker section.
 
 ### ❌ Handoff в commit-message only
 
-Long handoff в commit message убийствен для readability. Use `.planning/handoffs/*.md`.
+Long handoff в commit message убийствен для readability. Use `.planning/HANDOFF.md` (single rolling file).
 
 ### ❌ Handoff без файлов
 
@@ -171,7 +178,7 @@ Do: «refactored backend/src/iam/jwt.py + tests; touched files X, Y, Z».
 
 - **Session-scoped memory:** current TodoWrite items, file-read cache
 - **Project-scoped memory:** ADR-decisions, conventions, ongoing patterns
-- **Cross-session memory:** handoff files в `.planning/handoffs/`
+- **Cross-session memory:** rolling `.planning/HANDOFF.md` + append-only `.planning/JOURNAL.md` (git-history-backed)
 
 При завершении session — **persist** project-scoped insights в файлы (ADR, _meta/, conventions). Session-scoped — это самой sessии.
 
@@ -213,8 +220,8 @@ Do: «refactored backend/src/iam/jwt.py + tests; touched files X, Y, Z».
 | Сценарий | Action |
 |---|---|
 | Завершил task внутри phase | Commit + TodoWrite update + (опц.) STATUS update |
-| Завершил phase | Commit + handoff file + STATUS update + phase-spec checked |
-| Передаёшь другому agent | Handoff file с явным «Read first» list |
+| Завершил phase | Commit + HANDOFF.md refresh + JOURNAL.md +1 + STATUS update + phase-spec ✅ Complete |
+| Передаёшь другому agent | HANDOFF.md refresh с явным «Read first» list |
 | Передаёшь Tech Lead на review | PR description с «Что специально проверить» section |
 | Эскалируешь user'у | ESCALATION block (см. 03-ESCALATION.md) + STATUS update |
-| Заблокирован > 1 час | Handoff file + escalation + остановка работы |
+| Заблокирован > 1 час | HANDOFF.md refresh + escalation + остановка работы |
