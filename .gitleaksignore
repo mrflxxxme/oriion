@@ -4,3 +4,19 @@
 # this entry is kept so the original Phase 00.2 test commit (9179b9f)
 # does not retroactively fail the `--first-parent` PR diff scan.
 9179b9fd5cea58cc08b37f557796dc120a95a669:backend/tests/iam/conftest.py:generic-api-key:90
+
+# Phase 00.4 — dev-only BYOK master key literal in ci-backend.yml (commit
+# a3f54bf). The base64 string `dGVzdC1tYXN0ZXIta2V5LWZvci1jaS1vbmx5LWRldi0wMQ==`
+# decodes to "test-master-key-for-ci-only-dev-01" — NOT a real secret. It
+# was a CI-injection placeholder for the BYOK_MASTER_KEY_B64 env var used by
+# LocalAESKMS in test mode. Subsequent commit (7f65ed7) removed the literal
+# and switched to runtime key generation via GITHUB_ENV. These fingerprints
+# allowlist the legacy commit so the --first-parent PR diff scan ignores it.
+a3f54bfcc4c31b8df9c6fa5e983a22e60e63ce2e:.github/workflows/ci-backend.yml:generic-api-key:102
+a3f54bfcc4c31b8df9c6fa5e983a22e60e63ce2e:.github/workflows/ci-backend.yml:generic-api-key:113
+a3f54bfcc4c31b8df9c6fa5e983a22e60e63ce2e:.github/workflows/ci-backend.yml:generic-api-key:120
+
+# Phase 00.4 — contract documentation describing BYOK key handling triggers
+# generic-api-key rule on the phrase "...customer-provided API key, AES-256-GCM-
+# encrypted..." in llm-gateway README. Documentation, not a secret.
+f5d3e56d216c23fdab3c03aaf6bb071660c86e61:.planning/contracts/llm-gateway/README.md:generic-api-key:45

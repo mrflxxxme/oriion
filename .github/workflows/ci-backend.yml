@@ -98,7 +98,10 @@ jobs:
 
       - name: Apply alembic migrations to test DB
         working-directory: backend
-        run: uv run alembic upgrade head
+        # `heads` (plural) — Alembic has one head per bounded-context branch
+        # (_shared, iam, multitenancy, rbac, audit, llm_gateway, billing, mcp);
+        # `head` (singular) errors when >1 head exists.
+        run: uv run alembic upgrade heads
 
       - name: Ruff lint + format check
         working-directory: backend
