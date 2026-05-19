@@ -131,7 +131,12 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
+# Fixture loop scope MUST match test loop scope (default function) — otherwise
+# fixtures running in the session loop produce asyncpg connections that the
+# function-loop test can't reach ("Future attached to a different loop").
+# Wave 0 trade-off: per-test connect/dispose. Wave 1+ swaps to a testcontainers
+# session-scoped pg fixture + `loop_scope="session"` on the asyncio tests.
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "--strict-markers -ra -m 'not live and not integration'"
