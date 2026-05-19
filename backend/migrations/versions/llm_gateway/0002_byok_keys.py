@@ -77,12 +77,13 @@ def upgrade() -> None:
     op.execute("ALTER TABLE llm_gateway.byok_keys ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE llm_gateway.byok_keys FORCE  ROW LEVEL SECURITY;")
 
+    # Security audit H-1, 2026-05-19: use _shared.current_workspace_id() helper
+    # (returns NULL on empty/invalid GUC ⇒ default-deny). Inline current_setting
+    # cast raises invalid_text_representation on empty GUC.
     op.execute(
         """
         CREATE POLICY byok_keys_workspace_isolation ON llm_gateway.byok_keys
-            USING (
-                workspace_id = current_setting('app.current_workspace_id', true)::uuid
-            );
+            USING (workspace_id = _shared.current_workspace_id());
         """
     )
 

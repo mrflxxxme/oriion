@@ -66,30 +66,17 @@ def upgrade() -> None:
         """
     )
 
-    # RLS — membership-driven visibility (see contract README "RLS — 3-GUC layered model").
+    # RLS — enable + force (default-deny). Policy CREATE is deferred to
+    # multitenancy/0003_cell_members.py because workspaces_select_own's USING
+    # clause references multitenancy.cells + multitenancy.cell_members which
+    # don't exist yet at this point in the chain (Architect-audit H2,
+    # 2026-05-19). Default-deny posture holds until 0003 lands the policy.
     op.execute("ALTER TABLE multitenancy.workspaces ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE multitenancy.workspaces FORCE  ROW LEVEL SECURITY;")
-    op.execute(
-        """
-        CREATE POLICY workspaces_select_own
-            ON multitenancy.workspaces
-            FOR SELECT
-            USING (
-                EXISTS (
-                    SELECT 1
-                    FROM multitenancy.cells c
-                    JOIN multitenancy.cell_members m ON m.cell_id = c.id
-                    WHERE c.workspace_id = workspaces.id
-                      AND m.user_id = _shared.current_user_id()
-                )
-            );
-        """
-    )
 
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON multitenancy.workspaces TO oriion_app;")
 
 
 def downgrade() -> None:
-    op.execute("DROP POLICY IF EXISTS workspaces_select_own ON multitenancy.workspaces;")
     op.execute("DROP TRIGGER IF EXISTS workspaces_set_updated_at ON multitenancy.workspaces;")
     op.execute("DROP TABLE IF EXISTS multitenancy.workspaces;")

@@ -86,7 +86,67 @@ def upgrade() -> None:
 
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON multitenancy.cell_members TO oriion_app;")
 
+    # workspaces_select_own — deferred from 0001_workspaces.py (Architect-audit
+    # H2, 2026-05-19): the USING clause references multitenancy.cells AND
+    # multitenancy.cell_members which only exist at this point in the chain.
+    # Default-deny held during 0001+0002 because the table had RLS forced with
+    # zero permissive policies.
+    op.execute(
+        """
+        CREATE POLICY workspaces_select_own
+            ON multitenancy.workspaces
+            FOR SELECT
+            USING (
+                EXISTS (
+                    SELECT 1
+                    FROM multitenancy.cells c
+                    JOIN multitenancy.cell_members m ON m.cell_id = c.id
+                    WHERE c.workspace_id = workspaces.id
+                      AND m.user_id = _shared.current_user_id()
+                )
+            );
+        """
+    )
+
+    # Security audit H-2, 2026-05-19: explicit write policies for workspaces,
+    # cells, cell_members. The contract README states "Write policies are
+    # intentionally not defined at the RLS layer. Mutations go through
+    # service-account connections that bypass RLS via stored procedures;
+    # authorization is enforced application-side using the `rbac` context."
+    # Wave 0: app-layer authz (rbac.AuthorizationService) is the source of
+    # truth; RLS write policies permit writes when a tenant GUC is set
+    # (rejected when context unset — default-deny holds). Wave 1+ tightens
+    # via SECURITY DEFINER procedures + BYPASSRLS service role.
+    op.execute(
+        """
+        CREATE POLICY workspaces_write_with_context
+            ON multitenancy.workspaces
+            FOR ALL
+            USING (_shared.current_user_id() IS NOT NULL)
+            WITH CHECK (_shared.current_user_id() IS NOT NULL);
+        """
+    )
+    op.execute(
+        """
+        CREATE POLICY cells_write_with_context
+            ON multitenancy.cells
+            FOR ALL
+            USING (_shared.current_user_id() IS NOT NULL)
+            WITH CHECK (_shared.current_user_id() IS NOT NULL);
+        """
+    )
+    op.execute(
+        """
+        CREATE POLICY cell_members_write_with_context
+            ON multitenancy.cell_members
+            FOR ALL
+            USING (_shared.current_user_id() IS NOT NULL)
+            WITH CHECK (_shared.current_user_id() IS NOT NULL);
+        """
+    )
+
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS workspaces_select_own ON multitenancy.workspaces;")
     op.execute("DROP POLICY IF EXISTS cell_members_select_co_member ON multitenancy.cell_members;")
     op.execute("DROP TABLE IF EXISTS multitenancy.cell_members;")

@@ -70,20 +70,56 @@ def upgrade() -> None:
 
     op.execute("ALTER TABLE billing.credit_transactions ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE billing.credit_transactions FORCE  ROW LEVEL SECURITY;")
+    # Security audit H-1, 2026-05-19: use _shared.current_cell_id() helper
+    # (returns NULL on empty/invalid GUC ⇒ default-deny). Inline current_setting
+    # cast raises invalid_text_representation on empty GUC.
     op.execute(
         """
         CREATE POLICY ct_cell_isolation ON billing.credit_transactions
-            USING (
-                cell_id = current_setting('app.current_cell_id', true)::uuid
-            );
+            USING (cell_id = _shared.current_cell_id());
         """
     )
 
+    # Append-only ledger — paired with llm_usage_log per invariant #7. Architect-audit
+    # H3 + Security audit best-practice, 2026-05-19.
     op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE " "ON billing.credit_transactions TO oriion_app;"
+        """
+        CREATE OR REPLACE FUNCTION billing.deny_update_delete_credit_transactions()
+        RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'billing.credit_transactions is append-only';
+        END;
+        $$;
+        """
     )
+    op.execute(
+        """
+        CREATE TRIGGER credit_transactions_no_update
+            BEFORE UPDATE ON billing.credit_transactions
+            FOR EACH STATEMENT EXECUTE FUNCTION
+                billing.deny_update_delete_credit_transactions();
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER credit_transactions_no_delete
+            BEFORE DELETE ON billing.credit_transactions
+            FOR EACH STATEMENT EXECUTE FUNCTION
+                billing.deny_update_delete_credit_transactions();
+        """
+    )
+
+    op.execute("GRANT SELECT, INSERT ON billing.credit_transactions TO oriion_app;")
 
 
 def downgrade() -> None:
+    op.execute(
+        "DROP TRIGGER IF EXISTS credit_transactions_no_delete ON billing.credit_transactions;"
+    )
+    op.execute(
+        "DROP TRIGGER IF EXISTS credit_transactions_no_update ON billing.credit_transactions;"
+    )
+    op.execute("DROP FUNCTION IF EXISTS billing.deny_update_delete_credit_transactions();")
     op.execute("DROP POLICY IF EXISTS ct_cell_isolation ON billing.credit_transactions;")
     op.execute("DROP TABLE IF EXISTS billing.credit_transactions;")

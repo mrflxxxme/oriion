@@ -96,23 +96,55 @@ def upgrade() -> None:
 
     op.execute("ALTER TABLE llm_gateway.llm_usage_log ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE llm_gateway.llm_usage_log FORCE  ROW LEVEL SECURITY;")
+    # Use _shared.current_workspace_id() helper (returns NULL on empty/invalid
+    # GUC) — Security audit H-1, 2026-05-19. Inline current_setting()::uuid
+    # raises invalid_text_representation on empty GUC; helper returns NULL ⇒
+    # default-deny.
     op.execute(
         """
         CREATE POLICY llm_usage_log_workspace_isolation ON llm_gateway.llm_usage_log
-            USING (
-                workspace_id = current_setting('app.current_workspace_id', true)::uuid
-            );
+            USING (workspace_id = _shared.current_workspace_id());
         """
     )
 
+    # Append-only invariant per llm-gateway README invariant #2 (cost-ledger
+    # source-of-truth — must not be mutated). Architect-audit H3, 2026-05-19.
     op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE " "ON llm_gateway.llm_usage_log TO oriion_app;"
+        """
+        CREATE OR REPLACE FUNCTION llm_gateway.deny_update_delete_usage_log()
+        RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'llm_gateway.llm_usage_log is append-only';
+        END;
+        $$;
+        """
     )
+    op.execute(
+        """
+        CREATE TRIGGER llm_usage_log_no_update
+            BEFORE UPDATE ON llm_gateway.llm_usage_log
+            FOR EACH STATEMENT EXECUTE FUNCTION llm_gateway.deny_update_delete_usage_log();
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER llm_usage_log_no_delete
+            BEFORE DELETE ON llm_gateway.llm_usage_log
+            FOR EACH STATEMENT EXECUTE FUNCTION llm_gateway.deny_update_delete_usage_log();
+        """
+    )
+
+    # Defence-in-depth on top of the trigger: grant SELECT + INSERT only.
+    op.execute("GRANT SELECT, INSERT ON llm_gateway.llm_usage_log TO oriion_app;")
     op.execute("GRANT USAGE, SELECT ON SEQUENCE llm_gateway.llm_usage_log_id_seq TO oriion_app;")
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER IF EXISTS llm_usage_log_no_delete ON llm_gateway.llm_usage_log;")
+    op.execute("DROP TRIGGER IF EXISTS llm_usage_log_no_update ON llm_gateway.llm_usage_log;")
+    op.execute("DROP FUNCTION IF EXISTS llm_gateway.deny_update_delete_usage_log();")
     op.execute(
-        "DROP POLICY IF EXISTS llm_usage_log_workspace_isolation " "ON llm_gateway.llm_usage_log;"
+        "DROP POLICY IF EXISTS llm_usage_log_workspace_isolation ON llm_gateway.llm_usage_log;"
     )
     op.execute("DROP TABLE IF EXISTS llm_gateway.llm_usage_log;")
