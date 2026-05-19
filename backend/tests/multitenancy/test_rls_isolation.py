@@ -85,9 +85,15 @@ async def test_cell_members_isolated_by_rls(db_session: AsyncSession) -> None:
     )
 
     # As user A — should see only cell A's members.
+    #
+    # Drop to the non-superuser app role for the SELECT — PostgreSQL bypasses
+    # RLS for superusers even with FORCE ROW LEVEL SECURITY (the dev DB user
+    # `oriion` IS superuser via POSTGRES_USER). SET LOCAL ROLE reverts
+    # automatically when the outer TX rolls back at fixture teardown.
     async with set_tenant_context(
         db_session, workspace_id=ws_a_id, cell_id=cell_a_id, user_id=user_a
     ):
+        await db_session.execute(text("SET LOCAL ROLE oriion_app"))
         result = await db_session.execute(text("SELECT user_id FROM multitenancy.cell_members"))
         visible_users = {str(r[0]) for r in result.all()}
 
