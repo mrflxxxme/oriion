@@ -135,36 +135,38 @@ def upgrade() -> None:
     # truth; RLS write policies permit writes when a tenant GUC is set
     # (rejected when context unset — default-deny holds). Wave 1+ tightens
     # via SECURITY DEFINER procedures + BYPASSRLS service role.
-    op.execute(
-        """
-        CREATE POLICY workspaces_write_with_context
-            ON multitenancy.workspaces
-            FOR ALL
-            USING (_shared.current_user_id() IS NOT NULL)
-            WITH CHECK (_shared.current_user_id() IS NOT NULL);
-        """
-    )
-    op.execute(
-        """
-        CREATE POLICY cells_write_with_context
-            ON multitenancy.cells
-            FOR ALL
-            USING (_shared.current_user_id() IS NOT NULL)
-            WITH CHECK (_shared.current_user_id() IS NOT NULL);
-        """
-    )
-    op.execute(
-        """
-        CREATE POLICY cell_members_write_with_context
-            ON multitenancy.cell_members
-            FOR ALL
-            USING (_shared.current_user_id() IS NOT NULL)
-            WITH CHECK (_shared.current_user_id() IS NOT NULL);
-        """
-    )
+    #
+    # NOTE: per-command policies (INSERT / UPDATE / DELETE) rather than
+    # FOR ALL — multiple permissive policies on the same command are OR'd
+    # in Postgres, and a FOR ALL "context is set" policy would override
+    # the restrictive SELECT policies (`workspaces_select_own`,
+    # `cells_select_member`, `cell_members_select_self_row`), defeating
+    # the entire isolation model. Round-11 fix 2026-05-19.
+    for tbl in ("workspaces", "cells", "cell_members"):
+        for cmd in ("INSERT", "UPDATE", "DELETE"):
+            policy_name = f"{tbl}_write_{cmd.lower()}_with_context"
+            using_clause = (
+                "WITH CHECK (_shared.current_user_id() IS NOT NULL)"
+                if cmd == "INSERT"
+                else (
+                    "USING (_shared.current_user_id() IS NOT NULL) "
+                    "WITH CHECK (_shared.current_user_id() IS NOT NULL)"
+                    if cmd == "UPDATE"
+                    else "USING (_shared.current_user_id() IS NOT NULL)"
+                )
+            )
+            op.execute(
+                f"CREATE POLICY {policy_name} "
+                f"ON multitenancy.{tbl} FOR {cmd} {using_clause};"
+            )
 
 
 def downgrade() -> None:
+    for tbl in ("workspaces", "cells", "cell_members"):
+        for cmd in ("insert", "update", "delete"):
+            op.execute(
+                f"DROP POLICY IF EXISTS {tbl}_write_{cmd}_with_context ON multitenancy.{tbl};"
+            )
     op.execute("DROP POLICY IF EXISTS cells_select_member ON multitenancy.cells;")
     op.execute("DROP POLICY IF EXISTS workspaces_select_own ON multitenancy.workspaces;")
     op.execute("DROP POLICY IF EXISTS cell_members_select_self_row ON multitenancy.cell_members;")
