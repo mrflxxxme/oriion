@@ -46,23 +46,31 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
 
 @pytest_asyncio.fixture
 async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    """Rolled-back AsyncSession per test.
+    """Per-test AsyncSession backed by a fresh connection + outer TX rollback.
 
-    Каждый test получает свежую транзакцию, после теста — rollback,
-    чтобы test isolation сохранялась без drop/recreate DB.
+    Implementation note (2026-05-19): the previous session-only impl re-used
+    the connection across tests and left it in an aborted state when a test
+    triggered an expected EXCEPTION (e.g. append-only trigger fires).
+    Subsequent tests then failed with
+        cannot use Connection.transaction() in a manually started transaction
+    The savepoint-rollback pattern below isolates each test in its own
+    connection so a botched TX state cannot leak. See audit Section 04
+    (Test Adequacy) flag for the rationale.
     """
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-    session_factory = async_sessionmaker(
-        bind=db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-    async with session_factory() as session:
+    async with db_engine.connect() as conn:
+        # Outer transaction — rolled back wholesale at fixture teardown so the
+        # DB state stays clean between tests even when the test itself committed
+        # or raised mid-transaction.
+        outer_tx = await conn.begin()
+        session = AsyncSession(bind=conn, expire_on_commit=False)
         try:
             yield session
         finally:
-            await session.rollback()
+            await session.close()
+            if outer_tx.is_active:
+                await outer_tx.rollback()
 
 
 @pytest.fixture(scope="session")
