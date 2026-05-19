@@ -16,10 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 @pytest.mark.asyncio
 async def test_audit_log_is_range_partitioned(db_session: AsyncSession) -> None:
     """pg_partitioned_table confirms parent is partitioned, strategy 'r' (range)."""
+    # pg_partitioned_table.partstrat is `"char"` — asyncpg surfaces this as
+    # `bytes` (a single byte), so we cast to text in SQL for a portable
+    # string comparison.
     result = await db_session.execute(
         text(
             """
-            SELECT partstrat
+            SELECT partstrat::text
               FROM pg_partitioned_table pt
               JOIN pg_class c ON c.oid = pt.partrelid
               JOIN pg_namespace n ON n.oid = c.relnamespace

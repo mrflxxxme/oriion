@@ -94,9 +94,12 @@ async def test_pgvector_nearest_neighbor_query(db_session: AsyncSession) -> None
     )
     schema_name = res.scalar()
 
-    # Insert two rows with 1024-dim embeddings (mostly-zero with a single 1.0).
-    for i, val in enumerate([0.0, 1.0]):
-        vec = ", ".join([str(val) if j == i else "0.0" for j in range(1024)])
+    # Insert two rows with 1024-dim unit-like embeddings. NOTE: pgvector's
+    # cosine distance is undefined for zero vectors (||v|| = 0) — they're
+    # silently excluded from ANN results. So each row must have non-zero
+    # magnitude; we set the i-th component to 1.0 and leave the rest at 0.0.
+    for i in (0, 1):
+        vec = ", ".join(["1.0" if j == i else "0.0" for j in range(1024)])
         await db_session.execute(
             text(
                 f'INSERT INTO "{schema_name}".memory_entries '
@@ -106,7 +109,7 @@ async def test_pgvector_nearest_neighbor_query(db_session: AsyncSession) -> None
             {"c": f"row-{i}"},
         )
 
-    # ANN ordering on the cosine operator.
+    # ANN ordering on the cosine operator. Query vector matches row-1 exactly.
     query_vec = ", ".join(["1.0" if j == 1 else "0.0" for j in range(1024)])
     res = await db_session.execute(
         text(

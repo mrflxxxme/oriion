@@ -59,16 +59,21 @@ async def set_tenant_context(
     Postgres `SET LOCAL` is bound to the current transaction; on commit /
     rollback the values are dropped automatically. No explicit RESET needed.
     """
+    # Postgres `SET LOCAL <name> = <value>` does NOT accept bound parameters —
+    # the statement is parsed lexically without prepared-statement substitution.
+    # We use `set_config(name, value, is_local := true)` instead: a function
+    # call that DOES accept parameters and has the same per-transaction
+    # session-local semantics as SET LOCAL.
     await session.execute(
-        text("SET LOCAL app.current_user_id = :u"),
+        text("SELECT set_config('app.current_user_id', :u, true)"),
         {"u": str(user_id)},
     )
     await session.execute(
-        text("SET LOCAL app.current_workspace_id = :w"),
+        text("SELECT set_config('app.current_workspace_id', :w, true)"),
         {"w": str(workspace_id)},
     )
     await session.execute(
-        text("SET LOCAL app.current_cell_id = :c"),
+        text("SELECT set_config('app.current_cell_id', :c, true)"),
         {"c": str(cell_id)},
     )
     try:
@@ -84,6 +89,6 @@ async def clear_tenant_context(session: AsyncSession) -> None:
     Use in tests that want to assert default-deny posture (missing GUC → no
     rows) within a single transaction without rolling back.
     """
-    await session.execute(text("SET LOCAL app.current_user_id = ''"))
-    await session.execute(text("SET LOCAL app.current_workspace_id = ''"))
-    await session.execute(text("SET LOCAL app.current_cell_id = ''"))
+    await session.execute(text("SELECT set_config('app.current_user_id', '', true)"))
+    await session.execute(text("SELECT set_config('app.current_workspace_id', '', true)"))
+    await session.execute(text("SELECT set_config('app.current_cell_id', '', true)"))
