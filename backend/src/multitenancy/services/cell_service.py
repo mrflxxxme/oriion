@@ -15,7 +15,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src._stubs.audit import emit_audit_event  # 00.3-audit-subagent will swap
+from src._stubs.audit import emit_audit_event  # 00.2.5 integration swaps to src.audit.services.audit_service.emit_audit_event
 from src.multitenancy.events import (
     emit_cell_archived,
     emit_cell_created,

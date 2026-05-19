@@ -145,17 +145,17 @@ CREATE POLICY role_assignments_select_self
 -- =====================================================================
 --
 -- INSERT INTO rbac.system_roles (slug, display_name, description) VALUES
---   ('owner',   'Owner',   'Full control of the organization including billing.'),
---   ('admin',   'Admin',   'Full control of a cell; no billing/org-delete.'),
+--   ('owner',   'Owner',   'Full control of the workspace including billing.'),
+--   ('admin',   'Admin',   'Full control of a cell; no billing/workspace-delete.'),
 --   ('editor',  'Editor',  'Create / run tasks and agents; manage non-billing settings.'),
 --   ('viewer',  'Viewer',  'Read-only access to cell content.'),
 --   ('billing', 'Billing', 'View invoices and manage payment methods; no content access.'),
 --   ('guest',   'Guest',   'Time-boxed limited access (e.g. for friends-loop participants).');
 --
 -- INSERT INTO rbac.permissions (slug, display_name, category, description) VALUES
---   ('organization.view',   'View organization',  'organization', 'Read org metadata.'),
---   ('organization.update', 'Edit organization',  'organization', 'Mutate org metadata.'),
---   ('organization.delete', 'Delete organization','organization', 'Soft-delete the org.'),
+--   ('workspace.view',   'View workspace',  'workspace', 'Read workspace metadata.'),
+--   ('workspace.update', 'Edit workspace',  'workspace', 'Mutate workspace metadata.'),
+--   ('workspace.delete', 'Delete workspace','workspace', 'Soft-delete the workspace.'),
 --   ('cell.create',         'Create cell',        'cell',         'Create a new cell in the org.'),
 --   ('cell.view',           'View cell',          'cell',         'Read cell metadata.'),
 --   ('cell.update',         'Edit cell',          'cell',         'Mutate cell metadata / settings.'),
