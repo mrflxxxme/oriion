@@ -284,6 +284,13 @@ class AuthService:
         if row is None:
             return  # logout is idempotent
 
+        # Look up the session BEFORE revoke so we can attribute the audit
+        # row to the real user_id (was UUID(int=0) pre-Phase-00.2.5 — see
+        # audit M-1 finding). Refresh-token is unauthenticated by design,
+        # but the refresh-token row carries session_id → session.user_id.
+        session_row = await self._session_repo.find_by_id(row.session_id)
+        actor_id_for_audit = session_row.user_id if session_row is not None else UUID(int=0)
+
         await self._session_repo.revoke(row.session_id)
         await self._refresh_repo.revoke_chain(row.rotation_chain_id)
         if access_jti is not None and access_remaining_ttl is not None:
@@ -291,7 +298,7 @@ class AuthService:
         await events.emit_session_revoked(session_id=row.session_id, reason="user_action")
         await emit_audit_event(
             actor_type="user",
-            actor_id=UUID(int=0),  # actor unknown post-logout (refresh-token unauthenticated)
+            actor_id=actor_id_for_audit,
             action="iam.auth.logout",
             resource_type="session",
             resource_id=row.session_id,

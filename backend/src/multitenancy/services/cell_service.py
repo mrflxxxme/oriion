@@ -106,6 +106,10 @@ class CellService:
         cell = await self._cell_repo.find_by_id(cell_id)
         if cell is None:
             raise CellNotFound()
+        # Snapshot workspace_id BEFORE the archive UPDATE so later
+        # ORM-state changes can't drift the audit row's workspace
+        # attribution (M-4 audit follow-up).
+        cell_workspace_id = cell.workspace_id
         await self._cell_repo.archive(cell_id)
         archived_at = datetime.now(UTC)
         await emit_cell_archived(
@@ -121,7 +125,7 @@ class CellService:
             resource_id=cell_id,
             payload={"archived_at": archived_at.isoformat()},
             session=self._session,
-            workspace_id=cell.workspace_id,
+            workspace_id=cell_workspace_id,
             cell_id=cell_id,
         )
 

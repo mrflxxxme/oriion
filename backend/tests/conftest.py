@@ -295,8 +295,20 @@ async def db_session_committed(db_engine: AsyncEngine) -> AsyncIterator[AsyncSes
         yield session
     finally:
         await session.close()
-        # TRUNCATE every table in our application schemas. Run outside of
-        # any TX so this always succeeds even if the test left state aborted.
+        # TRUNCATE every transactional table in our application schemas.
+        # Run outside of any TX so this always succeeds even if the test
+        # left state aborted.
+        #
+        # IMPORTANT exclusions:
+        # * `alembic_version` — migrations metadata, never reset
+        # * `rbac.{permissions, system_roles, role_permissions}` — seeded
+        #   by migration `migrations/versions/rbac/0005_seed_built_in_roles.py`;
+        #   wiping them breaks tests/rbac/test_seed_data.py + any test
+        #   that LEFT JOINs from cell_members.role_id.
+        #
+        # Per-cell schemas (`cell_<uuid>`) are NOT in the schemaname filter
+        # below — they're created on-demand by `provision_cell_schema` and
+        # disappear with the testcontainers container at session end.
         async with db_engine.begin() as conn:
             tables = await conn.execute(
                 text(
@@ -304,7 +316,9 @@ async def db_session_committed(db_engine: AsyncEngine) -> AsyncIterator[AsyncSes
                     "  FROM pg_tables "
                     " WHERE schemaname IN ('iam','multitenancy','rbac',"
                     "                       'audit','llm_gateway','billing','mcp') "
-                    "   AND tablename NOT LIKE 'alembic_%'"
+                    "   AND tablename NOT LIKE 'alembic_%' "
+                    "   AND NOT (schemaname = 'rbac' AND tablename IN "
+                    "            ('permissions','system_roles','role_permissions'))"
                 )
             )
             qualified = [row[0] for row in tables.all()]

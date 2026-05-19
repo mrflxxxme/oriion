@@ -68,7 +68,15 @@ pytestmark = [pytest.mark.integration, pytest.mark.commit_required]
 
 
 @pytest_asyncio.fixture
-async def app(db_engine: AsyncEngine) -> AsyncIterator[FastAPI]:
+async def app(
+    db_engine: AsyncEngine,
+    # commit_required-marked → request db_session_committed so its
+    # TRUNCATE-based teardown runs after each test. Without this, audit_log
+    # rows + workspaces + cells accumulate across tests within one pytest
+    # session, breaking `count == 1`-style assertions under any non-default
+    # ordering (random, -k filtering, repeat-on-fail).
+    db_session_committed: AsyncSession,
+) -> AsyncIterator[FastAPI]:
     """FastAPI app instance with dependency overrides bound to the test container.
 
     Overrides ``get_db`` to commit-per-request against the testcontainers
@@ -169,11 +177,28 @@ def _client(app: FastAPI) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
-async def _count_audit_rows(session: AsyncSession, action: str) -> int:
-    result = await session.execute(
-        text("SELECT count(*) FROM audit.audit_log WHERE action = :a"),
-        {"a": action},
-    )
+async def _count_audit_rows(
+    session: AsyncSession,
+    action: str,
+    *,
+    actor_id: str | None = None,
+) -> int:
+    """Count audit_log rows for a given action.
+
+    ``actor_id`` is optional but recommended for test isolation: filtering
+    by the test's specific user_id makes the assertion robust to other
+    tests in the same session having emitted the same action.
+    """
+    if actor_id is None:
+        result = await session.execute(
+            text("SELECT count(*) FROM audit.audit_log WHERE action = :a"),
+            {"a": action},
+        )
+    else:
+        result = await session.execute(
+            text("SELECT count(*) FROM audit.audit_log " "WHERE action = :a AND actor_id = :u"),
+            {"a": action, "u": actor_id},
+        )
     return int(result.scalar() or 0)
 
 
@@ -242,10 +267,18 @@ async def test_register_through_logout_flow(app: FastAPI, assertion_session: Asy
         )
         assert schema_row.scalar() == schema_name
 
-        # Audit row written for register.
-        assert await _count_audit_rows(assertion_session, "iam.user.registered") == 1
+        # Audit row written for register. Filter by actor_id so the
+        # assertion is robust to cross-test pollution when other tests in
+        # the same session also emit `iam.user.registered` for their own
+        # users (db_session_committed's TRUNCATE handles inter-test
+        # cleanup, but defence-in-depth on actor_id is cheap).
+        assert (
+            await _count_audit_rows(assertion_session, "iam.user.registered", actor_id=user_id) == 1
+        )
         # Consent row written for pdn.
-        assert await _count_audit_rows(assertion_session, "iam.consent.granted") >= 1
+        assert (
+            await _count_audit_rows(assertion_session, "iam.consent.granted", actor_id=user_id) >= 1
+        )
 
         # ── 2. verify-email ────────────────────────────────────────────
         verification = app.state.test_email_sender.last()  # type: ignore[attr-defined]
@@ -262,7 +295,10 @@ async def test_register_through_logout_flow(app: FastAPI, assertion_session: Asy
             {"u": user_id},
         )
         assert row.scalar() is not None
-        assert await _count_audit_rows(assertion_session, "iam.user.email_verified") == 1
+        assert (
+            await _count_audit_rows(assertion_session, "iam.user.email_verified", actor_id=user_id)
+            == 1
+        )
 
         # ── 3. login ───────────────────────────────────────────────────
         r = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
@@ -272,7 +308,7 @@ async def test_register_through_logout_flow(app: FastAPI, assertion_session: Asy
         assert pair_a["access_token"]
         assert pair_a["refresh_token"]
 
-        assert await _count_audit_rows(assertion_session, "iam.auth.login") == 1
+        assert await _count_audit_rows(assertion_session, "iam.auth.login", actor_id=user_id) == 1
 
         # Session row persisted.
         sessions_row = await assertion_session.execute(
@@ -290,7 +326,7 @@ async def test_register_through_logout_flow(app: FastAPI, assertion_session: Asy
         assert pair_b["refresh_token"] != pair_a["refresh_token"]
         assert pair_b["access_token"] != pair_a["access_token"]
 
-        assert await _count_audit_rows(assertion_session, "iam.auth.refresh") == 1
+        assert await _count_audit_rows(assertion_session, "iam.auth.refresh", actor_id=user_id) == 1
 
         # Old refresh token marked used.
         used_row = await assertion_session.execute(
@@ -304,7 +340,9 @@ async def test_register_through_logout_flow(app: FastAPI, assertion_session: Asy
         )
         assert r.status_code == 204
 
-        assert await _count_audit_rows(assertion_session, "iam.auth.logout") == 1
+        # Logout now attributes to the real user_id (M-1 fix this PR —
+        # AuthService.logout looks up session.user_id before revoke).
+        assert await _count_audit_rows(assertion_session, "iam.auth.logout", actor_id=user_id) == 1
 
         # Session revoked.
         revoked_row = await assertion_session.execute(
@@ -331,6 +369,7 @@ async def test_forgot_and_reset_password_flow(
             json={"email": email, "password": initial_pw, "consent_pdn": True},
         )
         assert r.status_code == 201, r.text
+        register_user_id = r.json()["user_id"]
 
         verification = app.state.test_email_sender.last()  # type: ignore[attr-defined]
         await client.post("/api/v1/auth/verify-email", json={"token": verification.token})
@@ -355,8 +394,15 @@ async def test_forgot_and_reset_password_flow(
         assert r.status_code == 200
         assert r.json() == {"status": "password_reset"}
 
-        # Audit row for password_reset present.
-        assert await _count_audit_rows(assertion_session, "iam.user.password_reset") == 1
+        # Audit row for password_reset present (scoped to this test's user).
+        assert (
+            await _count_audit_rows(
+                assertion_session,
+                "iam.user.password_reset",
+                actor_id=register_user_id,
+            )
+            == 1
+        )
 
         # Old password invalid; new password works.
         r = await client.post("/api/v1/auth/login", json={"email": email, "password": initial_pw})
