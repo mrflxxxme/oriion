@@ -140,7 +140,10 @@ class WebSearchTool:
 
         API docs: https://api.search.brave.com/app/documentation/web-search
         """
-        assert self._brave_api_key is not None
+        # Type-narrow without bandit B101 — caller guarantees this by gating
+        # on self._brave_api_key truthiness before dispatch.
+        if self._brave_api_key is None:
+            raise WebSearchError("brave_api_key not configured")
         headers = {
             "Accept": "application/json",
             "X-Subscription-Token": self._brave_api_key,
@@ -166,7 +169,10 @@ class WebSearchTool:
         Real Yandex Search XML returns XML; Wave 0 we accept either JSON
         (test mocks) or treat XML as opaque text. Wave 1+ adds lxml parsing.
         """
-        assert self._yandex_api_key is not None
+        # Type-narrow without bandit B101 — caller guarantees this by gating
+        # on self._yandex_api_key truthiness before dispatch.
+        if self._yandex_api_key is None:
+            raise WebSearchError("yandex_api_key not configured")
         params: dict[str, Any] = {
             "user": "oriion",
             "key": self._yandex_api_key,
