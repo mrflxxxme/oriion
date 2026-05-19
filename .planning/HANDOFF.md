@@ -100,14 +100,20 @@ Standard bootstrap-4:
    ```bash
    git checkout main && git pull origin main
    git worktree add .planning/.claude/worktrees/phase-00-2-5-integration -b claude/phase-00-2-5-integration
-   # Brief: "Phase 00.2.5 integration. Delete backend/src/_stubs/,
-   #         rewire iam.auth_service.register → multitenancy.workspace_service.provision_initial_workspace,
-   #         rewire iam emit_audit_event → audit.audit_service.emit_audit_event,
+   # Brief: "Phase 00.2.5 integration. Delete backend/src/_stubs/{audit.py,multitenancy.py}.
+   #         emit_audit_event swap: pure import change (3 call-sites in iam +
+   #         multitenancy/services/cell_service.py:18) — signatures match (real impl is
+   #         strict superset, verified by tests/audit/test_emit_audit_event_stub_compat.py).
+   #         provision_initial_workspace swap: CALL-SITE refactor required — stub takes
+   #         (user_id) only; real impl takes (session, user_id, email_localpart). Update
+   #         iam.services.auth_service.register accordingly (1 call-site at auth_service.py:143).
    #         rewire llm_gateway router DI to call real chat/embeddings/byok with auth_dependency + workspace context,
    #         add testcontainers session-scoped pg fixture to conftest,
    #         run make dev-bootstrap, run E2E smoke (register → verify-email → login →
    #         /api/v1/llm/chat → refresh → logout), full coverage incl iam repositories
-   #         on real PG, update STATUS/HANDOFF/JOURNAL/PROJECT, mark 00.2/00.3/00.4 Complete."
+   #         on real PG, delete tests/audit/test_emit_audit_event_stub_compat.py and
+   #         tests/iam/unit/test_stubs.py (no longer applicable), update STATUS/HANDOFF/
+   #         JOURNAL/PROJECT, mark 00.2/00.3/00.4 Complete."
    ```
 
 ## Known caveats / tracked for 00.2.5 + 00.6

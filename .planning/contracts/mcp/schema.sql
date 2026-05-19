@@ -5,7 +5,7 @@
 -- Context: mcp (Model Context Protocol)
 -- Intent: MCP server connections, tool registrations, health logs
 -- Cross-context dependencies:
---   * multitenancy.organizations (organization_id is connection scope)
+--   * multitenancy.workspaces (workspace_id is connection scope)
 --   * multitenancy.cells (optional cell_id for per-cell connections)
 --   * agents.agent_instances (consumers of MCP tools)
 --   * rbac.* (per-tool permissions)
@@ -15,7 +15,7 @@
 -- =============================================================================
 CREATE TABLE mcp_connections (
     id              uuid        NOT NULL DEFAULT gen_random_uuid(),
-    organization_id uuid        NOT NULL,
+    workspace_id uuid        NOT NULL,
     -- TODO: columns в Milestone D / Wave 2
     --   cell_id uuid NULL — optional per-cell scope
     --   connection_name text — human-readable
@@ -27,7 +27,7 @@ CREATE TABLE mcp_connections (
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (id)
-    -- TODO: FOREIGN KEY (organization_id) REFERENCES multitenancy.organizations(id)
+    -- TODO: FOREIGN KEY (workspace_id) REFERENCES multitenancy.workspaces(id)
 );
 
 -- =============================================================================
@@ -35,7 +35,7 @@ CREATE TABLE mcp_connections (
 -- =============================================================================
 CREATE TABLE mcp_tools (
     id              uuid        NOT NULL DEFAULT gen_random_uuid(),
-    organization_id uuid        NOT NULL,
+    workspace_id uuid        NOT NULL,
     -- TODO: columns в Milestone D / Wave 2
     --   connection_id uuid FK -> mcp_connections.id
     --   tool_name text — MCP-advertised tool identifier
@@ -53,7 +53,7 @@ CREATE TABLE mcp_tools (
 -- =============================================================================
 CREATE TABLE mcp_health_log (
     id              uuid        NOT NULL DEFAULT gen_random_uuid(),
-    organization_id uuid        NOT NULL,
+    workspace_id uuid        NOT NULL,
     -- TODO: columns в Milestone D / Wave 2
     --   connection_id uuid FK -> mcp_connections.id
     --   probed_at timestamptz
@@ -66,6 +66,6 @@ CREATE TABLE mcp_health_log (
 );
 
 -- TODO (Milestone D / Wave 2):
---   * indexes on (organization_id, connection_id), (probed_at) for time-series
+--   * indexes on (workspace_id, connection_id), (probed_at) for time-series
 --   * partitioning of mcp_health_log by month (append-heavy)
 --   * RLS policies tied to multitenancy
