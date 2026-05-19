@@ -65,22 +65,22 @@ def upgrade() -> None:
         "'Cross-context FK → iam.users.id; nullable for owner self-join.';"
     )
 
-    # RLS — a member sees co-members within the same cell.
+    # RLS — restrictive self-row visibility (Wave 0). The contract README
+    # specifies "co-members of the same cell" but the natural EXISTS query
+    # over cell_members itself causes Postgres infinite-recursion in the
+    # policy check. Wave 1+ swaps in a SECURITY DEFINER helper
+    # `_shared.current_user_cell_ids()` that bypasses RLS for the inner
+    # lookup and restores the co-member visibility semantics. Until then
+    # the restrictive baseline (you see only your own membership rows)
+    # holds — strictly safer than the documented intent.
     op.execute("ALTER TABLE multitenancy.cell_members ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE multitenancy.cell_members FORCE  ROW LEVEL SECURITY;")
     op.execute(
         """
-        CREATE POLICY cell_members_select_co_member
+        CREATE POLICY cell_members_select_self_row
             ON multitenancy.cell_members
             FOR SELECT
-            USING (
-                EXISTS (
-                    SELECT 1
-                    FROM multitenancy.cell_members self
-                    WHERE self.cell_id = cell_members.cell_id
-                      AND self.user_id = _shared.current_user_id()
-                )
-            );
+            USING (user_id = _shared.current_user_id());
         """
     )
 
@@ -167,5 +167,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP POLICY IF EXISTS cells_select_member ON multitenancy.cells;")
     op.execute("DROP POLICY IF EXISTS workspaces_select_own ON multitenancy.workspaces;")
-    op.execute("DROP POLICY IF EXISTS cell_members_select_co_member ON multitenancy.cell_members;")
+    op.execute("DROP POLICY IF EXISTS cell_members_select_self_row ON multitenancy.cell_members;")
     op.execute("DROP TABLE IF EXISTS multitenancy.cell_members;")
