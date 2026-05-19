@@ -29,11 +29,19 @@ TEST_DB_URL: str = os.environ.get(
 )
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def db_engine() -> AsyncIterator[AsyncEngine]:
-    """Async SQLAlchemy engine для test DB.
+    """Async SQLAlchemy engine для test DB — function-scoped.
 
-    Используется только integration-тестами. Unit tests должны мокать DAL.
+    Used only by integration tests. Unit tests должны мокать DAL.
+
+    Note (2026-05-19): function-scoped (not session-scoped) so the engine
+    lives within the same event loop as the test that consumes it. Session-
+    scoped pytest-asyncio fixtures install a separate loop from each
+    function's loop, and asyncpg's Future bookkeeping refuses to cross
+    loops ("attached to a different loop"). Cost is one connect/dispose
+    cycle per integration test — acceptable given the limited integration
+    test count in Wave 0; testcontainers session reuse arrives in 00.2.5.
     """
     from sqlalchemy.ext.asyncio import create_async_engine
 
