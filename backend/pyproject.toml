@@ -24,10 +24,10 @@ dependencies = [
     "structlog>=24.4,<25.0",
     "email-validator>=2.2,<3.0",
     # Phase 00.4 — LLM Gateway + MCP tools
-    "cryptography>=43.0,<45.0",       # AES-256-GCM for LocalAESKMS BYOK envelope encryption
+    "cryptography>=46.0.6,<47.0",     # AES-256-GCM for LocalAESKMS (>=46.0.6 fixes CVE-2026-26007 + CVE-2026-34073)
     "openai>=1.55,<2.0",              # DeepSeek SDK (uses OpenAI-compatible base_url)
     "readability-lxml>=0.8,<1.0",     # MCP read_url tool main-content extraction
-    "lxml>=5.3,<6.0",                 # readability-lxml dep
+    "lxml>=6.1,<7.0",                 # readability-lxml dep (>=6.1 fixes CVE-2026-41066)
     "tenacity>=9.0,<10.0",            # circuit-breaker / retry decorators
     "pgvector>=0.3,<0.5",             # SQLAlchemy Vector column type (pgvector helper)
 ]
