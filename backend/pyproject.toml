@@ -131,11 +131,20 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-# Fixture loop scope MUST match test loop scope (default function) — otherwise
-# fixtures running in the session loop produce asyncpg connections that the
-# function-loop test can't reach ("Future attached to a different loop").
-# Wave 0 trade-off: per-test connect/dispose. Wave 1+ swaps to a testcontainers
-# session-scoped pg fixture + `loop_scope="session"` on the asyncio tests.
+# Phase 00.2.5 (2026-05-19) revisited: the Phase 00.2.5 launch checklist
+# proposed flipping this back to "session" together with the testcontainers
+# upgrade. That recommendation is incompatible with asyncpg's loop-binding
+# constraint — an engine created in the session loop crashes with "Future
+# attached to a different loop" when consumed by a function-loop test
+# (which is what pytest-asyncio creates per @pytest.mark.asyncio test).
+#
+# Resolution: keep "function" loop scope. The expensive part of integration
+# setup — the testcontainers PG container — is session-scoped in
+# `tests/conftest.py::pg_container`. The cheap part — the async engine —
+# is created/disposed per test (~10ms each, negligible vs container boot).
+# SAVEPOINT-rollback isolation in `db_session` works within a function-
+# scoped engine because both the connection and the SAVEPOINT live in the
+# same loop.
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -143,11 +152,21 @@ addopts = "--strict-markers -ra -m 'not live and not integration'"
 markers = [
     "integration: integration tests requiring docker-compose stack or testcontainers (deselect with '-m \"not integration\"')",
     "live: tests that hit real LLM provider APIs — require env keys (default: skipped via addopts)",
+    "commit_required: tests that need real COMMITs (cross-TX visibility, after-COMMIT triggers, partition routing observation) — use `db_session_committed` instead of `db_session`",
 ]
 # Promote warnings to errors so the suite never silently grows noise.
 # Add narrow ignores below if a third-party deprecation can't be avoided.
 filterwarnings = [
     "error",
+    # alembic 1.16+ deprecated `version_path_separator` in favour of
+    # `path_separator`. alembic.ini still uses the old key because
+    # programmatic override breaks `version_locations` parsing (space-
+    # separated; `path_separator=os` would force ; on Windows / : on
+    # Unix and collapse all 12 bounded-context locations into one bogus
+    # path). Phase 00.6 owns the alembic.ini rewrite once the cp1251
+    # issue (HANDOFF.md:120) is cleared.
+    "ignore:No path_separator found in configuration:DeprecationWarning:alembic",
+    "ignore:The version_path_separator configuration parameter is deprecated:DeprecationWarning:alembic",
 ]
 
 [tool.coverage.run]

@@ -101,7 +101,7 @@ async def test_archive_cell_not_found_raises() -> None:
 async def test_archive_cell_emits_event_and_audit() -> None:
     session = AsyncMock()
     cell_id = uuid4()
-    fake_cell = SimpleNamespace(id=cell_id)
+    fake_cell = SimpleNamespace(id=cell_id, workspace_id=uuid4())
     with (
         patch("src.multitenancy.services.cell_service.CellRepository") as mock_cr,
         patch("src.multitenancy.services.cell_service.emit_cell_archived") as mock_emit,
@@ -199,7 +199,9 @@ async def test_invite_member_emits_event_and_audit() -> None:
         patch("src.multitenancy.services.cell_service.emit_member_invited") as mock_emit,
         patch("src.multitenancy.services.cell_service.emit_audit_event") as mock_audit,
     ):
-        mock_cr.return_value.find_by_id = AsyncMock(return_value=SimpleNamespace(id=cell_id))
+        mock_cr.return_value.find_by_id = AsyncMock(
+            return_value=SimpleNamespace(id=cell_id, workspace_id=uuid4())
+        )
         service = CellService(session)
         invitation_id, expires_at = await service.invite_member(
             cell_id=cell_id,
