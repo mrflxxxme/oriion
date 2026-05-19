@@ -20,3 +20,12 @@ a3f54bfcc4c31b8df9c6fa5e983a22e60e63ce2e:.github/workflows/ci-backend.yml:generi
 # generic-api-key rule on the phrase "...customer-provided API key, AES-256-GCM-
 # encrypted..." in llm-gateway README. Documentation, not a secret.
 f5d3e56d216c23fdab3c03aaf6bb071660c86e61:.planning/contracts/llm-gateway/README.md:generic-api-key:45
+
+# Phase 00.2.5 — dev-only BYOK master key literal in the E2E test fixture
+# (commit 567c524). The base64 string `MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=`
+# decodes to "0123456789abcdef0123456789abcdef" — NOT a real secret. It was
+# inlined to pin the test_settings BYOK config; subsequent audit-fix commit
+# (f703d13) switched to runtime base64 generation from a literal seed string
+# so the high-entropy base64 no longer appears in source. This fingerprint
+# allowlists the legacy commit so the --first-parent PR diff scan ignores it.
+567c524e436e7b9b9c2ad63f984132ea9b387367:backend/tests/integration/test_e2e_auth_flow.py:generic-api-key:105
