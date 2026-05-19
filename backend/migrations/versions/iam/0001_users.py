@@ -74,9 +74,7 @@ def upgrade() -> None:
     )
 
     # Table-level GRANTs to oriion_app (USAGE on schema already granted in _shared).
-    op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.users TO oriion_app;"
-    )
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON iam.users TO oriion_app;")
 
 
 def downgrade() -> None:

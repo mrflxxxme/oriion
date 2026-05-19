@@ -23,6 +23,13 @@ dependencies = [
     "argon2-cffi>=23.1,<24.0",
     "structlog>=24.4,<25.0",
     "email-validator>=2.2,<3.0",
+    # Phase 00.4 — LLM Gateway + MCP tools
+    "cryptography>=43.0,<45.0",       # AES-256-GCM for LocalAESKMS BYOK envelope encryption
+    "openai>=1.55,<2.0",              # DeepSeek SDK (uses OpenAI-compatible base_url)
+    "readability-lxml>=0.8,<1.0",     # MCP read_url tool main-content extraction
+    "lxml>=5.3,<6.0",                 # readability-lxml dep
+    "tenacity>=9.0,<10.0",            # circuit-breaker / retry decorators
+    "pgvector>=0.3,<0.5",             # SQLAlchemy Vector column type (pgvector helper)
 ]
 
 [dependency-groups]
@@ -36,6 +43,13 @@ dev = [
     "pip-audit>=2.7,<3.0",
     "pip-licenses>=5.0,<6.0",
     "docker>=7.1,<8.0",
+    # Phase 00.3/00.4 — testcontainers PG + HTTP mocking
+    "testcontainers[postgres]>=4.9,<5.0",
+    "pytest-postgresql>=6.1,<8.0",   # fallback when testcontainers unavailable
+    "psycopg[binary]>=3.2,<4.0",     # libpq binary wheel for pytest-postgresql/testcontainers
+    "respx>=0.22,<0.23",             # httpx mocking for provider integration tests
+    "pytest-httpx>=0.36,<0.40",      # alternative httpx mocking (>=0.36 requires pytest 9.x)
+    "fakeredis[lua]>=2.26,<3.0",     # in-memory Redis fake for rate-limit tests
 ]
 
 [build-system]
@@ -104,7 +118,15 @@ no_implicit_optional = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["dramatiq.*", "argon2.*"]
+module = [
+    "dramatiq.*",
+    "argon2.*",
+    "lxml.*",
+    "readability.*",
+    "testcontainers.*",
+    "fakeredis.*",
+    "pgvector.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -112,9 +134,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "--strict-markers -ra"
+addopts = "--strict-markers -ra -m 'not live and not integration'"
 markers = [
-    "integration: integration tests requiring docker-compose stack (deselect with '-m \"not integration\"')",
+    "integration: integration tests requiring docker-compose stack or testcontainers (deselect with '-m \"not integration\"')",
+    "live: tests that hit real LLM provider APIs — require env keys (default: skipped via addopts)",
 ]
 # Promote warnings to errors so the suite never silently grows noise.
 # Add narrow ignores below if a third-party deprecation can't be avoided.

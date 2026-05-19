@@ -35,8 +35,6 @@ import structlog
 
 __all__ = ["emit_cloudevent"]
 
-_logger = structlog.get_logger(__name__)
-
 
 async def emit_cloudevent(
     *,
@@ -62,8 +60,13 @@ async def emit_cloudevent(
 
     Returns:
         None — emission is fire-and-log Wave 0 (no provider ack).
+
+    Note on testability: we resolve ``structlog.get_logger`` inside the function
+    rather than caching at module-import time so that ``structlog.testing.
+    capture_logs()`` installed AFTER this module imported still intercepts
+    emissions (lazy proxy re-resolves through current config on every call).
     """
-    _logger.bind(
+    structlog.get_logger(__name__).bind(
         cloudevent=True,
         ce_specversion="1.0",
         ce_id=str(uuid4()),

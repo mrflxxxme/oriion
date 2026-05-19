@@ -70,15 +70,9 @@ def upgrade() -> None:
         """
     )
 
-    op.execute(
-        "CREATE UNIQUE INDEX refresh_tokens_hash_uidx ON iam.refresh_tokens (token_hash);"
-    )
-    op.execute(
-        "CREATE INDEX refresh_tokens_session_id_idx ON iam.refresh_tokens (session_id);"
-    )
-    op.execute(
-        "CREATE INDEX refresh_tokens_chain_idx ON iam.refresh_tokens (rotation_chain_id);"
-    )
+    op.execute("CREATE UNIQUE INDEX refresh_tokens_hash_uidx ON iam.refresh_tokens (token_hash);")
+    op.execute("CREATE INDEX refresh_tokens_session_id_idx ON iam.refresh_tokens (session_id);")
+    op.execute("CREATE INDEX refresh_tokens_chain_idx ON iam.refresh_tokens (rotation_chain_id);")
     op.execute(
         """
         CREATE INDEX refresh_tokens_active_idx
@@ -93,9 +87,7 @@ def upgrade() -> None:
         "rotation_chain_id.';"
     )
 
-    op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.refresh_tokens TO oriion_app;"
-    )
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON iam.refresh_tokens TO oriion_app;")
 
 
 def downgrade() -> None:
