@@ -80,6 +80,57 @@ class Settings(BaseSettings):
         description="Default sliding-window length (15 min) for (ip,email)-keyed limits.",
     )
 
+    # ── BYOK + KMS (Phase 00.4) ─────────────────────────────────────────
+    kms_backend: Literal["local", "yandex"] = Field(
+        default="local",
+        description=(
+            "KMS provider for BYOK envelope encryption. Wave 0: 'local' "
+            "(LocalAESKMS using BYOK_MASTER_KEY_B64). Phase 00.6+: 'yandex' "
+            "(Yandex Cloud KMS managed key). See ADR-014 amendment 2026-05-19."
+        ),
+    )
+    byok_master_key_b64: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "Base64-encoded 32-byte AES-256 master key for LocalAESKMS. "
+            "Required when kms_backend='local'. Generate via "
+            "`openssl rand -base64 32`. NEVER commit. Replaced by Yandex KMS "
+            "managed key (TBD_YANDEX_CLOUD_KMS_KEY_ID) in Phase 00.6."
+        ),
+    )
+    yandex_cloud_kms_key_id: str = Field(
+        default="TBD_YANDEX_CLOUD_KMS_KEY_ID",
+        description="Yandex Cloud KMS master key id (used when kms_backend='yandex').",
+    )
+
+    # ── FX rate (Phase 00.4 — RU-currency billing per ADR-018 amendment) ─
+    fx_rate_usd_to_rub: float = Field(
+        default=100.0,
+        description=(
+            "Pinned FX rate USD→RUB for Wave 0 LLM cost ledger. "
+            "Phase 00.6 deploy may override per environment. "
+            "Wave 1+ replaces with live CBR feed cached 1h."
+        ),
+    )
+
+    # ── MCP tools (Phase 00.4 — web_search + read_url) ──────────────────
+    web_search_mock_mode: bool = Field(
+        default=True,
+        description=(
+            "When True, web_search tool returns canned results without "
+            "calling Brave / Yandex Search. Default True in dev for "
+            "deterministic tests; set False once provider keys provisioned."
+        ),
+    )
+    brave_search_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Brave Search API key. Used by mcp.tools.web_search when mock_mode=false.",
+    )
+    yandex_search_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Yandex Search API key. Fallback backend for mcp.tools.web_search.",
+    )
+
     # ── Helpers ─────────────────────────────────────────────────────────
     @property
     def is_dev(self) -> bool:
