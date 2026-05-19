@@ -1,0 +1,92 @@
+"""multitenancy.cell_members — user ↔ cell membership with system role.
+
+DDL matches contracts/multitenancy/schema.sql 1:1 (authoritative per ADR-024).
+Cross-context FKs (iam.users.id, rbac.system_roles.id) are declared in
+comments and validated at the application layer (ADR-024 Consequences —
+preserves the microservice-extraction option).
+
+RLS: cell_members_select_co_member policy (a member sees co-members).
+
+Revision ID: multitenancy_0003_cell_members
+Down revision: multitenancy_0002_cells
+Branch label: multitenancy (continued)
+"""
+
+from __future__ import annotations
+
+from alembic import op
+
+revision: str = "multitenancy_0003_cell_members"
+down_revision: str | None = "multitenancy_0002_cells"
+branch_labels: tuple[str, ...] | None = None
+depends_on: str | None = None
+
+
+def upgrade() -> None:
+    op.execute(
+        """
+        CREATE TABLE multitenancy.cell_members (
+            id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            cell_id         uuid NOT NULL
+                REFERENCES multitenancy.cells(id) ON DELETE CASCADE,
+            user_id         uuid NOT NULL,
+            role_id         uuid NOT NULL,
+            joined_at       timestamptz NOT NULL DEFAULT now(),
+            invited_by      uuid,
+            last_active_at  timestamptz
+        );
+        """
+    )
+
+    op.execute(
+        """
+        CREATE UNIQUE INDEX cell_members_cell_user_uidx
+            ON multitenancy.cell_members (cell_id, user_id);
+        """
+    )
+    op.execute("CREATE INDEX cell_members_user_id_idx ON multitenancy.cell_members (user_id);")
+    op.execute("CREATE INDEX cell_members_role_id_idx ON multitenancy.cell_members (role_id);")
+
+    op.execute(
+        "COMMENT ON TABLE multitenancy.cell_members IS "
+        "'User membership in a cell with a system role. "
+        "Cross-context FKs enforced at app layer.';"
+    )
+    op.execute(
+        "COMMENT ON COLUMN multitenancy.cell_members.user_id IS "
+        "'Cross-context FK → iam.users.id (not enforced as DB constraint).';"
+    )
+    op.execute(
+        "COMMENT ON COLUMN multitenancy.cell_members.role_id IS "
+        "'Cross-context FK → rbac.system_roles.id (not enforced as DB constraint).';"
+    )
+    op.execute(
+        "COMMENT ON COLUMN multitenancy.cell_members.invited_by IS "
+        "'Cross-context FK → iam.users.id; nullable for owner self-join.';"
+    )
+
+    # RLS — a member sees co-members within the same cell.
+    op.execute("ALTER TABLE multitenancy.cell_members ENABLE ROW LEVEL SECURITY;")
+    op.execute("ALTER TABLE multitenancy.cell_members FORCE  ROW LEVEL SECURITY;")
+    op.execute(
+        """
+        CREATE POLICY cell_members_select_co_member
+            ON multitenancy.cell_members
+            FOR SELECT
+            USING (
+                EXISTS (
+                    SELECT 1
+                    FROM multitenancy.cell_members self
+                    WHERE self.cell_id = cell_members.cell_id
+                      AND self.user_id = _shared.current_user_id()
+                )
+            );
+        """
+    )
+
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON multitenancy.cell_members TO oriion_app;")
+
+
+def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS cell_members_select_co_member ON multitenancy.cell_members;")
+    op.execute("DROP TABLE IF EXISTS multitenancy.cell_members;")
