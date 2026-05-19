@@ -82,3 +82,25 @@ async def test_deepseek_embeddings_not_implemented() -> None:
     provider = DeepSeekProvider(api_key="x")
     with pytest.raises(NotImplementedError):
         await provider.embeddings(["x"], model="text-embedding-3-small")
+
+
+@pytest.mark.asyncio
+async def test_deepseek_health_check_reachable() -> None:
+    """Reachable upstream returns True (respx-mocked)."""
+    import respx
+
+    async with respx.mock(base_url="https://api.deepseek.com") as router:
+        router.get("/").mock(return_value=httpx.Response(404))  # reachable; <500
+        provider = DeepSeekProvider(api_key="x")
+        assert await provider.health_check() is True
+
+
+@pytest.mark.asyncio
+async def test_deepseek_health_check_unreachable_returns_false() -> None:
+    """ConnectError -> False (covers the except branch)."""
+    import respx
+
+    async with respx.mock(base_url="https://api.deepseek.com") as router:
+        router.get("/").mock(side_effect=httpx.ConnectError("DNS failure (mock)"))
+        provider = DeepSeekProvider(api_key="x")
+        assert await provider.health_check() is False
