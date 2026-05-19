@@ -1,0 +1,17 @@
+{
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Здравствуйте! Как я могу вам помочь?"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 14,
+    "completion_tokens": 11,
+    "total_tokens": 25
+  }
+}
