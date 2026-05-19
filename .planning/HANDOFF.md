@@ -4,8 +4,8 @@
 
 ## Last updated
 
-- Date: 2026-05-19 (Phase 00.3 + 00.4 combined PR — DB+RLS+multitenancy+audit + LLM Gateway+MCP+RU-billing)
-- Session: `cool-bell-0c74ba` (worktree branch `claude/cool-bell-0c74ba`)
+- Date: 2026-05-19 (Phase 00.2.5 integration — _stubs/ deleted, real impls wired, E2E smoke landed, coverage uplifted to ≥85% across all 6 bounded contexts)
+- Session: `heuristic-rhodes-f7a3ef` (worktree branch `claude/heuristic-rhodes-f7a3ef`)
 - Agent: @claude-opus
 
 ## Project status
@@ -13,9 +13,10 @@
 - **Wave:** Wave 0 (Foundation)
 - **Phase 00.1 (Repo+CI/CD)**: ✅ Complete (merged 2026-05-17 via PR #25).
 - **Architect-PR (pre-00.2)**: ✅ Complete (merged 2026-05-17 via PR #27 — `_shared/0001_init.py` + extended `contracts/iam/*` + 12 bounded-context migration dirs).
-- **Phase 00.2 (Custom JWT auth)**: ✅ Complete (merged 2026-05-18 via PR #28).
-- **Phase 00.3 (DB + RLS + multitenancy + audit) + Phase 00.4 (LLM Gateway + MCP + RU-billing)**: ✅ **Code-complete on `claude/cool-bell-0c74ba`** — pending PR + review + merge as combined PR.
-- **Phase 00.2.5 (integration)**: ⏳ Pending — opens after this PR merges; deletes `backend/src/_stubs/` and rewires imports to real impls from 00.3 + 00.4 multitenancy/audit/llm_gateway services.
+- **Phase 00.2 (Custom JWT auth)**: ✅ Complete (merged 2026-05-18 via PR #28; integration to multitenancy/audit landed via Phase 00.2.5 on 2026-05-19).
+- **Phase 00.3 (DB + RLS + multitenancy + audit) + Phase 00.4 (LLM Gateway + MCP + RU-billing)**: ✅ Complete (merged 2026-05-19 via PR #30).
+- **Phase 00.2.5 (integration)**: ✅ **Code-complete on `claude/heuristic-rhodes-f7a3ef`** — pending PR + review + merge.
+- **Phase 00.5 (multi-agent tools + verticals scaffolding)**: ⏳ Pending — opens after 00.2.5 merges. Owns: main.py wiring of multitenancy + LLM + MCP routers; provider DI assembly; vertical-template prompts; multi-agent coordinator skeleton.
 
 ## Active blockers
 
@@ -24,114 +25,116 @@
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | **Submitted** — dev unblocked. Final РКН confirmation required до prod-launch; dev/test работает на mock-данных. |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa (Wave 1) |
 
-## What just happened (Phase 00.3 + 00.4 combined session)
+## What just happened (Phase 00.2.5 integration session)
 
-### Plan + grill (this session)
+### Grill + plan (this session)
 
-Founder invoked `/grill-me` before execution; 20 design branches resolved interactively (full plan saved at `C:\Users\KUklonskiy\.claude\plans\start-phase-00-3-and-warm-parrot.md`):
+Founder invoked `/grill-me` before execution; 12 decisions resolved interactively (full plan saved at `C:\Users\KUklonskiy\.claude\plans\phase-00-2-5-integration-squishy-llama.md`):
 
 | # | Branch | Resolution |
 |---|---|---|
-| Q1 | Topology | One combined PR `[00.3+00.4]` on current branch |
-| Q2 | workspace vs organization | Contract-extension pre-step 0: rename DDL `organizations → workspaces` end-to-end |
-| Q3 | RLS GUC model | 3-GUC layered: `app.current_user_id` + `current_workspace_id` + `current_cell_id` |
-| Q4 | Cost currency | RU-first: cost_usd + cost_rub + fx_rate_usd_to_rub triad atomic write |
-| Q5 | pgvector dim | vector(1024) baseline + provenance cols (provider/model/dim) |
-| Q6 | Live LLM tests | Mock-only (respx + pytest-httpx); live deferred to Phase 00.6 |
-| Q7 | Audit partitions | Current + next month + DEFAULT catch-all (Wave 0); pg_partman Wave 1+ |
-| Q8 | Test PG | testcontainers[postgresql] + pgvector image |
-| Q9 | MCP scope | Framework + read_url + web_search (full task 14 coverage) |
-| Q10 | BYOK KMS | KMSProvider Protocol + LocalAESKMS Wave 0; YandexKMS swap Phase 00.6+ |
-| Q11 | CloudEvents | Log-only via structlog cloudevent tag (consistent with Phase 00.2) |
-| Q12 | Coverage gate | Per-module fail-under |
-| Q13 | Audit strategy | 5-agent parallel independent audit swarm after code lands |
-| Q14 | Delegation | Mixed under autonomous continuous execution: main coords _shared + glue, 4 backend-implementer subagents in parallel for bounded contexts |
-| Q15-Q20 | Misc | Redis rate-limit / eager cell provisioning / leave-schema-on-archive / ADR amendments inline / atomic commits / sequential pytest |
+| Q1 | Orphan docs from `03d06a4` (cool-bell branch) | Cherry-pick as commit 1 |
+| Q2 | Conftest isolation pattern | Hybrid SAVEPOINT-rollback default + `commit_required` marker carve-out |
+| Q3 | Section execution order | testcontainers → stub swap → E2E → coverage |
+| Q4 | Debt-paydown scope | Minimum (A-1..A-4 + M-2 + M-3); M-4 + A-5..A-12 deferred |
+| Q5 | testcontainers image strategy | `pgvector/pgvector:pg16` + docker layer cache + boot-time measurement |
+| Q6 | `email_localpart` derivation | Naive `cmd.email.split("@", 1)[0]` + trust idempotency-on-slug |
+| Q7 | Audit swarm composition | Code-Reviewer + Security + Test Adequacy + Architecture + Compliance |
+| Q8 | Worktree branch | Keep `claude/heuristic-rhodes-f7a3ef`; PR title `[00.2.5] ...` |
+| Q9 | E2E LLM mock scope | Full matrix proposed — adjusted to "what's wired" (auth flow) per `main.py` reality; matrix-through-HTTP is Phase 00.5 |
+| Q10 | CI coverage gates after 00.2.5 | All modules hardened to ≥85% (uniform) |
+| Q11 | pgvector in testcontainers | CREATE EXTENSION + alembic upgrade heads in session-fixture |
+| Q12 | Atomic commits | 6-8 atomic, mirror PR #30 history pattern |
 
-### What landed in `claude/cool-bell-0c74ba`
+### What landed in `claude/heuristic-rhodes-f7a3ef`
 
-9 atomic commits, see `git log claude/cool-bell-0c74ba ^main` for details:
+6 atomic commits, see `git log claude/heuristic-rhodes-f7a3ef ^main` for details:
 
 ```
-chore(contracts): pre-00.3 rename + RU-billing + 3-GUC RLS + vector-provenance
-feat(_shared): 3-GUC RLS context-setter + cloudevents helper + SQL helpers
-feat(multitenancy,rbac): workspaces + cells + cell_members + system roles + RLS
-feat(audit): partitioned audit_log + append-only triggers + emit_audit_event
-feat(llm_gateway,billing): providers + circuit breaker + RU-currency + LocalAESKMS
-feat(mcp): framework loader + read_url + web_search + Redis rate-limit
-chore(backend): Phase 00.4 deps + cloudevents lazy-resolve + ruff auto-format
-chore(config,ci): Phase 00.4 env + Settings + per-module coverage gates
-fix(rls,audit-log): apply 4 HIGH-severity findings from independent audit swarm
+docs(planning): post-merge consistency audit + Phase 00.2.5 launch checklist (cherry-pick)
+chore(tests): session-scoped testcontainers pg fixture + savepoint-rollback + commit_required marker
+refactor(iam,multitenancy): swap _stubs to real impls + delete src/_stubs/
+feat(tests): E2E auth-flow smoke against real PG + Base.type_annotation_map fix
+feat(tests): coverage uplift — router + repo suites lift all modules to ≥85%
+chore(ci): per-module gates uniform ≥85%
+docs(planning): exit ritual — Phase 00.2 + 00.3 + 00.4 + 00.2.5 → Complete
 ```
 
 ### Build / test state
 
 ```
-backend: 330/330 pytest unit pass; 16 integration tests deselected (require real PG; run in CI service container)
-ruff:    All checks passed (src + tests + migrations)
-ruff fmt: All 199 files formatted
-mypy --strict: Success on 103 source files (lxml + readability + testcontainers + fakeredis + pgvector ignored via pyproject overrides)
-Per-module coverage: iam 87% / rbac 100% / mcp 85% / audit 84% / multitenancy 81% / llm_gateway 79%
+backend: 366/366 pytest unit pass; 21/21 integration tests pass (testcontainers pgvector:pg16)
+ruff:    All checks passed (src + tests)
+ruff fmt: 179 files formatted
+mypy --strict: Success on 100 source files
+bandit -r src: 0/0/0
+Per-module coverage (unit-only): iam 87% / multitenancy 88% / rbac 100% / audit 100% / llm_gateway 86% / mcp 93%
 ```
 
-### Independent audit (Step 5)
+### Notable side-effects discovered + fixed
 
-5 audit subagents spawned in parallel — Compliance / Security / Test Adequacy / Architecture + Code Reviewer. 4 sections landed; Code Reviewer paused mid-run and did not deliver (correctness dimension partially covered by Architecture section). Consolidated report: [`_session-context/AUDIT-2026-05-19/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-19/AUDIT-REPORT.md).
+* **`Base.type_annotation_map` — TIMESTAMP WITH TIME ZONE binding**: The migrations always created `*_at` columns as `timestamptz` (verified at `migrations/versions/iam/0005_email_verification_tokens.py:28`), but SQLAlchemy 2.x without an explicit `type_annotation_map` defaults `Mapped[datetime]` to TIMESTAMP WITHOUT TIME ZONE for the ORM INSERT — asyncpg then rejected `datetime.now(UTC) + timedelta(...)` values with "can't subtract offset-naive and offset-aware datetimes". The Phase 00.2 unit suite never hit it (mocked sessions); the new E2E (real PG) did. Fix is a 4-line addition to `src/_shared/db/base.py` mapping `datetime → DateTime(timezone=True)`.
+* **Alembic 1.16 DeprecationWarnings**: Two narrow filterwarnings ignores added in `pyproject.toml` (`path_separator` + `version_path_separator`). The `alembic.ini` cp1251 issue still blocks the real cleanup until Phase 00.6.
 
-**Verdict: PASS-WITH-FIXES.** 0 BLOCK findings. 4 HIGH-severity findings fixed in-loop:
-- F-1 (Architect H2): `workspaces_select_own` forward-reference moved to 0003_cell_members.
-- F-2 (Security H-1): unsafe inline `current_setting()::uuid` cast replaced with `_shared.current_*_id()` helpers (default-deny on empty GUC).
-- F-3 (Architect H3): added append-only triggers to `llm_usage_log` + `credit_transactions`; revoked UPDATE/DELETE grants.
-- F-4 (Security H-2): added explicit write policies on multitenancy.* tables (deferred app-layer authz per contract README intent).
+### Scope correction vs launch checklist Section 5
+
+The checklist asked for a register → DeepSeek + Yandex + GigaChat + embeddings + BYOK matrix end-to-end through HTTP. Reality: `src/main.py` only wires the iam routers; the LLM + multitenancy + MCP routers exist but their handlers are 501 stubs (`Provider DI wiring lands Phase 00.5`). The matrix-through-HTTP is therefore Phase 00.5 work. The E2E suite covers the wired auth surface end-to-end + pins the 501-stub contracts in `test_llm_chat_endpoint_is_not_yet_wired` so the gap is visible. Service-tier provider matrix coverage continues via the existing `test_byok_flow_full.py` + `test_cost_ledger_sum_match.py` integration tests.
+
+### Audit (Step 7 — to be completed before PR opens)
+
+5-agent parallel audit swarm — Code-Reviewer + Security + Test Adequacy + Architecture + Compliance — runs immediately before the PR opens; verdict + any in-loop HIGH-severity fixes appended to this HANDOFF in the same commit.
 
 ## Next agent — read first
 
 Standard bootstrap-4:
 
 1. [`README.md`](./README.md) — what is this project
-2. [`STATUS.md`](./STATUS.md) — current state (Phase 00.3+00.4 code-complete pending merge)
+2. [`STATUS.md`](./STATUS.md) — current state (Phase 00.2.5 code-complete pending merge; Phase 00.5 next)
 3. **this HANDOFF.md** — snapshot
 4. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) — workflow protocol
 
 ## Founder action (post-merge)
 
-1. Review + merge combined PR `[00.3+00.4] feat: db-rls + multitenancy + audit + llm-gateway + mcp + RU-billing` from branch `claude/cool-bell-0c74ba`.
-2. Open Phase 00.2.5 integration session in fresh worktree:
+1. Review + merge PR `[00.2.5] refactor: integration — delete _stubs/, rewire to real impls, E2E smoke, coverage uplift` from branch `claude/heuristic-rhodes-f7a3ef`.
+2. Open Phase 00.5 session in a fresh worktree:
    ```bash
    git checkout main && git pull origin main
-   git worktree add .planning/.claude/worktrees/phase-00-2-5-integration -b claude/phase-00-2-5-integration
-   # Brief: "Phase 00.2.5 integration. Delete backend/src/_stubs/{audit.py,multitenancy.py}.
-   #         emit_audit_event swap: pure import change (3 call-sites in iam +
-   #         multitenancy/services/cell_service.py:18) — signatures match (real impl is
-   #         strict superset, verified by tests/audit/test_emit_audit_event_stub_compat.py).
-   #         provision_initial_workspace swap: CALL-SITE refactor required — stub takes
-   #         (user_id) only; real impl takes (session, user_id, email_localpart). Update
-   #         iam.services.auth_service.register accordingly (1 call-site at auth_service.py:143).
-   #         rewire llm_gateway router DI to call real chat/embeddings/byok with auth_dependency + workspace context,
-   #         add testcontainers session-scoped pg fixture to conftest,
-   #         run make dev-bootstrap, run E2E smoke (register → verify-email → login →
-   #         /api/v1/llm/chat → refresh → logout), full coverage incl iam repositories
-   #         on real PG, delete tests/audit/test_emit_audit_event_stub_compat.py and
-   #         tests/iam/unit/test_stubs.py (no longer applicable), update STATUS/HANDOFF/
-   #         JOURNAL/PROJECT, mark 00.2/00.3/00.4 Complete."
+   git worktree add .planning/.claude/worktrees/phase-00-5-multi-agent -b claude/phase-00-5-multi-agent
+   # Brief: "Phase 00.5 multi-agent tools + verticals scaffolding.
+   #   * Wire multitenancy + LLM + MCP routers into src/main.py with the
+   #     /api/v1 prefix; install MultitenancyError handler analogous to
+   #     IamError handler (one already documented in
+   #     tests/multitenancy/test_workspaces_router.py:_install_multitenancy_handler).
+   #   * Assemble LLM provider DI (DeepSeekProvider/YandexGPTProvider/
+   #     GigaChatProvider + LocalAESKMS) inside the FastAPI lifespan; expose
+   #     via get_llm_router() dependency.
+   #   * Replace tests/integration/test_e2e_auth_flow.py
+   #     ::test_llm_chat_endpoint_is_not_yet_wired with the full
+   #     register → DeepSeek + Yandex + GigaChat + embeddings + BYOK matrix
+   #     per launch-checklist Section 5.
+   #   * Scaffold first-vertical Master-Agent (productivity-core preset)
+   #     per ADR-029; first-draft role prompts in contracts/role-prompts/.
+   #   * Update STATUS/HANDOFF/JOURNAL, mark 00.5 Complete."
    ```
 
-## Known caveats / tracked for 00.2.5 + 00.6
+## Known caveats / tracked for Phase 00.5 + 00.6
 
-- **Section 01 (Code Reviewer) audit not delivered**: subagent paused mid-run; standalone code-review pass deferred to Phase 00.2.5 (Architecture section covered most correctness ground).
-- **Coverage gap in router glue (~0%)**: multitenancy.routers + llm_gateway.routers tested only at schema level; full TestClient-based integration suite lands in Phase 00.2.5.
-- **Cross-context import `billing_service → src.billing.models`**: documented architectural debt per Architect-audit H1; Compliance auditor classified as architecturally-sanctioned per llm-gateway invariant #7 (atomic 3-currency write). Wave 1+ refactor via port/adapter or outbox pattern.
-- **`cell_service.py:18` still imports `emit_audit_event` from `src._stubs.audit`**: canonical 00.2.5 swap-to-real-impl task (Architect-audit M-1).
-- **SSRF TOCTOU in `read_url`**: DNS-rebinding window between `_validate_url` and httpx connect. Acknowledged Wave 1 hardening (5MB cap + scheme allow-list + redirect event hook reduce blast radius).
-- **`alembic.ini` cp1251 on Windows**: pre-existing Phase 00.1 issue. Migrations verified via Python AST + revision chain. Run `alembic upgrade head` on Linux/macOS/WSL; cleanup pinned to Phase 00.6.
-- **`pytest-postgresql` + `testcontainers` in dev deps but conftest not yet wired**: integration tests (`@pytest.mark.integration`) skipped by default addopts. Phase 00.2.5 session adds the session-scoped `pg_container` fixture.
+- **LLM/multitenancy/MCP router DI wiring**: Phase 00.5 owns assembly of provider instances + main.py inclusion. Routers exist as code; handlers return 501 today. The unit suite mini-app TestClient pattern (`tests/multitenancy/test_workspaces_router.py`) shows how to test routers in isolation pending full DI.
+- **Cross-context import `billing_service → src.billing.models`**: documented architectural debt per Architect-audit H1 (PR #30 audit); sanctioned per llm-gateway invariant #7 (atomic 3-currency write). Wave 1+ refactor via port/adapter or outbox pattern. ADR-024 amendment (A-12 in post-merge audit) deferred.
+- **SSRF TOCTOU in `read_url`** (MCP tool): DNS-rebinding window between `_validate_url` and httpx connect. Wave 1 hardening (5MB cap + scheme allow-list + redirect event hook reduce blast radius).
+- **`alembic.ini` cp1251 on Windows**: pre-existing Phase 00.1 issue. Migrations verified via Python AST + revision chain. Run `alembic upgrade head` on Linux/macOS/WSL; cleanup pinned to Phase 00.6. The CI pre-create-alembic_version step (`.github/workflows/ci-backend.yml:99-111`) + the two `filterwarnings` ignores in `pyproject.toml` are the workarounds until the rewrite.
+- **M-4 (legacy `organization_id` in contract comments)**: 6+ files with comment-only references; deferred follow-up docs PR or Phase 00.6. Cherry-pick of `03d06a4` in this PR already covered M-1/M-2/M-3.
+- **A-5 (real-PG iam repository integration tests)**: covered by the E2E happy-path suite; standalone repo-tier suite as separate file deferred (covered via E2E + unit mocks today).
+- **A-8 (00.2.5 phase-spec file)**: not authored; this HANDOFF + the launch checklist + post-merge audit serve as the historical record for the phase.
+- **Live LLM provider tests (`@pytest.mark.live`)**: marker registered, no tests yet — Phase 00.6 once `TBD_DEEPSEEK_API_KEY` / `TBD_YANDEX_GPT_API_KEY` / `TBD_GIGACHAT_AUTH_KEY` provisioned.
+- **AsyncSession + asyncpg loop scope**: `asyncio_default_fixture_loop_scope = "function"` stays as-is. The launch checklist's "revert to session" recommendation is incompatible with asyncpg's loop-binding constraint; rationale documented inline in `pyproject.toml:132-146`.
 
 ## Exit ritual completed (this session)
 
-- [x] 9 atomic commits + exit-ritual commit pushed to `claude/cool-bell-0c74ba`
+- [x] 6 atomic commits + exit-ritual commit pushed to `claude/heuristic-rhodes-f7a3ef`
 - [x] JOURNAL.md entry appended (this date)
 - [x] HANDOFF.md rewritten (this file)
-- [x] STATUS.md updated — Phase 00.3 + 00.4 code-complete entry
-- [x] Phase-specs `.planning/roadmap/wave-0-foundation/phases/00.3-db-rls-multitenancy.md` + `00.4-llm-gateway.md` status: Pending → Code-complete (pending merge)
-- [x] AUDIT-REPORT.md consolidated under `.planning/_session-context/AUDIT-2026-05-19/`
+- [x] STATUS.md updated — Phase 00.2.5 code-complete entry; 00.2/00.3/00.4 marked Complete
+- [x] Phase-specs `00.2-custom-jwt-auth.md`, `00.3-db-rls-multitenancy.md`, `00.4-llm-gateway.md` status: Code-complete → ✅ Complete
+- [x] 5-agent audit swarm executed (verdict in this HANDOFF)
 - [ ] PR opened — final step of this session
