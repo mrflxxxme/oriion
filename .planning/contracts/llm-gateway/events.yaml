@@ -2,7 +2,14 @@ specversion: "1.0"
 context: llm-gateway
 description: |
   CloudEvents 1.0 emitted/consumed by the llm-gateway bounded context.
-  Transport: in-process EventBus + Redis Streams (Wave 0). Future: NATS/Kafka.
+  Transport: Wave 0 — log-only via structlog cloudevent tag (per Phase 00.2
+  precedent). Wave 1+: Redis Streams XADD; future: NATS / Kafka.
+
+  NAMING (2026-05-19): `organization_id` renamed to `workspace_id` to match
+  the multitenancy DDL rename.
+
+  CURRENCY (2026-05-19): events carry both `cost_usd` and `cost_rub` so
+  downstream consumers (billing, ops dashboards) get reconciled values.
 
 events:
   - type: oriion.llm-gateway.request.completed.v1
@@ -10,30 +17,32 @@ events:
     description: Every LLM call, success or failure, after usage log persisted.
     data_schema:
       type: object
-      required: [request_id, organization_id, cell_id, provider_slug, model, status, cost_usd, latency_ms, input_tokens, output_tokens]
+      required: [request_id, workspace_id, cell_id, provider_slug, model, status, cost_usd, cost_rub, fx_rate_usd_to_rub, latency_ms, input_tokens, output_tokens]
       properties:
-        request_id:      { type: string }
-        organization_id: { type: string, format: uuid }
-        cell_id:         { type: string, format: uuid }
-        task_id:         { type: string, format: uuid, nullable: true }
-        byok_key_id:     { type: string, format: uuid, nullable: true }
-        provider_slug:   { type: string }
-        model:           { type: string }
-        status:          { type: string, enum: [success, error, timeout, rate_limited] }
-        cost_usd:        { type: number }
-        latency_ms:      { type: integer }
-        input_tokens:    { type: integer }
-        output_tokens:   { type: integer }
+        request_id:          { type: string }
+        workspace_id:        { type: string, format: uuid }
+        cell_id:             { type: string, format: uuid }
+        task_id:             { type: string, format: uuid, nullable: true }
+        byok_key_id:         { type: string, format: uuid, nullable: true }
+        provider_slug:       { type: string }
+        model:               { type: string }
+        status:              { type: string, enum: [success, error, timeout, rate_limited] }
+        cost_usd:            { type: number }
+        cost_rub:            { type: number }
+        fx_rate_usd_to_rub:  { type: number }
+        latency_ms:          { type: integer }
+        input_tokens:        { type: integer }
+        output_tokens:       { type: integer }
 
   - type: oriion.llm-gateway.byok.created.v1
     direction: emit
-    description: BYOK key registered for an organization.
+    description: BYOK key registered for a workspace.
     data_schema:
       type: object
-      required: [byok_key_id, organization_id, provider_slug, label, created_by]
+      required: [byok_key_id, workspace_id, provider_slug, label, created_by]
       properties:
         byok_key_id:     { type: string, format: uuid }
-        organization_id: { type: string, format: uuid }
+        workspace_id:    { type: string, format: uuid }
         provider_slug:   { type: string }
         label:           { type: string }
         created_by:      { type: string, format: uuid }
@@ -43,10 +52,10 @@ events:
     description: BYOK soft-quota crossed warning threshold (best-effort).
     data_schema:
       type: object
-      required: [byok_key_id, organization_id, percent_used, monthly_used_usd, monthly_quota_usd]
+      required: [byok_key_id, workspace_id, percent_used, monthly_used_usd, monthly_quota_usd]
       properties:
         byok_key_id:       { type: string, format: uuid }
-        organization_id:   { type: string, format: uuid }
+        workspace_id:      { type: string, format: uuid }
         percent_used:      { type: number, minimum: 0, maximum: 200 }
         monthly_used_usd:  { type: number }
         monthly_quota_usd: { type: number }
@@ -56,10 +65,10 @@ events:
     description: BYOK soft-quota exceeded. Does NOT fail-closed by itself (see invariant #4).
     data_schema:
       type: object
-      required: [byok_key_id, organization_id, monthly_used_usd, monthly_quota_usd]
+      required: [byok_key_id, workspace_id, monthly_used_usd, monthly_quota_usd]
       properties:
         byok_key_id:       { type: string, format: uuid }
-        organization_id:   { type: string, format: uuid }
+        workspace_id:      { type: string, format: uuid }
         monthly_used_usd:  { type: number }
         monthly_quota_usd: { type: number }
 
@@ -74,6 +83,18 @@ events:
         error_rate_pct:     { type: number }
         window_started_at:  { type: string, format: date-time }
         failover_to:        { type: string, nullable: true, description: "Alternative provider_slug if available" }
+
+  - type: oriion.llm-gateway.provider.health_change.v1
+    direction: emit
+    description: Provider health-state transition (healthy ↔ degraded ↔ down) per health-monitor 30s loop.
+    data_schema:
+      type: object
+      required: [provider_slug, old_state, new_state, checked_at]
+      properties:
+        provider_slug:    { type: string }
+        old_state:        { type: string, enum: [healthy, degraded, down] }
+        new_state:        { type: string, enum: [healthy, degraded, down] }
+        checked_at:       { type: string, format: date-time }
 
   - type: oriion.billing.kill_switch.engaged.v1
     direction: consume

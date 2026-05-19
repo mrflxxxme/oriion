@@ -23,7 +23,7 @@ what data a workflow may read) belong to the `agents` and `mcp` contexts.
 | **permissions** | Granular capability tokens shaped as `<resource>.<action>` (e.g. `cell.create`, `member.invite`, `billing.view`). |
 | **role_permissions** | Many-to-many bridge granting a permission to a role. |
 | **role_assignments** | A `(user, scope_type, scope_id, role)` binding with optional `expires_at`. |
-| **scope_type** | `organization` or `cell` — determines which `multitenancy` table `scope_id` references. |
+| **scope_type** | `workspace` or `cell` — determines which `multitenancy` table `scope_id` references. (Was `organization` pre-2026-05-19.) |
 
 **Crucial disambiguation — DO NOT CONFUSE:**
 
@@ -50,9 +50,9 @@ what data a workflow may read) belong to the `agents` and `mcp` contexts.
    the same gate.
 4. **Scope match invariant.** A role assignment's `scope_type` must match
    the role's design intent. Examples:
-   - `billing` role is meaningful only at `scope_type = organization`.
+   - `billing` role is meaningful only at `scope_type = workspace`.
    - `editor` / `viewer` roles are meaningful only at `scope_type = cell`.
-   - `owner` is meaningful only at `scope_type = organization`.
+   - `owner` is meaningful only at `scope_type = workspace`.
    The API rejects mismatches with `rbac.assignment.scope_mismatch`. The DB
    does not encode the mapping — it lives in the role metadata seed and is
    validated application-side.
@@ -79,7 +79,7 @@ This context **references** (via cross-context FKs declared in comments,
 not as physical FOREIGN KEYs — preserves microservice extraction):
 
 - `role_assignments.user_id` → `iam.users.id`
-- `role_assignments.scope_id` → `multitenancy.organizations.id`
+- `role_assignments.scope_id` → `multitenancy.workspaces.id`
   **or** `multitenancy.cells.id` (per `scope_type`)
 
 This context is **referenced by**:

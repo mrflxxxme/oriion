@@ -60,6 +60,9 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@localhost:5432/oriion_test
       TEST_DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@localhost:5432/oriion_test
       REDIS_URL: redis://localhost:6379/0
+      # Generated at job start (see Generate dev BYOK key step). Non-secret —
+      # static base64 string of "ci-test-master-key-32-bytes-zzzz".
+      CI_BYOK_MASTER_KEY_B64: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +89,34 @@ jobs:
           psql -h localhost -U oriion -d oriion_test -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
           psql -h localhost -U oriion -d oriion_test -c "CREATE EXTENSION IF NOT EXISTS unaccent;"
 
+      - name: Generate dev BYOK master key (CI-only)
+        # Deterministic non-secret key for CI integration tests. Avoids
+        # checking a high-entropy base64 literal into the workflow YAML.
+        run: |
+          KEY=$(printf 'ci-test-master-key-for-dev-only!' | head -c 32 | base64 -w0)
+          echo "CI_BYOK_MASTER_KEY_B64=$KEY" >> "$GITHUB_ENV"
+
+      - name: Pre-create alembic_version with wider column
+        env:
+          PGPASSWORD: oriion-dev
+        # Alembic's default `alembic_version.version_num VARCHAR(32)` truncates
+        # long revision IDs (e.g. `multitenancy_0004_provision_cell_schema_function`).
+        # Create the table with VARCHAR(255) BEFORE alembic runs — alembic
+        # detects an existing table and skips its own CREATE TABLE.
+        run: |
+          psql -h localhost -U oriion -d oriion_test -c "
+            CREATE TABLE IF NOT EXISTS alembic_version (
+              version_num VARCHAR(255) NOT NULL
+                CONSTRAINT alembic_version_pkc PRIMARY KEY
+            );"
+
+      - name: Apply alembic migrations to test DB
+        working-directory: backend
+        # `heads` (plural) — Alembic has one head per bounded-context branch
+        # (_shared, iam, multitenancy, rbac, audit, llm_gateway, billing, mcp);
+        # `head` (singular) errors when >1 head exists.
+        run: uv run alembic upgrade heads
+
       - name: Ruff lint + format check
         working-directory: backend
         run: |
@@ -96,15 +127,47 @@ jobs:
         working-directory: backend
         run: uv run mypy --strict src
 
-      - name: Pytest + coverage [AC2 ≥ 70%]
+      - name: Pytest unit suite [AC2 ≥ 70% aggregate]
         working-directory: backend
+        env:
+          # Dev-only AES-256 master key generated at runtime from a non-secret
+          # deterministic seed. Avoids the gitleaks high-entropy-literal false
+          # positive that would fire on a checked-in base64 string. Real prod
+          # key lives in Yandex Lockbox (Wave 1+).
+          BYOK_MASTER_KEY_B64: ${{ env.CI_BYOK_MASTER_KEY_B64 }}
         run: |
           uv run pytest \
             --cov=src \
             --cov-fail-under=70 \
             --cov-report=xml \
-            --cov-report=term-missing \
-            -m "not integration"
+            --cov-report=term-missing
+
+      - name: Pytest integration suite (real PG)
+        working-directory: backend
+        env:
+          # Dev-only AES-256 master key generated at runtime from a non-secret
+          # deterministic seed. Avoids the gitleaks high-entropy-literal false
+          # positive that would fire on a checked-in base64 string. Real prod
+          # key lives in Yandex Lockbox (Wave 1+).
+          BYOK_MASTER_KEY_B64: ${{ env.CI_BYOK_MASTER_KEY_B64 }}
+        run: |
+          uv run pytest -m "integration and not live"
+
+      - name: Per-module coverage gate (Phase 00.2 + 00.3 + 00.4)
+        working-directory: backend
+        env:
+          # Dev-only AES-256 master key generated at runtime from a non-secret
+          # deterministic seed. Avoids the gitleaks high-entropy-literal false
+          # positive that would fire on a checked-in base64 string. Real prod
+          # key lives in Yandex Lockbox (Wave 1+).
+          BYOK_MASTER_KEY_B64: ${{ env.CI_BYOK_MASTER_KEY_B64 }}
+        run: |
+          uv run pytest tests/iam        --cov=src/iam        --cov-fail-under=85 -q
+          uv run pytest tests/multitenancy --cov=src/multitenancy --cov-fail-under=70 -q -m "not integration"
+          uv run pytest tests/rbac       --cov=src/rbac       --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/audit      --cov=src/audit      --cov-fail-under=80 -q -m "not integration"
+          uv run pytest tests/llm_gateway --cov=src/llm_gateway --cov-fail-under=70 -q -m "not integration"
+          uv run pytest tests/mcp        --cov=src/mcp        --cov-fail-under=85 -q -m "not integration"
 
       # Per-phase coverage gate: Phase 00.2 AC9 demands ≥85% on src/iam
       # specifically. Without this, the global 70% gate hides regressions

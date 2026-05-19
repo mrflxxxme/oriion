@@ -29,11 +29,19 @@ TEST_DB_URL: str = os.environ.get(
 )
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def db_engine() -> AsyncIterator[AsyncEngine]:
-    """Async SQLAlchemy engine для test DB.
+    """Async SQLAlchemy engine для test DB — function-scoped.
 
-    Используется только integration-тестами. Unit tests должны мокать DAL.
+    Used only by integration tests. Unit tests должны мокать DAL.
+
+    Note (2026-05-19): function-scoped (not session-scoped) so the engine
+    lives within the same event loop as the test that consumes it. Session-
+    scoped pytest-asyncio fixtures install a separate loop from each
+    function's loop, and asyncpg's Future bookkeeping refuses to cross
+    loops ("attached to a different loop"). Cost is one connect/dispose
+    cycle per integration test — acceptable given the limited integration
+    test count in Wave 0; testcontainers session reuse arrives in 00.2.5.
     """
     from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -46,23 +54,31 @@ async def db_engine() -> AsyncIterator[AsyncEngine]:
 
 @pytest_asyncio.fixture
 async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    """Rolled-back AsyncSession per test.
+    """Per-test AsyncSession backed by a fresh connection + outer TX rollback.
 
-    Каждый test получает свежую транзакцию, после теста — rollback,
-    чтобы test isolation сохранялась без drop/recreate DB.
+    Implementation note (2026-05-19): the previous session-only impl re-used
+    the connection across tests and left it in an aborted state when a test
+    triggered an expected EXCEPTION (e.g. append-only trigger fires).
+    Subsequent tests then failed with
+        cannot use Connection.transaction() in a manually started transaction
+    The savepoint-rollback pattern below isolates each test in its own
+    connection so a botched TX state cannot leak. See audit Section 04
+    (Test Adequacy) flag for the rationale.
     """
-    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-    session_factory = async_sessionmaker(
-        bind=db_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-    async with session_factory() as session:
+    async with db_engine.connect() as conn:
+        # Outer transaction — rolled back wholesale at fixture teardown so the
+        # DB state stays clean between tests even when the test itself committed
+        # or raised mid-transaction.
+        outer_tx = await conn.begin()
+        session = AsyncSession(bind=conn, expire_on_commit=False)
         try:
             yield session
         finally:
-            await session.rollback()
+            await session.close()
+            if outer_tx.is_active:
+                await outer_tx.rollback()
 
 
 @pytest.fixture(scope="session")

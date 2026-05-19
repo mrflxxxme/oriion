@@ -1,6 +1,21 @@
 # ADR-009: Multitenancy — Cell как domain-first concept + 3 уровня изоляции
 
-- **Status:** Accepted
+- **Status:** Accepted (amendments 2026-05-19, see «Wave 0 implementation decisions» below)
+
+## Wave 0 implementation decisions (2026-05-19)
+
+> Amendments adopted as part of the pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR).
+
+1. **Naming bridge: `organization` → `workspace`.** The legacy DDL term `organizations` is retired in favour of `workspaces` to align with the public IAM API surface (`RegisterResponse.workspace_id`) and the cross-context stubs landed in the architect-PR. Cells reference `workspace_id` (was `organization_id`). RBAC `scope_type` enum becomes `('workspace','cell')`. New code MUST use `workspace`; legacy term appears only in archived session-context files.
+2. **3-GUC layered RLS model.** Every tenant-scoped FastAPI dependency sets three Postgres session locals on every transaction: `app.current_user_id` + `app.current_workspace_id` + `app.current_cell_id`. Each downstream context picks the GUC matching its filter granularity:
+    - `multitenancy.*` policies use `_shared.current_user_id()` (membership-driven, EXISTS over `cell_members`).
+    - `llm_gateway.byok_keys`, `llm_gateway.llm_usage_log` use `app.current_workspace_id`.
+    - Per-cell hot tables (`billing.credit_transactions`, future `tasks.*`, `memory.*`) use `app.current_cell_id` for O(1) filter.
+    - Missing GUC → `NULL` → default-deny.
+3. **Eager cell provisioning.** `cell_<uuid>` per-cell schema + `memory_entries` table + HNSW index are created inside the same TX as the `cells` INSERT via SQL function `multitenancy.provision_cell_schema(uuid)`. No lazy first-access bootstrap.
+4. **Cell archive retention.** Archive (`archived_at`) does NOT drop the per-cell schema — retention is 3 years per FZ-152. DROP cleanup deferred to Wave 3.
+
+
 
 ## Decision
 

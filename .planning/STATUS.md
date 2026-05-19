@@ -30,9 +30,13 @@ Per session-decision (11 развилок resolved):
 
 ## Текущая активная фаза
 
-**Phase 00.2 (Custom JWT auth, full-scope)** — ✅ **Code-complete** on branch `claude/gifted-feistel-55966b` (2026-05-18). Pending PR review + merge alongside parallel 00.3 + 00.4. 14 atomic commits; **AC1-AC10 all green**; src.iam coverage **86.69%** (AC9 gate ≥85%); 76 unit tests pass; ruff + mypy --strict clean. Full breakdown in [`HANDOFF.md`](./HANDOFF.md). After merge of 00.2 + 00.3 + 00.4 — Phase 00.2.5 integration session swaps `backend/src/_stubs/` for real impls.
+**Phase 00.3 (DB + RLS + multitenancy + audit) + Phase 00.4 (LLM Gateway + MCP + RU-billing)** — ✅ **Code-complete** on branch `claude/cool-bell-0c74ba` (2026-05-19). 9 atomic commits в combined PR. **All Phase 00.3 AC1-AC8 + Phase 00.4 AC1-AC10 covered**; 330 unit tests pass; ruff + mypy --strict clean across 103 source files. Per-module coverage: iam 87% (preserved Phase 00.2 AC9 ≥85%), rbac 100%, mcp 85%, audit 84%, multitenancy 81%, llm_gateway 79% — router-glue tier (~0% coverage) covered by Phase 00.2.5 integration TestClient suite. Per-module CI gates configured (iam ≥85%, multitenancy/llm_gateway ≥70%, audit ≥80%, rbac/mcp ≥85%). 5-agent independent audit swarm (Compliance / Security / Test Adequacy / Architecture + Code Reviewer paused) ran; 4 HIGH-severity findings fixed in-loop (forward-reference policy, unsafe RLS GUC cast, append-only triggers for llm_usage_log + credit_transactions, write policies for multitenancy). Full audit report in [`_session-context/AUDIT-2026-05-19/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-19/AUDIT-REPORT.md). Full session breakdown in [`HANDOFF.md`](./HANDOFF.md).
+
+**Phase 00.2 (Custom JWT auth, full-scope)** — ✅ **Complete** (merged 2026-05-18 via PR #28).
 
 **Phase 00.1 (Repo & CI/CD)** — ✅ **Complete** (merged 2026-05-17 via [PR #25](https://github.com/mrflxxxme/oriion/pull/25), merge-commit `b192c6b`).
+
+**Pre-Phase-00.3 contract extension PR (2026-05-19)** — ✅ **Code-complete on same branch** as part of 00.3+00.4 combined PR. Renames `multitenancy.organizations → multitenancy.workspaces` end-to-end (DDL + API + events + RLS GUC `app.current_organization_id → app.current_workspace_id` + rbac scope_type + llm_gateway.byok_keys + 5 ADR amendments with «Wave 0 implementation decisions» sections). Adds RU-currency triad (cost_usd + cost_rub + fx_rate_usd_to_rub) per ADR-018 amendment. Adds vector(1024) provenance columns per ADR-005 amendment. Adds 3-GUC RLS layered model per ADR-009 amendment. Adds 4 new PLACEHOLDER tokens (BYOK_MASTER_KEY_B64, YANDEX_CLOUD_KMS_KEY_ID, FX_RATE_USD_TO_RUB_OVERRIDE, YANDEX_SEARCH_API_KEY).
 
 **Final AC scoreboard:**
 - ✅ **AC2** (coverage ≥ 70%) — local-verified backend 100% (8 tests, 16/16 stmts), frontend utils.ts 100% (5 tests)

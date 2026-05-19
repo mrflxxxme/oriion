@@ -133,7 +133,9 @@ def downgrade() -> None:
     # other databases on the cluster may share them. Schemas are dropped only
     # if empty (CASCADE deliberately omitted to fail loud if downstream
     # bounded contexts still have tables here).
-    op.execute("REVOKE USAGE ON SCHEMA " + ", ".join(f'"{s}"' for s in SCHEMAS) + " FROM oriion_app;")
+    op.execute(
+        "REVOKE USAGE ON SCHEMA " + ", ".join(f'"{s}"' for s in SCHEMAS) + " FROM oriion_app;"
+    )
     op.execute("DROP ROLE IF EXISTS oriion_app;")
     op.execute("DROP FUNCTION IF EXISTS _shared.set_updated_at();")
     for schema in reversed(SCHEMAS):

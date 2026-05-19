@@ -4,8 +4,8 @@
 
 ## Last updated
 
-- Date: 2026-05-18 (Phase 00.2 — Custom JWT auth full-scope implementation)
-- Session: `phase-00-2-jwt-auth` (worktree branch `claude/gifted-feistel-55966b`)
+- Date: 2026-05-19 (Phase 00.3 + 00.4 combined PR — DB+RLS+multitenancy+audit + LLM Gateway+MCP+RU-billing)
+- Session: `cool-bell-0c74ba` (worktree branch `claude/cool-bell-0c74ba`)
 - Agent: @claude-opus
 
 ## Project status
@@ -13,10 +13,9 @@
 - **Wave:** Wave 0 (Foundation)
 - **Phase 00.1 (Repo+CI/CD)**: ✅ Complete (merged 2026-05-17 via PR #25).
 - **Architect-PR (pre-00.2)**: ✅ Complete (merged 2026-05-17 via PR #27 — `_shared/0001_init.py` + extended `contracts/iam/*` + 12 bounded-context migration dirs).
-- **Phase 00.2 (Custom JWT auth)**: ✅ Code-complete on `claude/gifted-feistel-55966b` — pending PR + review + merge alongside 00.3 + 00.4.
-- **Phase 00.3 (DB + RLS + multitenancy + audit)**: 🔄 In progress in parallel worktree (founder spawns separately).
-- **Phase 00.4 (LLM gateway + MCP)**: 🔄 In progress in parallel worktree (founder spawns separately).
-- **Phase 00.2.5 (integration)**: ⏳ Pending — opens after all 3 PRs merge; deletes `backend/src/_stubs/` and rewires imports to real impls from 00.3.
+- **Phase 00.2 (Custom JWT auth)**: ✅ Complete (merged 2026-05-18 via PR #28).
+- **Phase 00.3 (DB + RLS + multitenancy + audit) + Phase 00.4 (LLM Gateway + MCP + RU-billing)**: ✅ **Code-complete on `claude/cool-bell-0c74ba`** — pending PR + review + merge as combined PR.
+- **Phase 00.2.5 (integration)**: ⏳ Pending — opens after this PR merges; deletes `backend/src/_stubs/` and rewires imports to real impls from 00.3 + 00.4 multitenancy/audit/llm_gateway services.
 
 ## Active blockers
 
@@ -25,106 +24,108 @@
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | **Submitted** — dev unblocked. Final РКН confirmation required до prod-launch; dev/test работает на mock-данных. |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa (Wave 1) |
 
-## What just happened (Phase 00.2 implementation)
+## What just happened (Phase 00.3 + 00.4 combined session)
 
-### Discovery + decisions (this session)
+### Plan + grill (this session)
 
-Founder invoked `/grill-me` before execution; 10 design branches resolved interactively (saved in plan `C:\Users\KUklonskiy\.claude\plans\start-phase-00-2-per-resilient-noodle.md`):
+Founder invoked `/grill-me` before execution; 20 design branches resolved interactively (full plan saved at `C:\Users\KUklonskiy\.claude\plans\start-phase-00-3-and-warm-parrot.md`):
 
 | # | Branch | Resolution |
 |---|---|---|
-| Q1 | Endpoint scope | 10 endpoints (8 auth + GET/PATCH /users/me). Skip /auth/sessions* + OAuth → Wave 1. |
-| Q2 | URL prefix | `/api/v1` (matches ADR-010 + phase-spec /api/auth/* mention) |
-| Q3 | Email-sender | EmailSender Protocol + ConsoleEmailSender (dev) + InMemoryEmailSender (test). NO `iam.email_outbox` table (would need contract extension). Added `structlog` + `email-validator` deps. |
-| Q4 | Tests | Hybrid (unit + integration, marker `integration`); iam-specific coverage gate ≥85%. |
-| Q5 | JWT | HS256 with claims sub/sid/jti/iat/exp/iss/aud/type; Redis blacklist SET blacklist:jwt:{jti} 1 EX ttl. |
-| Q6 | Rate-limit | login/register: 5/15min (ip,email). forgot/resend: 3/15min anti-spam. refresh: 30/min ip-only. |
-| Q7 | Argon2 | argon2-cffi defaults (t=3, m=64MB, p=4) prod; DI swap to (t=1, m=1KB, p=1) for tests. |
-| Q8 | CloudEvents emission | Log-only envelope (structlog tag cloudevent=True); swap to Redis Streams in Wave 1+. |
-| Q9 | Migrations | 6 (oauth_links separate). |
-| Q10 | Workflow | Branch `claude/gifted-feistel-55966b` retained; PR title `[00.2] feat(iam): ...`; atomic Conventional Commits; Exit ritual (this file + JOURNAL + STATUS + phase-spec status). |
+| Q1 | Topology | One combined PR `[00.3+00.4]` on current branch |
+| Q2 | workspace vs organization | Contract-extension pre-step 0: rename DDL `organizations → workspaces` end-to-end |
+| Q3 | RLS GUC model | 3-GUC layered: `app.current_user_id` + `current_workspace_id` + `current_cell_id` |
+| Q4 | Cost currency | RU-first: cost_usd + cost_rub + fx_rate_usd_to_rub triad atomic write |
+| Q5 | pgvector dim | vector(1024) baseline + provenance cols (provider/model/dim) |
+| Q6 | Live LLM tests | Mock-only (respx + pytest-httpx); live deferred to Phase 00.6 |
+| Q7 | Audit partitions | Current + next month + DEFAULT catch-all (Wave 0); pg_partman Wave 1+ |
+| Q8 | Test PG | testcontainers[postgresql] + pgvector image |
+| Q9 | MCP scope | Framework + read_url + web_search (full task 14 coverage) |
+| Q10 | BYOK KMS | KMSProvider Protocol + LocalAESKMS Wave 0; YandexKMS swap Phase 00.6+ |
+| Q11 | CloudEvents | Log-only via structlog cloudevent tag (consistent with Phase 00.2) |
+| Q12 | Coverage gate | Per-module fail-under |
+| Q13 | Audit strategy | 5-agent parallel independent audit swarm after code lands |
+| Q14 | Delegation | Mixed under autonomous continuous execution: main coords _shared + glue, 4 backend-implementer subagents in parallel for bounded contexts |
+| Q15-Q20 | Misc | Redis rate-limit / eager cell provisioning / leave-schema-on-archive / ADR amendments inline / atomic commits / sequential pytest |
 
-### What landed in `claude/gifted-feistel-55966b`
+### What landed in `claude/cool-bell-0c74ba`
 
-14 atomic commits, see `git log claude/gifted-feistel-55966b ^main` for details:
+9 atomic commits, see `git log claude/cool-bell-0c74ba ^main` for details:
 
 ```
-chore(deps): add structlog + email-validator
-feat(_shared): config + logging + db session + redis factory
-feat(_stubs): multitenancy + audit cross-context stubs
-feat(iam,migrations): 6 alembic migrations matching contracts/iam/schema.sql
-feat(iam): SQLAlchemy 2.x models matching contracts/iam/schema.sql
-feat(iam): Pydantic 2.x schemas + domain exceptions
-feat(iam): password_service (argon2id) + token_service (JWT HS256)
-feat(iam): rate_limit_service (Redis INCR+EXPIRE atomic)
-feat(iam): 6 thin SQLAlchemy repositories
-feat(iam): consent_service + email_service + cloudevents emitters
-feat(iam): auth_service orchestration + get_current_user middleware
-feat(iam): routers (8 auth + 2 me endpoints) + DI factories + main.py wiring
-test(iam): 76 unit tests, src.iam coverage 86.69% (AC9 >=85%)
+chore(contracts): pre-00.3 rename + RU-billing + 3-GUC RLS + vector-provenance
+feat(_shared): 3-GUC RLS context-setter + cloudevents helper + SQL helpers
+feat(multitenancy,rbac): workspaces + cells + cell_members + system roles + RLS
+feat(audit): partitioned audit_log + append-only triggers + emit_audit_event
+feat(llm_gateway,billing): providers + circuit breaker + RU-currency + LocalAESKMS
+feat(mcp): framework loader + read_url + web_search + Redis rate-limit
+chore(backend): Phase 00.4 deps + cloudevents lazy-resolve + ruff auto-format
+chore(config,ci): Phase 00.4 env + Settings + per-module coverage gates
+fix(rls,audit-log): apply 4 HIGH-severity findings from independent audit swarm
 ```
-
-### AC scoreboard (10/10 ✅ — full pass against phase-spec)
-
-| AC | Description | Status | Test reference |
-|---|---|---|---|
-| AC1 | register → 201 + workspace+cell IDs | ✅ | test_register_201, test_register_happy_path |
-| AC2 | login → TokenPair | ✅ | test_login_200, test_login_returns_token_pair |
-| AC3 | /me requires Bearer JWT | ✅ | test_get_me_401_without_auth, test_get_me_200_with_override |
-| AC4 | Revoked JWT → 401 | ✅ | test_blacklist_and_verify_raises_token_revoked |
-| AC5 | Refresh rotation chain-revoke | ✅ | test_refresh_reuse_revokes_chain, test_refresh_chain_revoke_401 |
-| AC6 | Consent recorded with version pin | ✅ | test_register_happy_path (consent_repo.record asserted) |
-| AC7 | Email verification gate | ✅ | test_login_email_not_verified_when_gate_on |
-| AC8 | 6-я login → 429 | ✅ | test_login_6th_attempt_is_blocked_with_retry_after |
-| AC9 | Coverage ≥85% on src.iam | ✅ | 86.69% (gate passed) |
-| AC10 | Audit emission per auth-event | ✅ | _stubs.audit.emit_audit_event called from auth_service + test_all_emit_functions_run |
 
 ### Build / test state
 
 ```
-backend: 84/84 pytest pass (76 iam unit + 5 health + 3 smoke)
-ruff:    All checks passed (src/ + tests/iam)
-ruff fmt: All files formatted
-mypy --strict: Success on 36 source files
-src.iam coverage: 86.69%
-pip-audit: not re-run (no new high-risk deps; structlog + email-validator clean)
+backend: 330/330 pytest unit pass; 16 integration tests deselected (require real PG; run in CI service container)
+ruff:    All checks passed (src + tests + migrations)
+ruff fmt: All 199 files formatted
+mypy --strict: Success on 103 source files (lxml + readability + testcontainers + fakeredis + pgvector ignored via pyproject overrides)
+Per-module coverage: iam 87% / rbac 100% / mcp 85% / audit 84% / multitenancy 81% / llm_gateway 79%
 ```
+
+### Independent audit (Step 5)
+
+5 audit subagents spawned in parallel — Compliance / Security / Test Adequacy / Architecture + Code Reviewer. 4 sections landed; Code Reviewer paused mid-run and did not deliver (correctness dimension partially covered by Architecture section). Consolidated report: [`_session-context/AUDIT-2026-05-19/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-19/AUDIT-REPORT.md).
+
+**Verdict: PASS-WITH-FIXES.** 0 BLOCK findings. 4 HIGH-severity findings fixed in-loop:
+- F-1 (Architect H2): `workspaces_select_own` forward-reference moved to 0003_cell_members.
+- F-2 (Security H-1): unsafe inline `current_setting()::uuid` cast replaced with `_shared.current_*_id()` helpers (default-deny on empty GUC).
+- F-3 (Architect H3): added append-only triggers to `llm_usage_log` + `credit_transactions`; revoked UPDATE/DELETE grants.
+- F-4 (Security H-2): added explicit write policies on multitenancy.* tables (deferred app-layer authz per contract README intent).
 
 ## Next agent — read first
 
 Standard bootstrap-4:
 
 1. [`README.md`](./README.md) — what is this project
-2. [`STATUS.md`](./STATUS.md) — current state (Phase 00.2 code-complete pending merge)
+2. [`STATUS.md`](./STATUS.md) — current state (Phase 00.3+00.4 code-complete pending merge)
 3. **this HANDOFF.md** — snapshot
 4. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) — workflow protocol
 
 ## Founder action (post-merge)
 
-1. Review + merge PR `[00.2] feat(iam): ...` from branch `claude/gifted-feistel-55966b`.
-2. Confirm 00.3 + 00.4 parallel PRs also merge.
-3. After all 3 merge, open Phase 00.2.5 integration session in fresh worktree:
+1. Review + merge combined PR `[00.3+00.4] feat: db-rls + multitenancy + audit + llm-gateway + mcp + RU-billing` from branch `claude/cool-bell-0c74ba`.
+2. Open Phase 00.2.5 integration session in fresh worktree:
    ```bash
    git checkout main && git pull origin main
    git worktree add .planning/.claude/worktrees/phase-00-2-5-integration -b claude/phase-00-2-5-integration
    # Brief: "Phase 00.2.5 integration. Delete backend/src/_stubs/,
-   #         replace imports to real impls from 00.3, run make dev-bootstrap,
-   #         run E2E smoke (register -> verify-email -> login -> /api/llm/chat ->
-   #         refresh -> logout), full coverage incl iam repositories on real PG,
-   #         update STATUS/HANDOFF/JOURNAL/PROJECT, mark 00.2/00.3/00.4 Complete."
+   #         rewire iam.auth_service.register → multitenancy.workspace_service.provision_initial_workspace,
+   #         rewire iam emit_audit_event → audit.audit_service.emit_audit_event,
+   #         rewire llm_gateway router DI to call real chat/embeddings/byok with auth_dependency + workspace context,
+   #         add testcontainers session-scoped pg fixture to conftest,
+   #         run make dev-bootstrap, run E2E smoke (register → verify-email → login →
+   #         /api/v1/llm/chat → refresh → logout), full coverage incl iam repositories
+   #         on real PG, update STATUS/HANDOFF/JOURNAL/PROJECT, mark 00.2/00.3/00.4 Complete."
    ```
 
 ## Known caveats / tracked for 00.2.5 + 00.6
 
-- **alembic.ini cp1251 on Windows**: pre-existing Phase 00.1 issue (russian comments in alembic.ini cause configparser cp1251 decode error on Windows when invoked via `uv run alembic ...`). Migrations are valid (verified via Python AST import + revision chain check). Workaround: run `alembic upgrade head` on Linux/macOS or set system locale; cleanup pinned to Phase 00.6.
-- **Repositories <60% covered via unit mocks**: by design (Q4 hybrid). Real-PG integration suite under `tests/iam/integration/` will land in 00.2.5 to push aggregate coverage even higher.
-- **InsecureKeyLengthWarning** on `test_verify_wrong_signature_raises_token_invalid` — uses a short test secret; production secret is 32+ chars per `.env.example` template.
+- **Section 01 (Code Reviewer) audit not delivered**: subagent paused mid-run; standalone code-review pass deferred to Phase 00.2.5 (Architecture section covered most correctness ground).
+- **Coverage gap in router glue (~0%)**: multitenancy.routers + llm_gateway.routers tested only at schema level; full TestClient-based integration suite lands in Phase 00.2.5.
+- **Cross-context import `billing_service → src.billing.models`**: documented architectural debt per Architect-audit H1; Compliance auditor classified as architecturally-sanctioned per llm-gateway invariant #7 (atomic 3-currency write). Wave 1+ refactor via port/adapter or outbox pattern.
+- **`cell_service.py:18` still imports `emit_audit_event` from `src._stubs.audit`**: canonical 00.2.5 swap-to-real-impl task (Architect-audit M-1).
+- **SSRF TOCTOU in `read_url`**: DNS-rebinding window between `_validate_url` and httpx connect. Acknowledged Wave 1 hardening (5MB cap + scheme allow-list + redirect event hook reduce blast radius).
+- **`alembic.ini` cp1251 on Windows**: pre-existing Phase 00.1 issue. Migrations verified via Python AST + revision chain. Run `alembic upgrade head` on Linux/macOS/WSL; cleanup pinned to Phase 00.6.
+- **`pytest-postgresql` + `testcontainers` in dev deps but conftest not yet wired**: integration tests (`@pytest.mark.integration`) skipped by default addopts. Phase 00.2.5 session adds the session-scoped `pg_container` fixture.
 
 ## Exit ritual completed (this session)
 
-- [x] 14 atomic commits pushed to `claude/gifted-feistel-55966b`
+- [x] 9 atomic commits + exit-ritual commit pushed to `claude/cool-bell-0c74ba`
 - [x] JOURNAL.md entry appended (this date)
 - [x] HANDOFF.md rewritten (this file)
-- [x] STATUS.md updated — Phase 00.2 code-complete entry
-- [x] Phase-spec `.planning/roadmap/wave-0-foundation/phases/00.2-custom-jwt-auth.md` status: Pending → Code-complete (pending merge)
-- [ ] PR opened — pending (founder action)
+- [x] STATUS.md updated — Phase 00.3 + 00.4 code-complete entry
+- [x] Phase-specs `.planning/roadmap/wave-0-foundation/phases/00.3-db-rls-multitenancy.md` + `00.4-llm-gateway.md` status: Pending → Code-complete (pending merge)
+- [x] AUDIT-REPORT.md consolidated under `.planning/_session-context/AUDIT-2026-05-19/`
+- [ ] PR opened — final step of this session

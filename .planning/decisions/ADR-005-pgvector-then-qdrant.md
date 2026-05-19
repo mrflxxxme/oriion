@@ -1,6 +1,21 @@
 # ADR-005: pgvector на старте, Qdrant standalone в Wave 4
 
-- **Status:** Accepted
+- **Status:** Accepted (amendment 2026-05-19, see «Wave 0 vector schema decisions»)
+
+## Wave 0 vector schema decisions (2026-05-19)
+
+> Adopted in the pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR).
+
+1. **Baseline dim: `vector(1024)`** per `cell_<uuid>.memory_entries.embedding`. Matches GigaChat embeddings native + leaves headroom for OpenAI 1536-truncate via BYOK.
+2. **Provenance columns.** `memory_entries` carries three audit columns:
+    - `embedding_provider text NOT NULL` — e.g. `yandex`, `gigachat`, `openai-byok`, `local`.
+    - `embedding_model text NOT NULL` — e.g. `text-search-doc`, `GigaChat-Embeddings`.
+    - `embedding_dim int NOT NULL CHECK (embedding_dim <= 1024)` — native dim before truncate/pad.
+    Provider-canonicalization migration deferred to Wave 1.
+3. **Truncate/pad strategy.** Yandex 256-dim embeddings pad zeros to 1024 before storage; OpenAI 1536-dim truncate to 1024 (last 512 dims dropped — acceptable for cosine sim with token loss <3% per OpenAI dim-reduction guidance). HNSW index built on the 1024-dim canonical vector.
+4. **HNSW params:** `(m=16, ef_construction=64)` — baseline per pgvector docs; tune Wave 1+ based on query patterns.
+
+
 
 ## Decision
 

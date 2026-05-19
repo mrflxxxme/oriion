@@ -20,9 +20,13 @@
 --
 -- Cross-context refs:
 --   * role_assignments.user_id    → iam.users.id
---   * role_assignments.scope_id   → multitenancy.organizations.id
+--   * role_assignments.scope_id   → multitenancy.workspaces.id
 --                                  OR multitenancy.cells.id
 --                                  (resolved by scope_type)
+--
+-- NAMING (2026-05-19): the `organization` scope value was renamed to
+--   `workspace` along with the multitenancy DDL rename. `scope_type` enum
+--   is now `('workspace','cell')`.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -90,8 +94,8 @@ CREATE INDEX role_permissions_permission_id_idx ON rbac.role_permissions (permis
 CREATE TABLE rbac.role_assignments (
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      uuid NOT NULL,  -- → iam.users.id
-    scope_type   text NOT NULL CHECK (scope_type IN ('organization','cell')),
-    scope_id     uuid NOT NULL,  -- → multitenancy.organizations.id OR .cells.id
+    scope_type   text NOT NULL CHECK (scope_type IN ('workspace','cell')),
+    scope_id     uuid NOT NULL,  -- → multitenancy.workspaces.id OR .cells.id
     role_id      uuid NOT NULL REFERENCES rbac.system_roles(id) ON DELETE RESTRICT,
     assigned_by  uuid,           -- → iam.users.id (nullable: system / bootstrap)
     assigned_at  timestamptz NOT NULL DEFAULT now(),

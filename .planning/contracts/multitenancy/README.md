@@ -1,24 +1,36 @@
-﻿# Bounded context: `multitenancy` — Organizations & Cells
+# Bounded context: `multitenancy` — Workspaces & Cells
 
 **Status:** DRAFT-READY (Milestone B, Wave 0 full context per ADR-024)
 **Authoritative source per ADR-024 / P-INIT-2.**
 
+## Naming bridge (2026-05-19)
+
+> ⚠️ **Renamed pre-Phase-00.3:** `organizations` → `workspaces`. The DDL and
+> public API now use **`workspace` / `workspace_id`** everywhere. The
+> previous term `organization` is retired. The cross-context stubs landed in
+> the architect-PR (`backend/src/_stubs/multitenancy.py`) and the IAM API
+> `RegisterResponse.workspace_id` are now consistent with this DDL.
+>
+> If you see `organization` in legacy artefacts (older ADRs, archived
+> session-context files) treat it as the same entity. New code MUST use
+> `workspace`.
+
 ## Purpose
 
 The `multitenancy` context owns the **primary tenancy boundary** of the
-platform: the **organization → cell → cell_member** hierarchy. Per ADR-009
+platform: the **workspace → cell → cell_member** hierarchy. Per ADR-009
 the cell is the unit of billing, RLS isolation, quotas, and per-tenant
 configuration (LLM stack preference, secrets path, audit stream).
 
 Every multi-tenant table elsewhere in the system carries a `cell_id` (or, less
-commonly, an `organization_id`); all visibility / authorization downstream is
+commonly, a `workspace_id`); all visibility / authorization downstream is
 expressed in those terms.
 
 ## Ubiquitous language
 
 | Term | Meaning |
 |---|---|
-| **Organization** | The legal entity holding the subscription and receiving invoices. One organization, N cells. |
+| **Workspace** | The legal entity holding the subscription and receiving invoices. One workspace, N cells. (Was `organization` pre-2026-05-19.) |
 | **Cell** | A workspace = an AI team per ADR-009. Has its own credit balance, secrets path, sandbox context, audit stream. |
 | **CellMember** | A `(cell, user)` pair augmented with a system role. The atomic unit of "who can do what in this cell". |
 | **Invitation** | A pending CellMember addressed by email + token (lives in a sibling table referenced by the API; not modelled in this `schema.sql` to keep the W0 surface tight). |
@@ -31,10 +43,10 @@ expressed in those terms.
 
 ## Invariants
 
-1. A **cell belongs to exactly one organization** (`organization_id NOT NULL`,
-   `ON DELETE RESTRICT` — orgs cannot be hard-deleted while they hold cells).
+1. A **cell belongs to exactly one workspace** (`workspace_id NOT NULL`,
+   `ON DELETE RESTRICT` — workspaces cannot be hard-deleted while they hold cells).
 2. A **user can be a member of many cells**, including cells across different
-   organizations.
+   workspaces.
 3. `cell_members (cell_id, user_id)` is **unique** — a user has at most one
    membership row per cell. Role changes update the row in place and emit
    `oriion.multitenancy.member.role_changed.v1`.
@@ -45,27 +57,33 @@ expressed in those terms.
    the calling user. Writes go through service-account connections that
    bypass RLS via stored procedures; the `rbac` context authorizes those
    procedures.
-6. **Soft-delete on organizations cascades to archival** (not deletion) of
+6. **Soft-delete on workspaces cascades to archival** (not deletion) of
    their cells. Hard purge is owned by the retention job.
 
-## RLS — explicit policy snippets
+## RLS — 3-GUC layered model (revised 2026-05-19)
 
-The application MUST set the current user on every request transaction:
+Per ADR-009 amendment, the FastAPI dependency
+`get_tenant_db_session(user, cell_id)` sets THREE Postgres session locals on
+every tenant-scoped transaction:
 
 ```sql
-SET LOCAL app.current_user_id = '<uuid>';
+SET LOCAL app.current_user_id      = '<uuid>';
+SET LOCAL app.current_workspace_id = '<uuid>';
+SET LOCAL app.current_cell_id      = '<uuid>';
 ```
+
+Each downstream context picks the GUC that matches its filter granularity:
+
+| Context | GUC used | Why |
+|---|---|---|
+| `multitenancy.*`  | `app.current_user_id` (membership EXISTS) | Visibility tied to per-cell membership |
+| `llm_gateway.byok_keys` | `app.current_workspace_id` | BYOK is workspace-scoped |
+| `billing.credit_transactions`, future `tasks.*`, `memory.*` | `app.current_cell_id` | Per-cell hot tables; O(1) filter |
+| `rbac.role_assignments` | `app.current_user_id` (self) | Baseline self-row visibility |
 
 A missing or invalid GUC results in zero rows (default-deny). The shared
 helper `_shared.current_user_id()` returns `NULL` on missing GUC so all
 policies naturally evaluate to FALSE.
-
-Read policies (see `schema.sql` for full DDL):
-
-- `organizations` — visible to a user who is a member of **any cell** in that
-  organization.
-- `cells` — visible to its **direct members**.
-- `cell_members` — visible to **co-members** of the same cell.
 
 Write policies are intentionally not defined at the RLS layer. Mutations
 flow through `SECURITY DEFINER` procedures or a `BYPASSRLS` service role;
@@ -80,14 +98,14 @@ This context **references**:
 
 This context is **referenced by**:
 - `tasks` — `task.cell_id` ownership scope.
-- `billing` — `invoice.organization_id`, `credit_balance.cell_id`.
+- `billing` — `credit_transactions.cell_id`.
 - `agents`, `mcp`, `llm-gateway`, `artifacts`, `memory` — all multi-tenant
-  rows carry `cell_id`.
+  rows carry `cell_id` and/or `workspace_id`.
 
 ## Events
 
 See [`events.yaml`](./events.yaml). Notable consumers:
-- `billing` listens to `oriion.multitenancy.organization.plan_changed.v1` to
+- `billing` listens to `oriion.multitenancy.workspace.plan_changed.v1` to
   recompute entitlements.
 - `agents` listens to `oriion.multitenancy.cell.created.v1` to seed the
   default team preset from the vertical template.
@@ -97,7 +115,8 @@ See [`events.yaml`](./events.yaml). Notable consumers:
 - [ADR-024](../../decisions/ADR-024-bounded-context-contracts.md) — contracts
   layout.
 - [ADR-009](../../decisions/ADR-009-multitenancy-3-levels.md) — cell as
-  first-class domain concept; B+/C/D isolation tiers.
+  first-class domain concept; B+/C/D isolation tiers; **3-GUC RLS amendment
+  2026-05-19**.
 - [ADR-007](../../decisions/ADR-007-authentik-then-keycloak.md) — auth
   stack (consumes user identity).
 - [ADR-014](../../decisions/ADR-014-security.md) — RLS + secrets posture.
@@ -112,8 +131,8 @@ run in parallel.
 ```python
 # backend/src/multitenancy/services/workspace_service.py (real impl — Phase 00.3)
 class WorkspaceProvisionResult(BaseModel):
-    workspace_id: UUID
-    cell_id: UUID
+    workspace_id: UUID         # = multitenancy.workspaces.id
+    cell_id: UUID              # = multitenancy.cells.id
 
 async def provision_initial_workspace(user_id: UUID) -> WorkspaceProvisionResult:
     """Seed the user's first workspace + initial trial cell.
@@ -150,3 +169,7 @@ async def provision_initial_workspace(user_id: UUID) -> WorkspaceProvisionResult
   extract-to-microservice option (ADR-024 Consequences).
 - Trial cells / TTL cleanup (ADR-009 Wave 1 scope) will extend `cells` with
   a `trial_expires_at` column; out of scope for this draft.
+- Per-cell schema (`cell_<uuid>`) and its `memory_entries` table are
+  created eagerly inside `provision_cell()` via the SQL function
+  `multitenancy.provision_cell_schema(uuid)`. Cell archive does NOT drop
+  the schema (retention 3y per FZ-152). DROP deferred to Wave 3 cleanup.

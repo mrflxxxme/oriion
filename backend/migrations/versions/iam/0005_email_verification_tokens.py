@@ -53,8 +53,7 @@ def upgrade() -> None:
     )
 
     op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.email_verification_tokens "
-        "TO oriion_app;"
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.email_verification_tokens " "TO oriion_app;"
     )
 
 

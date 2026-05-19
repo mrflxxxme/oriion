@@ -42,8 +42,7 @@ def upgrade() -> None:
         """
     )
     op.execute(
-        "CREATE INDEX password_reset_tokens_user_id_idx "
-        "ON iam.password_reset_tokens (user_id);"
+        "CREATE INDEX password_reset_tokens_user_id_idx " "ON iam.password_reset_tokens (user_id);"
     )
     op.execute(
         "CREATE INDEX password_reset_tokens_chain_idx "
@@ -64,8 +63,7 @@ def upgrade() -> None:
     )
 
     op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.password_reset_tokens "
-        "TO oriion_app;"
+        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.password_reset_tokens " "TO oriion_app;"
     )
 
 

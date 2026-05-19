@@ -54,9 +54,7 @@ def upgrade() -> None:
         "'Privacy Policy / consent-form version pinned at grant time. Never mutated.';"
     )
 
-    op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.consents TO oriion_app;"
-    )
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON iam.consents TO oriion_app;")
 
 
 def downgrade() -> None:

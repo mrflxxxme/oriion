@@ -1,16 +1,27 @@
-﻿-- =====================================================================
--- Bounded context: multitenancy (Organizations & Cells)
+-- =====================================================================
+-- Bounded context: multitenancy (Workspaces & Cells)
 -- Owner: Oriion backend / multitenancy-implementer
 -- Authoritative source per ADR-024. Phase-specs MUST NOT duplicate DDL.
 --
+-- ⚠️ NAMING (revised 2026-05-19): previously `organizations` — renamed to
+--    `workspaces` as part of pre-Phase-00.3 contract extension to align DDL
+--    with the IAM API surface (`workspace_id` returned by /api/v1/auth/register)
+--    and the cross-context stubs that Phase 00.2 already merged. The legacy
+--    term `organization` is retired; do not introduce it in new code.
+--
 -- Scope of this file:
---   * organizations  — billing/legal tenant (1 org → N cells)
+--   * workspaces     — billing/legal tenant (1 workspace → N cells)
+--                      (was `organizations` pre-2026-05-19)
 --   * cells          — workspace boundary (= AI team per ADR-009)
 --   * cell_members   — user ↔ cell membership with system role assignment
 --
--- RLS: ENABLED on all three tables. Per-request the app sets
---      SET LOCAL app.current_user_id = '<uuid>'
---      (FastAPI middleware). Policies key off that GUC.
+-- RLS: ENABLED on all three tables. Per-request the app sets THREE GUCs
+--      (per ADR-009 amendment 2026-05-19, layered RLS model):
+--      SET LOCAL app.current_user_id      = '<uuid>'
+--      SET LOCAL app.current_workspace_id = '<uuid>'
+--      SET LOCAL app.current_cell_id      = '<uuid>'
+--      (FastAPI dependency `get_tenant_db_session`). multitenancy.* policies
+--      use the `user_id` membership model (default-deny on missing GUC).
 --
 -- Cross-context refs:
 --   * cell_members.user_id  → iam.users.id     (see contracts/iam/schema.sql)
@@ -18,12 +29,13 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- Table: organizations
+-- Table: workspaces
 -- Purpose:
---   Legal / billing tenant. One organization holds N cells; subscription
---   and invoicing happen at this level (see `billing` context).
+--   Legal / billing tenant. One workspace holds N cells; subscription
+--   and invoicing happen at this level (see `billing` context). In the
+--   public API this entity is exposed as `workspace` (per IAM API contract).
 -- ---------------------------------------------------------------------
-CREATE TABLE multitenancy.organizations (
+CREATE TABLE multitenancy.workspaces (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     slug            text NOT NULL,
     display_name    text NOT NULL,
@@ -37,15 +49,15 @@ CREATE TABLE multitenancy.organizations (
     deleted_at      timestamptz
 );
 
-CREATE UNIQUE INDEX organizations_slug_active_uidx
-    ON multitenancy.organizations (slug)
+CREATE UNIQUE INDEX workspaces_slug_active_uidx
+    ON multitenancy.workspaces (slug)
     WHERE deleted_at IS NULL;
 
-CREATE INDEX organizations_plan_tier_idx
-    ON multitenancy.organizations (plan_tier)
+CREATE INDEX workspaces_plan_tier_idx
+    ON multitenancy.workspaces (plan_tier)
     WHERE deleted_at IS NULL;
 
-COMMENT ON TABLE multitenancy.organizations IS 'Billing / legal tenant. Soft-delete cascades cells to archived state (not hard delete).';
+COMMENT ON TABLE multitenancy.workspaces IS 'Billing / legal tenant (was `organizations` pre-2026-05-19). Soft-delete cascades cells to archived state (not hard delete).';
 
 -- ---------------------------------------------------------------------
 -- Table: cells
@@ -56,7 +68,7 @@ COMMENT ON TABLE multitenancy.organizations IS 'Billing / legal tenant. Soft-del
 -- ---------------------------------------------------------------------
 CREATE TABLE multitenancy.cells (
     id                          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id             uuid NOT NULL REFERENCES multitenancy.organizations(id) ON DELETE RESTRICT,
+    workspace_id                uuid NOT NULL REFERENCES multitenancy.workspaces(id) ON DELETE RESTRICT,
     slug                        text NOT NULL,
     display_name                text NOT NULL,
     vertical_template_slug      text,
@@ -66,18 +78,18 @@ CREATE TABLE multitenancy.cells (
     archived_at                 timestamptz
 );
 
-CREATE UNIQUE INDEX cells_org_slug_uidx
-    ON multitenancy.cells (organization_id, slug);
+CREATE UNIQUE INDEX cells_workspace_slug_uidx
+    ON multitenancy.cells (workspace_id, slug);
 
-CREATE INDEX cells_organization_id_idx
-    ON multitenancy.cells (organization_id)
+CREATE INDEX cells_workspace_id_idx
+    ON multitenancy.cells (workspace_id)
     WHERE archived_at IS NULL;
 
 CREATE INDEX cells_vertical_template_idx
     ON multitenancy.cells (vertical_template_slug)
     WHERE archived_at IS NULL AND vertical_template_slug IS NOT NULL;
 
-COMMENT ON TABLE  multitenancy.cells IS 'Workspace = AI team per ADR-009. Archived (soft) on org soft-delete.';
+COMMENT ON TABLE  multitenancy.cells IS 'Workspace = AI team per ADR-009. Archived (soft) on workspace soft-delete.';
 COMMENT ON COLUMN multitenancy.cells.vertical_template_slug IS 'Loose FK to verticals/<slug>/ (string match by convention).';
 
 -- ---------------------------------------------------------------------
@@ -111,32 +123,38 @@ COMMENT ON TABLE multitenancy.cell_members IS 'User membership in a cell with a 
 -- =====================================================================
 -- RLS — Row Level Security
 -- All three tables are RLS-enabled. Policies key off the per-request GUC
--- `app.current_user_id`. The application MUST set it on every transaction:
+-- `app.current_user_id` (membership pattern). The application MUST set
+-- it on every transaction:
 --     SET LOCAL app.current_user_id = '<uuid>';
 -- A missing/invalid GUC yields zero rows (default-deny).
+--
+-- Per ADR-009 amendment 2026-05-19 (3-GUC layered model): the application
+-- also sets `app.current_workspace_id` and `app.current_cell_id` for use
+-- by `llm_gateway.*` and per-cell tables respectively. multitenancy.*
+-- policies remain membership-driven via `_shared.current_user_id()`.
 -- =====================================================================
 
-ALTER TABLE multitenancy.organizations  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE multitenancy.organizations  FORCE  ROW LEVEL SECURITY;
-ALTER TABLE multitenancy.cells          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE multitenancy.cells          FORCE  ROW LEVEL SECURITY;
-ALTER TABLE multitenancy.cell_members   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE multitenancy.cell_members   FORCE  ROW LEVEL SECURITY;
+ALTER TABLE multitenancy.workspaces    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE multitenancy.workspaces    FORCE  ROW LEVEL SECURITY;
+ALTER TABLE multitenancy.cells         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE multitenancy.cells         FORCE  ROW LEVEL SECURITY;
+ALTER TABLE multitenancy.cell_members  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE multitenancy.cell_members  FORCE  ROW LEVEL SECURITY;
 
 -- Helper: extract current user id from GUC, return NULL on missing.
--- Defined in _shared once; declared here for documentation.
+-- Defined in `_shared/0002_current_user_id_helper.py` migration.
 --   CREATE FUNCTION _shared.current_user_id() RETURNS uuid ...
 
--- Organizations: visible to anyone who is a member of any cell in the org.
-CREATE POLICY organizations_select_own
-    ON multitenancy.organizations
+-- Workspaces: visible to anyone who is a member of any cell in the workspace.
+CREATE POLICY workspaces_select_own
+    ON multitenancy.workspaces
     FOR SELECT
     USING (
         EXISTS (
             SELECT 1
             FROM multitenancy.cells c
             JOIN multitenancy.cell_members m ON m.cell_id = c.id
-            WHERE c.organization_id = organizations.id
+            WHERE c.workspace_id = workspaces.id
               AND m.user_id = _shared.current_user_id()
         )
     );

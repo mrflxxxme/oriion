@@ -61,9 +61,7 @@ def upgrade() -> None:
         """
     )
 
-    op.execute(
-        "GRANT SELECT, INSERT, UPDATE, DELETE ON iam.oauth_links TO oriion_app;"
-    )
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON iam.oauth_links TO oriion_app;")
 
 
 def downgrade() -> None:
