@@ -52,6 +52,7 @@ def get_consent_service(
     return ConsentService(
         consent_repo=ConsentRepository(db),
         consent_version=settings.consent_version_current,
+        session=db,
     )
 
 
@@ -65,6 +66,7 @@ def get_auth_service(
     password_service: PasswordService = Depends(get_password_service),
 ) -> AuthService:
     return AuthService(
+        session=db,
         user_repo=UserRepository(db),
         session_repo=SessionRepository(db),
         refresh_repo=RefreshTokenRepository(db),

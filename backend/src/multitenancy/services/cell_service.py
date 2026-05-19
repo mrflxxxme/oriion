@@ -15,7 +15,7 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src._stubs.audit import emit_audit_event  # 00.2.5 integration swaps to src.audit.services.audit_service.emit_audit_event
+from src.audit.services.audit_service import emit_audit_event
 from src.multitenancy.events import (
     emit_cell_archived,
     emit_cell_created,
@@ -89,6 +89,9 @@ class CellService:
                 "slug": cell.slug,
                 "vertical_template_slug": cell.vertical_template_slug,
             },
+            session=self._session,
+            workspace_id=cell.workspace_id,
+            cell_id=cell.id,
         )
 
         logger.info(
@@ -117,6 +120,9 @@ class CellService:
             resource_type="cell",
             resource_id=cell_id,
             payload={"archived_at": archived_at.isoformat()},
+            session=self._session,
+            workspace_id=cell.workspace_id,
+            cell_id=cell_id,
         )
 
     # ── member operations ────────────────────────────────────────────────
@@ -188,6 +194,9 @@ class CellService:
             resource_type="cell",
             resource_id=cell_id,
             payload={"email": email, "role_id": str(role_id)},
+            session=self._session,
+            workspace_id=cell.workspace_id,
+            cell_id=cell_id,
         )
         return (invitation_id, expires_at)
 
@@ -226,6 +235,8 @@ class CellService:
                 "old_role_id": str(old_role_id),
                 "new_role_id": str(new_role_id),
             },
+            session=self._session,
+            cell_id=cell_id,
         )
         # Refresh the row so the caller sees the new role_id on the returned
         # ORM instance.
@@ -257,6 +268,8 @@ class CellService:
             resource_type="cell",
             resource_id=cell_id,
             payload={"user_id": str(user_id), "removed_at": removed_at.isoformat()},
+            session=self._session,
+            cell_id=cell_id,
         )
 
     async def list_members(self, *, cell_id: UUID) -> list[CellMember]:

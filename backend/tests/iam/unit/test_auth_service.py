@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -63,6 +63,7 @@ def _build_auth_service(
     email_verif_repo: AsyncMock | None = None,
     password_reset_repo: AsyncMock | None = None,
     require_email_verification: bool = False,
+    db_session: AsyncMock | None = None,
 ) -> tuple[AuthService, dict[str, AsyncMock]]:
     user_repo = user_repo or AsyncMock()
     session_repo = session_repo or AsyncMock()
@@ -70,8 +71,16 @@ def _build_auth_service(
     consent_repo = consent_repo or AsyncMock()
     email_verif_repo = email_verif_repo or AsyncMock()
     password_reset_repo = password_reset_repo or AsyncMock()
-    consent_service = ConsentService(consent_repo, settings.consent_version_current)
+    # Phase 00.2.5: AuthService now holds an AsyncSession so audit_log inserts
+    # and provision_initial_workspace participate in the request's outer TX.
+    # Unit tests pass a mock; integration tests (and the new E2E TestClient
+    # suite) go through real testcontainers PG.
+    db_session = db_session or AsyncMock()
+    consent_service = ConsentService(
+        consent_repo, settings.consent_version_current, session=db_session
+    )
     svc = AuthService(
+        session=db_session,
         user_repo=user_repo,
         session_repo=session_repo,
         refresh_repo=refresh_repo,
@@ -128,20 +137,34 @@ async def test_register_happy_path_sends_email_and_returns_workspace(
         email_verif_repo=email_verif_repo,
     )
 
-    result = await svc.register(
-        RegisterCommand(
-            email="new@x.dev",
-            password="strong-password-123",
-            consent_pdn=True,
-            ip="1.2.3.4",
-            user_agent="pytest",
-        )
+    # The real provision_initial_workspace hits the DB; in unit-mode we
+    # short-circuit it and assert the call site shape (positional / kwarg
+    # contract) without exercising multitenancy internals.
+    fake_workspace_id, fake_cell_id = uuid4(), uuid4()
+    fake_provision = AsyncMock(
+        return_value=SimpleNamespace(workspace_id=fake_workspace_id, cell_id=fake_cell_id)
     )
+    with patch("src.iam.services.auth_service.provision_initial_workspace", fake_provision):
+        result = await svc.register(
+            RegisterCommand(
+                email="new@x.dev",
+                password="strong-password-123",
+                consent_pdn=True,
+                ip="1.2.3.4",
+                user_agent="pytest",
+            )
+        )
 
     assert result.user_id == new_user.id
-    assert result.workspace_id is not None
-    assert result.cell_id is not None
+    assert result.workspace_id == fake_workspace_id
+    assert result.cell_id == fake_cell_id
     assert result.email_verification_sent is True
+    # Verify the new call-site contract: session + email_localpart passed.
+    fake_provision.assert_awaited_once()
+    _, kwargs = fake_provision.call_args
+    assert kwargs["user_id"] == new_user.id
+    assert kwargs["email_localpart"] == "new"
+    assert "session" in kwargs
 
     mocks["user"].create.assert_awaited_once()
     mocks["consent"].record.assert_awaited()

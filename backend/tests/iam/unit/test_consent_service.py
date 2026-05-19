@@ -15,7 +15,7 @@ from src.iam.services.consent_service import ConsentService
 async def test_record_persists_grant() -> None:
     repo = AsyncMock()
     repo.record.return_value = SimpleNamespace(id=uuid4(), granted_at=datetime.now(UTC))
-    svc = ConsentService(repo, consent_version="v1")
+    svc = ConsentService(repo, consent_version="v1", session=AsyncMock())
     uid = uuid4()
     await svc.record(user_id=uid, kind="pdn", ip="1.1.1.1", user_agent="pytest")
     repo.record.assert_awaited_once_with(
@@ -26,7 +26,7 @@ async def test_record_persists_grant() -> None:
 @pytest.mark.asyncio
 async def test_revoke_calls_repo() -> None:
     repo = AsyncMock()
-    svc = ConsentService(repo, consent_version="v1")
+    svc = ConsentService(repo, consent_version="v1", session=AsyncMock())
     uid = uuid4()
     await svc.revoke(user_id=uid, kind="marketing", ip=None, user_agent=None)
     repo.revoke.assert_awaited_once_with(user_id=uid, kind="marketing")

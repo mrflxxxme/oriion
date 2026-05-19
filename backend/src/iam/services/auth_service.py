@@ -10,8 +10,11 @@ Public methods:
     forgot_password               — POST /auth/forgot-password     (anti-enum 202)
     reset_password                — POST /auth/reset-password
 
-All cross-context calls go through stubs (multitenancy / audit); Phase 00.2.5
-swaps imports to real impls landed by Phase 00.3.
+Phase 00.2.5: stubs deleted; emit_audit_event + provision_initial_workspace
+now resolve to the real impls landed by Phase 00.3. The service holds an
+AsyncSession so both calls can participate in the request's outer TX —
+audit_log inserts and workspace+cell provisioning land atomically with the
+user-row create instead of leaking on partial failure.
 """
 
 from __future__ import annotations
@@ -20,8 +23,9 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from src._stubs.audit import emit_audit_event
-from src._stubs.multitenancy import provision_initial_workspace
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.audit.services.audit_service import emit_audit_event
 from src.iam import events
 from src.iam.exceptions import (
     ConsentMissing,
@@ -52,6 +56,7 @@ from src.iam.services.email_service import EmailSender
 from src.iam.services.password_service import PasswordService
 from src.iam.services.rate_limit_service import RateLimitService
 from src.iam.services.token_service import TokenService
+from src.multitenancy.services.workspace_service import provision_initial_workspace
 
 # Token TTLs per contract README invariants 7+8
 EMAIL_VERIFICATION_TTL_SECONDS = 24 * 3600  # 24h
@@ -72,6 +77,7 @@ class AuthService:
     def __init__(
         self,
         *,
+        session: AsyncSession,
         user_repo: UserRepository,
         session_repo: SessionRepository,
         refresh_repo: RefreshTokenRepository,
@@ -87,6 +93,9 @@ class AuthService:
         refresh_ttl_seconds: int,
         access_ttl_seconds: int,
     ) -> None:
+        # Session is passed in so audit_log inserts + provision_initial_workspace
+        # share the request's outer TX with the user / refresh-token writes.
+        self._session = session
         self._user_repo = user_repo
         self._session_repo = session_repo
         self._refresh_repo = refresh_repo
@@ -139,8 +148,16 @@ class AuthService:
                 user_agent=cmd.user_agent,
             )
 
-        # Provision first workspace via stub (00.3 real impl in 00.2.5)
-        provision = await provision_initial_workspace(user.id)
+        # Provision first workspace + initial cell. Real impl is idempotent
+        # on workspace slug (see workspace_service.py:166-179) — slug is
+        # derived from the email localpart. Naive split is acceptable for
+        # Wave 0 (1 user -> 1 workspace at registration; collision between
+        # alice@x and alice@y is a known Wave-1 user-testing risk).
+        provision = await provision_initial_workspace(
+            session=self._session,
+            user_id=user.id,
+            email_localpart=cmd.email.split("@", 1)[0],
+        )
 
         # Issue email-verification token
         plaintext = _new_token_plaintext()
@@ -173,6 +190,9 @@ class AuthService:
             payload={"email": user.email, "workspace_id": str(provision.workspace_id)},
             ip=cmd.ip,
             user_agent=cmd.user_agent,
+            session=self._session,
+            workspace_id=provision.workspace_id,
+            cell_id=provision.cell_id,
         )
 
         return RegisterResult(
@@ -243,6 +263,7 @@ class AuthService:
             payload=None,
             ip=ip,
             user_agent=user_agent,
+            session=self._session,
         )
         return TokenPair(
             access_token=access.token,
@@ -270,11 +291,12 @@ class AuthService:
         await events.emit_session_revoked(session_id=row.session_id, reason="user_action")
         await emit_audit_event(
             actor_type="user",
-            actor_id=UUID(int=0),  # actor unknown post-logout; replaced in 00.3 audit
+            actor_id=UUID(int=0),  # actor unknown post-logout (refresh-token unauthenticated)
             action="iam.auth.logout",
             resource_type="session",
             resource_id=row.session_id,
             payload=None,
+            session=self._session,
         )
 
     # ── rotate_refresh (OWASP chain-revoke) ─────────────────────────────
@@ -306,6 +328,7 @@ class AuthService:
                 payload={"rotation_chain_id": str(old.rotation_chain_id)},
                 ip=ip,
                 user_agent=user_agent,
+                session=self._session,
             )
             raise TokenRotationError("refresh token already used — chain revoked")
 
@@ -339,6 +362,7 @@ class AuthService:
             payload=None,
             ip=ip,
             user_agent=user_agent,
+            session=self._session,
         )
         return TokenPair(
             access_token=access.token,
@@ -364,6 +388,7 @@ class AuthService:
             resource_type="user",
             resource_id=row.user_id,
             payload=None,
+            session=self._session,
         )
 
     # ── resend-verification (anti-enum 202) ─────────────────────────────
@@ -453,6 +478,7 @@ class AuthService:
                 resource_type="user",
                 resource_id=row.user_id,
                 payload={"reset_chain_id": str(row.reset_chain_id)},
+                session=self._session,
             )
             raise TokenNotFound()
 
@@ -474,6 +500,7 @@ class AuthService:
             resource_type="user",
             resource_id=row.user_id,
             payload=None,
+            session=self._session,
         )
 
     # ── /users/me helpers (kept here so router stays thin) ──────────────

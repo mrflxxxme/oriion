@@ -169,8 +169,10 @@ def _alembic_upgrade_heads(sync_url: str) -> None:
     # protection against running migrations against a hardcoded localhost
     # if env is misconfigured). Promote `sync_url` back to async driver
     # form so `async_engine_from_config` in env.py works.
-    async_url = sync_url if "+asyncpg" in sync_url else sync_url.replace(
-        "postgresql://", "postgresql+asyncpg://"
+    async_url = (
+        sync_url
+        if "+asyncpg" in sync_url
+        else sync_url.replace("postgresql://", "postgresql+asyncpg://")
     )
     prev = os.environ.get("DATABASE_URL")
     os.environ["DATABASE_URL"] = async_url
