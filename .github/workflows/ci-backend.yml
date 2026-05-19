@@ -96,6 +96,20 @@ jobs:
           KEY=$(printf 'ci-test-master-key-for-dev-only!' | head -c 32 | base64 -w0)
           echo "CI_BYOK_MASTER_KEY_B64=$KEY" >> "$GITHUB_ENV"
 
+      - name: Pre-create alembic_version with wider column
+        env:
+          PGPASSWORD: oriion-dev
+        # Alembic's default `alembic_version.version_num VARCHAR(32)` truncates
+        # long revision IDs (e.g. `multitenancy_0004_provision_cell_schema_function`).
+        # Create the table with VARCHAR(255) BEFORE alembic runs — alembic
+        # detects an existing table and skips its own CREATE TABLE.
+        run: |
+          psql -h localhost -U oriion -d oriion_test -c "
+            CREATE TABLE IF NOT EXISTS alembic_version (
+              version_num VARCHAR(255) NOT NULL
+                CONSTRAINT alembic_version_pkc PRIMARY KEY
+            );"
+
       - name: Apply alembic migrations to test DB
         working-directory: backend
         # `heads` (plural) — Alembic has one head per bounded-context branch
