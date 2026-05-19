@@ -108,6 +108,24 @@ def upgrade() -> None:
         """
     )
 
+    # cells_select_member — deferred from 0002_cells.py (same forward-reference
+    # issue: references cell_members which only exists here).
+    op.execute(
+        """
+        CREATE POLICY cells_select_member
+            ON multitenancy.cells
+            FOR SELECT
+            USING (
+                EXISTS (
+                    SELECT 1
+                    FROM multitenancy.cell_members m
+                    WHERE m.cell_id = cells.id
+                      AND m.user_id = _shared.current_user_id()
+                )
+            );
+        """
+    )
+
     # Security audit H-2, 2026-05-19: explicit write policies for workspaces,
     # cells, cell_members. The contract README states "Write policies are
     # intentionally not defined at the RLS layer. Mutations go through
@@ -147,6 +165,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS cells_select_member ON multitenancy.cells;")
     op.execute("DROP POLICY IF EXISTS workspaces_select_own ON multitenancy.workspaces;")
     op.execute("DROP POLICY IF EXISTS cell_members_select_co_member ON multitenancy.cell_members;")
     op.execute("DROP TABLE IF EXISTS multitenancy.cell_members;")

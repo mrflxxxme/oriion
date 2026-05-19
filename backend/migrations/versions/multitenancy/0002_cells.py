@@ -77,29 +77,17 @@ def upgrade() -> None:
         """
     )
 
-    # RLS — visible to members (EXISTS over cell_members keyed on current_user_id GUC).
+    # RLS — enable + force (default-deny). Policy `cells_select_member`
+    # references `multitenancy.cell_members` which doesn't exist yet at this
+    # point in the chain (forward-reference). Policy creation is deferred to
+    # `multitenancy/0003_cell_members.py` after cell_members lands.
+    # Architect-audit H2 echo, 2026-05-19.
     op.execute("ALTER TABLE multitenancy.cells ENABLE ROW LEVEL SECURITY;")
     op.execute("ALTER TABLE multitenancy.cells FORCE  ROW LEVEL SECURITY;")
-    op.execute(
-        """
-        CREATE POLICY cells_select_member
-            ON multitenancy.cells
-            FOR SELECT
-            USING (
-                EXISTS (
-                    SELECT 1
-                    FROM multitenancy.cell_members m
-                    WHERE m.cell_id = cells.id
-                      AND m.user_id = _shared.current_user_id()
-                )
-            );
-        """
-    )
 
     op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON multitenancy.cells TO oriion_app;")
 
 
 def downgrade() -> None:
-    op.execute("DROP POLICY IF EXISTS cells_select_member ON multitenancy.cells;")
     op.execute("DROP TRIGGER IF EXISTS cells_set_updated_at ON multitenancy.cells;")
     op.execute("DROP TABLE IF EXISTS multitenancy.cells;")
