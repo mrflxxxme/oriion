@@ -68,3 +68,5 @@ docker-compose.override.yml
 .claude-flow/
 .swarm/
 .hive-mind/
+# Per-session Claude Code allow-list — machine-local, must not enter repo
+.claude/settings.local.json

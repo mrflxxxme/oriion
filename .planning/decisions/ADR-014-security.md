@@ -1,12 +1,61 @@
 # ADR-014: Security — RBAC + DLP + изоляция memory от tool-output + операционная гигиена
 
-- **Status:** Accepted (amendments 2026-05-19, see «Wave 0 security decisions»)
+- **Status:** Accepted (amendments 2026-05-19 + 2026-05-20, see «Wave 0 security decisions»)
 
-## Wave 0 security decisions (2026-05-19)
+## Pip-audit ignored advisories registry (audit-trail)
+
+> Each ignored advisory MUST be re-reviewed at the next dependency bump
+> of the affected package. CI hooks: `.github/workflows/ci-backend.yml`
+> step `pip-audit (CVE scan)`.
+
+| Advisory | Package | Status | Justification | Re-review trigger |
+|---|---|---|---|---|
+| `PYSEC-2025-183` / `CVE-2025-45768` | `pyjwt` (all versions) | DISPUTED by upstream (jpadilla) | Claim is "weak encryption when key length is short". Our policy: HS256 + mandatory 32+ char secret per `Settings.jwt_secret_access_v1` field default literally encoding "min-32-chars". No fix version published; advisory has no upper-bound (all versions marked affected). | Re-review at every `pyjwt` bump or when fix version published |
+
+## Wave 0 security decisions (2026-05-19, amended 2026-05-20)
 
 > Adopted in the pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR).
+> Honesty-pass amendment 2026-05-20: Phase 00.5 Topic 1 RLS Option A landed
+> the practical bootstrap escape (per F-ST-4 deferral from pre-Phase-05 audit).
+> The amendment below replaces the original «3-GUC default-deny RLS posture»
+> bullet with a truthful statement of the register-time exception.
 
-1. **3-GUC default-deny RLS posture.** Per ADR-009 amendment 2026-05-19: `app.current_user_id` + `app.current_workspace_id` + `app.current_cell_id` set per transaction via FastAPI dependency `get_tenant_db_session`. Missing GUC → `NULL` → policy evaluates FALSE → zero rows visible. Integration tests assert default-deny (`tests/multitenancy/test_rls_isolation.py`).
+1. **3-GUC default-deny RLS posture with documented bootstrap exception** (amended 2026-05-20):
+    - **Production behaviour.** App connections use the non-superuser `oriion_app`
+      role (no BYPASSRLS). Every request handler depends on
+      `_shared.middleware.tenant_context.get_tenant_db_session` which sets
+      `app.current_user_id` + `app.current_workspace_id` + `app.current_cell_id`
+      session locals per transaction via `_shared.db.rls.set_tenant_context`.
+      Missing GUC → `_shared.current_*_id()` helpers return `NULL` →
+      multitenancy + per-cell RLS policies evaluate FALSE → zero rows visible.
+    - **Register-time bootstrap exception.** `POST /auth/register` cannot satisfy
+      the FORCE-RLS INSERT WITH CHECK policies on
+      `multitenancy.{workspaces, cells, cell_members}` — the just-created user
+      has no session yet, hence no tenant GUC. Per Phase 00.5 Topic 1
+      (founder-resolved 2026-05-20, RLS Option A), the bootstrap is delegated
+      to the SECURITY DEFINER SQL function
+      `multitenancy.bootstrap_first_workspace(p_user_id, p_workspace_slug,
+      p_display_name)` introduced in migration
+      `multitenancy/0005_bootstrap_first_workspace_function.py`. The function
+      runs with migration-owner privileges (BYPASSRLS) for the four bootstrap
+      INSERTs + per-cell schema provisioning, returns `(workspace_id, cell_id,
+      schema_name, was_replay)`. This is the SOLE production-callable owner-
+      context path; every other endpoint uses `oriion_app` with GUC.
+    - **Companion helper for the middleware itself.**
+      `multitenancy.resolve_user_first_membership(p_user_id) RETURNS TABLE(
+      workspace_id uuid, cell_id uuid)` is the second SECURITY DEFINER helper
+      (same migration). The tenant_context middleware uses it to look up the
+      user's first membership BEFORE the GUC is set (chicken-and-egg). Wave-0
+      single-membership simplification; Wave-1+ replaces with an
+      `active_workspace_id` JWT claim.
+    - **CI assertion of production failure mode.**
+      `backend/tests/integration/test_e2e_auth_flow.py::override_get_db`
+      issues `SET LOCAL ROLE oriion_app` so the integration suite surfaces
+      the RLS posture that prod will actually see (instead of silently
+      bypassing FORCE RLS as the testcontainers DB owner).
+    - **Direct DB-owner credentials never used by app code.** The two
+      SECURITY DEFINER functions above are the entire surface; any future
+      bootstrap-class operation needs the same pattern + an ADR amendment.
 2. **KMSProvider Protocol — Wave 0 → Wave 1 migration path:**
     - **Wave 0:** `LocalAESKMS` impl. AES-256-GCM with master key from env `BYOK_MASTER_KEY_B64` (32-byte base64). DEK envelope wrap done in-process. NOT production-grade — dev/test only.
     - **Phase 00.6+:** `YandexKMS` impl. Real envelope encryption via Yandex KMS API (`TBD_YANDEX_CLOUD_KMS_KEY_ID`). DEK wrapped by Yandex KMS master key, never exits HSM.
