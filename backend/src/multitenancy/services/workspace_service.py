@@ -5,24 +5,29 @@ consumed by ``iam.auth_service.register()`` (wired here as of Phase 00.2.5
 integration, PR #32).
 
 Signature: ``(session, user_id, email_localpart) -> WorkspaceProvisionResult``.
-Needs a live DB session to insert rows and the email-localpart to derive
-the workspace slug. ``AuthService.register`` passes its request-scoped
-``AsyncSession`` through so the workspace + cell INSERTs commit atomically
-with the user row.
+Needs a live DB session to call the SECURITY DEFINER bootstrap function and
+the email-localpart to derive the workspace slug. ``AuthService.register``
+passes its request-scoped ``AsyncSession`` through so the workspace + cell +
+cell_member INSERTs commit atomically with the user row.
 
-Logic per contracts/multitenancy/README.md "Service contract":
-  1. INSERT workspace (slug=email_localpart sanitized, display_name=email_localpart,
-     plan_tier='free').
-  2. INSERT cell (slug='default', display_name='Default cell',
-     vertical_template_slug=None).
-  3. CALL multitenancy.provision_cell_schema(cell.id) via raw SQL.
-  4. emit workspace.created.v1 + cell.created.v1 CloudEvents.
-  5. Idempotent on user_id — re-invocation returns existing IDs by slug lookup.
+Per Phase 00.5 Topic 1 (RLS Option A, 2026-05-20): provisioning is now
+delegated to ``multitenancy.bootstrap_first_workspace(...)`` — a SECURITY
+DEFINER SQL function introduced in migration
+``multitenancy/0005_bootstrap_first_workspace_function.py``. The function
+bypasses the FORCE-RLS INSERT WITH CHECK policies on
+multitenancy.{workspaces, cells, cell_members} because at register-time
+the user has no tenant GUC set yet (chicken-and-egg).
 
-This service intentionally does NOT add the user as a cell_member —
-``CellService.add_creator_as_owner`` handles that during normal cell
-provisioning (W0 auth flow has no concept of "owner role" yet; the
-00.4 onboarding wizard sets up RBAC assignments).
+The function:
+  1. Idempotent slug lookup → on replay returns existing IDs.
+  2. INSERT workspace (slug, display_name=email_localpart, plan_tier='free').
+  3. INSERT cell (slug='default', display_name='Default cell').
+  4. INSERT cell_member (user → cell with rbac.system_roles 'cell.owner').
+  5. CALL multitenancy.provision_cell_schema(cell.id) — per-cell schema.
+
+The application layer (this module) emits the CloudEvents (workspace.created.v1
++ cell.created.v1) so event-side semantics are unchanged from the pre-refactor
+flow.
 """
 
 from __future__ import annotations
@@ -38,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.multitenancy.events import emit_cell_created, emit_workspace_created
 from src.multitenancy.exceptions import CellProvisioningError
-from src.multitenancy.models import Cell, Workspace
+from src.multitenancy.models import Workspace
 from src.multitenancy.repositories.cell_repository import CellRepository
 from src.multitenancy.repositories.workspace_repository import (
     PlanTier,
@@ -142,100 +147,108 @@ async def provision_initial_workspace(
     is persisted and BEFORE the email-verification token is issued (so the
     user has a valid {workspace_id, cell_id} on first login).
 
-    Invariants:
-      * Exactly one workspace + one cell per user from this call.
-      * Workspace slug + display_name derived from email_localpart
-        (sanitized via _sanitize_slug; user can rename via PATCH later).
-      * plan_tier = 'free' (W0 — paid tiers gated behind ЮKassa flow).
-      * Idempotent on (user_id) — re-invocation looks up the existing rows
-        by slug and returns those IDs.
+    Implementation note (Phase 00.5 Topic 1, RLS Option A, 2026-05-20):
+    delegates to the SECURITY DEFINER SQL function
+    ``multitenancy.bootstrap_first_workspace(p_user_id, p_workspace_slug,
+    p_display_name)`` rather than issuing direct ORM INSERTs. Reason: the
+    register-flow runs without any tenant GUC set, so direct INSERTs against
+    multitenancy.{workspaces, cells, cell_members} would hit the FORCE-RLS
+    INSERT WITH CHECK policies (current_user_id IS NOT NULL → fails). The
+    SECURITY DEFINER function runs as the migration owner (BYPASSRLS), so
+    the bootstrap escapes the RLS chicken-and-egg cleanly.
 
-    The cell's per-schema `cell_<uuid>.memory_entries` table + HNSW index
-    are materialized in the same TX via multitenancy.provision_cell_schema().
+    Invariants (unchanged from pre-refactor):
+      * Exactly one workspace + one cell + one cell_member per user.
+      * Workspace slug + display_name derived from email_localpart.
+      * plan_tier = 'free' (W0).
+      * Idempotent on slug → returns existing IDs as a replay path.
+
+    The function also materializes the per-cell ``cell_<uuid>.memory_entries``
+    table + HNSW index via ``multitenancy.provision_cell_schema()``.
     """
-    workspace_repo = WorkspaceRepository(session)
-    cell_repo = CellRepository(session)
-
     slug = _sanitize_slug(email_localpart)
 
-    # Idempotent path: if a workspace with this slug already exists, treat
-    # the registration as a replay and return the existing IDs. The slug is
-    # globally unique among active workspaces (partial unique index) so the
-    # lookup is safe.
-    existing_workspace = await workspace_repo.find_by_slug_active(slug)
-    if existing_workspace is not None:
-        existing_cell = await cell_repo.find_by_workspace_slug(existing_workspace.id, "default")
-        if existing_cell is not None:
-            logger.info(
-                "multitenancy.provision_initial_workspace.replay",
-                user_id=str(user_id),
-                workspace_id=str(existing_workspace.id),
-                cell_id=str(existing_cell.id),
-            )
-            return WorkspaceProvisionResult(
-                workspace_id=existing_workspace.id,
-                cell_id=existing_cell.id,
-            )
-
-    workspace = await workspace_repo.create(
-        slug=slug,
-        display_name=email_localpart,
-        billing_email=None,
-        plan_tier="free",
+    result = await session.execute(
+        text(
+            "SELECT workspace_id, cell_id, schema_name, was_replay "
+            "FROM multitenancy.bootstrap_first_workspace(:user_id, :slug, :display_name)"
+        ),
+        {
+            "user_id": str(user_id),
+            "slug": slug,
+            "display_name": email_localpart,
+        },
     )
+    row = result.first()
+    if row is None:
+        raise CellProvisioningError(
+            "multitenancy.bootstrap_first_workspace returned no row "
+            "(expected exactly 1)."
+        )
+    workspace_id_str, cell_id_str, schema_name, was_replay = row
+    workspace_id = UUID(str(workspace_id_str))
+    cell_id = UUID(str(cell_id_str))
 
-    cell = await cell_repo.create(
-        workspace_id=workspace.id,
-        slug="default",
-        display_name="Default cell",
-        vertical_template_slug=None,
-        settings=None,
-    )
+    expected_schema = f"cell_{str(cell_id).replace('-', '_')}"
+    if schema_name != expected_schema:
+        raise CellProvisioningError(
+            f"bootstrap_first_workspace returned schema {schema_name!r}, "
+            f"expected {expected_schema!r}"
+        )
 
-    # Eager per-cell schema provisioning (ADR-009 amendment 2026-05-19).
-    await _call_provision_cell_schema(session, cell)
+    # Replay path: no CloudEvents (already emitted on first registration).
+    if was_replay:
+        logger.info(
+            "multitenancy.provision_initial_workspace.replay",
+            user_id=str(user_id),
+            workspace_id=str(workspace_id),
+            cell_id=str(cell_id),
+        )
+        return WorkspaceProvisionResult(workspace_id=workspace_id, cell_id=cell_id)
+
+    # Fresh-create path: emit the two CloudEvents.
+    # NOTE: SECURITY DEFINER bypasses RLS for the INSERTs but does not write
+    # CloudEvents (which live in the application layer per ADR-024). We
+    # issue them here so event semantics are unchanged from the pre-refactor
+    # implementation.
+    #
+    # We avoid a follow-up SELECT against multitenancy.cells because the
+    # session still has no tenant GUC set (the bootstrap is exactly what
+    # makes the GUC possible). The cell's created_at is "moments ago" by
+    # construction; vertical_template_slug is always NULL for the Wave-0
+    # productivity-core preset. Application-clock timestamp matches what
+    # the database wrote within tens of microseconds — acceptable for an
+    # event that downstream consumers treat as wall-clock approximate.
+    from datetime import UTC, datetime
 
     correlation = f"provision_initial:{user_id}"
+    bootstrap_ts = datetime.now(UTC)
     await emit_workspace_created(
-        workspace_id=workspace.id,
-        slug=workspace.slug,
+        workspace_id=workspace_id,
+        slug=slug,
         plan_tier="free",
         created_by_user_id=user_id,
         correlation_id=correlation,
     )
     await emit_cell_created(
-        cell_id=cell.id,
-        workspace_id=workspace.id,
-        created_at=cell.created_at,
-        vertical_template_slug=cell.vertical_template_slug,
+        cell_id=cell_id,
+        workspace_id=workspace_id,
+        created_at=bootstrap_ts,
+        vertical_template_slug=None,
         correlation_id=correlation,
     )
 
     logger.info(
         "multitenancy.provision_initial_workspace.created",
         user_id=str(user_id),
-        workspace_id=str(workspace.id),
-        cell_id=str(cell.id),
+        workspace_id=str(workspace_id),
+        cell_id=str(cell_id),
     )
 
     return WorkspaceProvisionResult(
-        workspace_id=workspace.id,
-        cell_id=cell.id,
+        workspace_id=workspace_id,
+        cell_id=cell_id,
     )
-
-
-async def _call_provision_cell_schema(session: AsyncSession, cell: Cell) -> None:
-    """Invoke the SQL function and validate the returned schema name."""
-    expected = f"cell_{str(cell.id).replace('-', '_')}"
-    result = await session.execute(
-        text("SELECT multitenancy.provision_cell_schema(:cell_id)"),
-        {"cell_id": str(cell.id)},
-    )
-    schema_name = result.scalar()
-    if schema_name != expected:
-        raise CellProvisioningError(
-            f"provision_cell_schema returned {schema_name!r}, expected {expected!r}"
-        )
 
 
 def _narrow_plan_tier(value: str) -> Literal["free", "starter", "pro", "enterprise"]:

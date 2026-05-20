@@ -133,7 +133,19 @@ async def app(
     )
 
     async def override_get_db() -> AsyncIterator[AsyncSession]:
+        # Phase 00.5 Topic 1 RLS Option A: surface the prod RLS failure mode
+        # by running as `oriion_app` (the non-superuser role used in prod)
+        # instead of the testcontainers `oriion` owner. Without this SET
+        # LOCAL ROLE, FORCE-RLS-protected INSERTs in register() would pass
+        # in CI (owner bypasses FORCE RLS) yet fail in prod. With it:
+        #   * Direct INSERTs into multitenancy.{workspaces,cells,cell_members}
+        #     fail unless _shared.current_user_id() IS NOT NULL.
+        #   * multitenancy.bootstrap_first_workspace() (SECURITY DEFINER)
+        #     correctly escapes the RLS check — this is the canary test.
+        # The role auto-resets at COMMIT / ROLLBACK so subsequent fixtures
+        # (db_session_committed teardown TRUNCATE) regain owner privileges.
         async with sessionmaker() as session:
+            await session.execute(text("SET LOCAL ROLE oriion_app"))
             try:
                 yield session
             except Exception:

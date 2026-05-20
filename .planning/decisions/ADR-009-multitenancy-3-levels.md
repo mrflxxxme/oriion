@@ -1,10 +1,12 @@
 # ADR-009: Multitenancy — Cell как domain-first concept + 3 уровня изоляции
 
-- **Status:** Accepted (amendments 2026-05-19, see «Wave 0 implementation decisions» below)
+- **Status:** Accepted (amendments 2026-05-19 + 2026-05-20, see «Wave 0 implementation decisions» below)
 
-## Wave 0 implementation decisions (2026-05-19)
+## Wave 0 implementation decisions (2026-05-19, amended 2026-05-20)
 
 > Amendments adopted as part of the pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR).
+> Bootstrap-exception amendment 2026-05-20: Phase 00.5 Topic 1 RLS Option A
+> landed the register-time SECURITY DEFINER escape per F-ST-4 deferral.
 
 1. **Naming bridge: `organization` → `workspace`.** The legacy DDL term `organizations` is retired in favour of `workspaces` to align with the public IAM API surface (`RegisterResponse.workspace_id`) and the cross-context stubs landed in the architect-PR. Cells reference `workspace_id` (was `organization_id`). RBAC `scope_type` enum becomes `('workspace','cell')`. New code MUST use `workspace`; legacy term appears only in archived session-context files.
 2. **3-GUC layered RLS model.** Every tenant-scoped FastAPI dependency sets three Postgres session locals on every transaction: `app.current_user_id` + `app.current_workspace_id` + `app.current_cell_id`. Each downstream context picks the GUC matching its filter granularity:
@@ -12,8 +14,27 @@
     - `llm_gateway.byok_keys`, `llm_gateway.llm_usage_log` use `app.current_workspace_id`.
     - Per-cell hot tables (`billing.credit_transactions`, future `tasks.*`, `memory.*`) use `app.current_cell_id` for O(1) filter.
     - Missing GUC → `NULL` → default-deny.
+    - **Single production caller (amended 2026-05-20):**
+      `_shared.middleware.tenant_context.get_tenant_db_session` — FastAPI
+      dependency that resolves `(workspace_id, cell_id)` from the JWT'd user
+      via the SECURITY DEFINER helper `multitenancy.resolve_user_first_membership`
+      (Wave-0 single-membership) then wraps the request session with
+      `set_tenant_context`. Wave-1+ replaces the resolver with an
+      `active_workspace_id` JWT claim.
 3. **Eager cell provisioning.** `cell_<uuid>` per-cell schema + `memory_entries` table + HNSW index are created inside the same TX as the `cells` INSERT via SQL function `multitenancy.provision_cell_schema(uuid)`. No lazy first-access bootstrap.
 4. **Cell archive retention.** Archive (`archived_at`) does NOT drop the per-cell schema — retention is 3 years per FZ-152. DROP cleanup deferred to Wave 3.
+5. **Register-time bootstrap escape** (amended 2026-05-20): the
+   `POST /auth/register` flow cannot satisfy the FORCE-RLS INSERT WITH CHECK
+   policies on `multitenancy.{workspaces, cells, cell_members}` because the
+   just-created user has no session and no tenant GUC. Per Phase 00.5 Topic 1
+   (RLS Option A) the bootstrap is delegated to SECURITY DEFINER SQL function
+   `multitenancy.bootstrap_first_workspace(p_user_id, p_workspace_slug,
+   p_display_name)` (migration `multitenancy/0005_bootstrap_first_workspace_function.py`).
+   The function provisions the 4-row tuple (workspace + cell + cell_member with
+   `rbac.system_roles.cell.owner` + per-cell schema) atomically with the user
+   INSERT done by `iam.auth_service.register`. Replay-idempotent on slug
+   lookup. ADR-014 honesty-pass amendment (same date) documents this as the
+   sole production-callable owner-context path. See also: ADR-014 §1.
 
 
 
