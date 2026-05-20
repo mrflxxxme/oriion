@@ -11,6 +11,7 @@
 | Advisory | Package | Status | Justification | Re-review trigger |
 |---|---|---|---|---|
 | `PYSEC-2025-183` / `CVE-2025-45768` | `pyjwt` (all versions) | DISPUTED by upstream (jpadilla) | Claim is "weak encryption when key length is short". Our policy: HS256 + mandatory 32+ char secret per `Settings.jwt_secret_access_v1` field default literally encoding "min-32-chars". No fix version published; advisory has no upper-bound (all versions marked affected). | Re-review at every `pyjwt` bump or when fix version published |
+| `CVE-2025-69872` | `diskcache` 5.6.3 (transitive via `fastmcp` → `pydantic-ai`) | No fix version published as of 2026-05-21 | Not on a runtime critical path for our stack — used internally by `fastmcp` for its own request-caching layer, not for user data or BYOK key material. The other 5 transitive CVEs (CVE-2026-25580 / GHSA-rcfx-77hg-w2wv / CVE-2025-69196 / CVE-2025-64340 / CVE-2026-27124) were closed by bumping pydantic-ai → 1.56+ and fastmcp → 3.2+ in Phase 00.5b post-PR-CI fix. | Re-review when `diskcache` publishes a fix or when `fastmcp` drops the dep |
 
 ## Wave 0 security decisions (2026-05-19, amended 2026-05-20)
 

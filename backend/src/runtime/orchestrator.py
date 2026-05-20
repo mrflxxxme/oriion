@@ -157,7 +157,12 @@ async def execute_agent_task(
         # Pydantic-AI returns an AgentRunResult with .output (or .data,
         # depending on version) — defensive access keeps the bridge
         # version-tolerant.
-        run_result = await coordinator_agent.run(user_prompt, deps=deps)
+        # coordinator_agent is typed Agent[CoordinatorDeps, CoordinatorOutput]
+        # in agents/coordinator.py; here we pass the structurally-compatible
+        # CoordinatorDepsLike shim (the runner-injection seam — see
+        # agents/tools/delegate.py). Wave-1 AC-W1-7 collapses the two via
+        # NullTeamProvisioningService.
+        run_result = await coordinator_agent.run(user_prompt, deps=deps)  # type: ignore[call-overload]
         output = getattr(run_result, "output", None) or getattr(run_result, "data", None)
     except Exception as exc:
         completed_at = datetime.now(UTC)
@@ -203,9 +208,12 @@ async def execute_agent_task(
         task.total_output_tokens = sum(r.tokens_used for r in ctx.leaf_outputs)
     refund_unused(ctx.accumulated_cost, reserved)
 
-    output_dict: dict[str, Any] = (
-        output.model_dump() if hasattr(output, "model_dump") else {"summary": str(output)}
-    )
+    if output is None:
+        output_dict: dict[str, Any] = {"summary": "(no output)"}
+    elif hasattr(output, "model_dump"):
+        output_dict = output.model_dump()
+    else:
+        output_dict = {"summary": str(output)}
     output_dict["total_cost_credits"] = str(ctx.accumulated_cost)
 
     await sse_publisher.publish(

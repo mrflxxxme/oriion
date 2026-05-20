@@ -19,7 +19,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Final
+from typing import Final, cast
 
 import structlog
 from fastapi import FastAPI, Request
@@ -38,6 +38,7 @@ from src.iam.routers.auth import router as auth_router
 from src.iam.routers.me import router as me_router
 from src.llm_gateway.circuit_breaker import ProviderCircuit
 from src.llm_gateway.exceptions import LLMGatewayException
+from src.llm_gateway.providers.base import LLMProvider
 from src.llm_gateway.providers.deepseek import DeepSeekProvider
 from src.llm_gateway.providers.gigachat import GigaChatProvider
 from src.llm_gateway.providers.yandex import YandexGPTProvider
@@ -46,7 +47,7 @@ from src.llm_gateway.routers.chat import router as chat_router
 from src.llm_gateway.routers.embeddings import router as embeddings_router
 from src.llm_gateway.routers.providers import router as providers_router
 from src.llm_gateway.routers.usage import router as usage_router
-from src.llm_gateway.services.kms_provider import LocalAESKMS, YandexKMS
+from src.llm_gateway.services.kms_provider import KMSProvider, LocalAESKMS, YandexKMS
 from src.llm_gateway.services.router_service import LLMRouter
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
 from src.multitenancy.exceptions import MultitenancyError
@@ -129,6 +130,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
 
     # ── KMS provider ─────────────────────────────────────────────────────
+    kms_provider: KMSProvider
     if settings.kms_backend == "yandex":
         kms_provider = YandexKMS()
     else:
@@ -140,19 +142,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # An empty credential just means calls to that provider's HTTP API will
     # fail at request-time — the lifespan boot stays green so routers like
     # /api/v1/llm/providers (health probe) can still answer.
-    providers = {
-        "deepseek": DeepSeekProvider(
-            api_key=settings.deepseek_api_key.get_secret_value(),
-        ),
-        "yandexgpt": YandexGPTProvider(
+    # The provider classes implement the LLMProvider Protocol structurally
+    # (they don't inherit from it). mypy --strict in dict-assignment context
+    # doesn't auto-narrow concrete -> Protocol, so cast() is the explicit
+    # acknowledgement that we've verified the shape matches at the Protocol
+    # boundary in tests/llm_gateway/test_provider_*_mock.py.
+    providers: dict[str, LLMProvider] = {}
+    providers["deepseek"] = cast(
+        LLMProvider,
+        DeepSeekProvider(api_key=settings.deepseek_api_key.get_secret_value()),
+    )
+    providers["yandexgpt"] = cast(
+        LLMProvider,
+        YandexGPTProvider(
             iam_token=settings.yandex_iam_token.get_secret_value(),
             catalog_id=settings.yandex_catalog_id,
         ),
-        "gigachat": GigaChatProvider(
-            auth_key=settings.gigachat_auth_key.get_secret_value(),
-        ),
-    }
-    circuits = {slug: ProviderCircuit(provider_slug=slug) for slug in providers}
+    )
+    providers["gigachat"] = cast(
+        LLMProvider,
+        GigaChatProvider(auth_key=settings.gigachat_auth_key.get_secret_value()),
+    )
+    circuits = {slug: ProviderCircuit(provider=slug) for slug in providers}
     llm_router = LLMRouter(providers=providers, circuits=circuits)
 
     # Stash everything on app.state — llm_gateway.deps reads from here.

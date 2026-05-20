@@ -21,7 +21,7 @@ from src.runtime.sse_publisher import get_sse_publisher
 router = APIRouter(prefix="/cells/{cell_id}/tasks/{task_id}/stream", tags=["tasks"])
 
 
-def _format_sse_event(event_type: str, payload: dict) -> str:
+def _format_sse_event(event_type: str, payload: dict[str, object]) -> str:
     body = json.dumps(payload, default=str, separators=(",", ":"))
     return f"event: {event_type}\ndata: {body}\n\n"
 

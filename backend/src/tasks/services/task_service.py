@@ -100,8 +100,6 @@ class TaskService:
             if row is None:
                 break
             current_id = row
-            if current_id is None:
-                break
             depth += 1
             if depth > DEFAULT_MAX_DELEGATION_DEPTH * 2:  # safety
                 break

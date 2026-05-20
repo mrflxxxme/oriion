@@ -55,15 +55,16 @@ def fake_router(fake_provider):
 
 @pytest.fixture
 def model_request_params():
+    # pydantic-ai 1.56+ renamed `builtin_tools=` to `native_tools=` and removed
+    # `allow_image_output`. Use minimal field set so the fixture survives
+    # incremental pydantic-ai upgrades (only Wave-0-relevant fields).
     return ModelRequestParameters(
         function_tools=[],
-        builtin_tools=[],
         output_mode="text",
         output_object=None,
         output_tools=[],
         prompted_output_template=None,
         allow_text_output=True,
-        allow_image_output=False,
     )
 
 

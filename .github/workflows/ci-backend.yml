@@ -217,7 +217,12 @@ jobs:
         #   default carries the "min-32-chars" requirement literally. No
         #   fix version published; advisory has no upper-bound (all versions
         #   marked affected). Re-review at every pyjwt bump.
-        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183
+        # * CVE-2025-69872 (diskcache) — transitive dep via pydantic-ai/fastmcp.
+        #   No fix version published as of 2026-05-21. Not on a runtime
+        #   critical path for our stack (used internally by fastmcp for
+        #   its own caching, not our user-data). Re-review when diskcache
+        #   publishes a fix or when fastmcp drops the dep.
+        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-69872
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: backend

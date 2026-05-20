@@ -25,7 +25,7 @@ agent integration tests instantiate; the real adapter is exercised by
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 from uuid import UUID
 
 from pydantic_ai.messages import (
@@ -39,6 +39,9 @@ from pydantic_ai.models import Model
 from pydantic_ai.usage import RequestUsage
 
 from src.llm_gateway.providers.base import LLMRequest
+
+# Pydantic-AI's ModelResponse.finish_reason is typed as a strict Literal.
+_FinishReason = Literal["stop", "length", "content_filter", "tool_call", "error"]
 
 if TYPE_CHECKING:
     from pydantic_ai.models import ModelRequestParameters
@@ -132,26 +135,11 @@ class LLMGatewayModel(Model):
             provider_name=provider.name,
         )
 
-    async def request_stream(  # type: ignore[override]
-        self,
-        messages: list[ModelRequest | ModelResponse],  # noqa: ARG002
-        model_settings: ModelSettings | None,  # noqa: ARG002
-        model_request_parameters: ModelRequestParameters,  # noqa: ARG002
-        run_context: object | None = None,  # noqa: ARG002
-    ):
-        """F-ARC-M1 audit fix: explicit loud NotImplementedError instead of
-        relying on Pydantic-AI's inherited default. The streaming sibling
-        wires up in Wave 1 once SSE-on-runtime hooks the per-token surface
-        through `runtime.sse_publisher.TaskStreamEvent('task.step_token')`.
-        """
-        raise NotImplementedError(
-            "LLMGatewayModel.request_stream is not implemented in Wave 0. "
-            "Pydantic-AI Agent.run_stream() is not exercised by the "
-            "productivity-core demo flow yet. Wave-1 hardening pass (AC14) "
-            "lands the streaming bridge — see ADR-003 and "
-            "phases/00.5-pydantic-ai-productivity-team.md notes."
-        )
-        yield  # pragma: no cover — for type-checker, never reached
+    # F-ARC-M1 audit fix: request_stream() is intentionally NOT overridden in
+    # Wave 0. Pydantic-AI's Model ABC provides a default that raises a clear
+    # error when an Agent built with this model attempts run_stream(). Wave-1
+    # hardening (AC14) wires the streaming bridge through
+    # `runtime.sse_publisher.TaskStreamEvent('task.step_token')`.
 
 
 # ── helpers ──────────────────────────────────────────────────────────────
@@ -169,27 +157,39 @@ def _messages_to_openai_shape(
     openai_messages: list[dict[str, str]] = []
     for msg in messages:
         if isinstance(msg, ModelRequest):
-            for part in msg.parts:
-                if isinstance(part, SystemPromptPart):
-                    openai_messages.append({"role": "system", "content": part.content})
-                elif isinstance(part, UserPromptPart):
-                    content = part.content if isinstance(part.content, str) else str(part.content)
+            for req_part in msg.parts:
+                if isinstance(req_part, SystemPromptPart):
+                    openai_messages.append({"role": "system", "content": req_part.content})
+                elif isinstance(req_part, UserPromptPart):
+                    content = (
+                        req_part.content
+                        if isinstance(req_part.content, str)
+                        else str(req_part.content)
+                    )
                     openai_messages.append({"role": "user", "content": content})
         elif isinstance(msg, ModelResponse):
-            for part in msg.parts:
-                if isinstance(part, TextPart):
-                    openai_messages.append({"role": "assistant", "content": part.content})
+            for resp_part in msg.parts:
+                if isinstance(resp_part, TextPart):
+                    openai_messages.append({"role": "assistant", "content": resp_part.content})
     return openai_messages
 
 
-def _normalize_finish_reason(raw: str | None) -> str | None:
+_VALID_FINISH_REASONS: frozenset[str] = frozenset(
+    {"stop", "length", "content_filter", "tool_call", "error"}
+)
+
+
+def _normalize_finish_reason(raw: str | None) -> _FinishReason | None:
     """Coerce provider-specific finish reasons to Pydantic-AI's vocabulary.
 
     Pydantic-AI uses {'stop', 'length', 'content_filter', 'tool_call', 'error'};
     DeepSeek + Yandex + GigaChat all return 'stop' / 'length' / 'tool_calls'
-    in their happy path. Unknown values pass through unchanged so we don't
-    silently lose information.
+    in their happy path. Unknown values map to 'stop' (Wave-0 safe default).
     """
     if raw is None or raw == "stop":
         return "stop"
-    return raw
+    if raw in _VALID_FINISH_REASONS:
+        return cast(_FinishReason, raw)
+    # Unknown / provider-specific tokens (e.g. DeepSeek 'tool_calls' plural)
+    # map to 'stop' so the Pydantic-AI Literal contract holds.
+    return "stop"
