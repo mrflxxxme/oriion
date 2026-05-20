@@ -1,5 +1,40 @@
 # Development Journal
 
+## 2026-05-20 · admiring-chaplygin-7da2f7 · @claude-opus
+- Scope: Phase 00.5a (foundation) — RLS Thread A closure per Topic 1 (Option A) + ADR-014/ADR-009 honesty amendments. Chunked deliverable; Phase 00.5b (router wiring + Pydantic-AI runtime + agents/tasks/runtime + demo + 5-agent audit) ships in follow-up worktree per cut-list philosophy from Topic 2 grill.
+- Done (1 atomic commit, 8 files, 754 insertions / 95 deletions):
+  1. **/grill-me interview** (5 main topics + 4 extras): Topic 1 RLS Option A (SECURITY DEFINER bootstrap), Topic 2 cut-list verbatim (MUST-LAND F-P5-1/2/4(DS+Y+GC)/5/6; SLIP F-P5-3 + GigaChat-OAuth; SKIP M2), Topic 3 custom stub at LLMGatewayModel level with `(role_key, scenario_id)` keying, Topic 4 hybrid demo (CI canned + script for Phase 00.6 staging), Topic 5 first-pass alignment hardening. Extras E2/E3/E4/E5 all ratified.
+  2. **migrations/multitenancy/0005_bootstrap_first_workspace_function.py** — TWO SECURITY DEFINER functions: `bootstrap_first_workspace(p_user_id, p_workspace_slug, p_display_name)` returning `(workspace_id, cell_id, schema_name, was_replay)` provisions 4-row tuple atomically (workspace + cell + cell_member with `cell.owner` role + per-cell schema). Idempotent replay on slug lookup. `resolve_user_first_membership(p_user_id)` companion helper bypasses RLS for the middleware's chicken-and-egg lookup. Both functions `GRANT EXECUTE TO oriion_app`.
+  3. **backend/src/_shared/middleware/tenant_context.py** — new FastAPI dependency `get_tenant_db_session` wrapping `get_db` + `set_tenant_context`. Calls the SECURITY DEFINER resolver, then sets 3 GUCs per request. **SOLE production caller of `set_tenant_context`** — closes Architecture H2 dead-code finding from pre-Phase-05 audit.
+  4. **backend/src/multitenancy/services/workspace_service.py** — `provision_initial_workspace` refactored to delegate to SQL function via `text("SELECT * FROM multitenancy.bootstrap_first_workspace(...)")`. CloudEvents (workspace.created.v1 + cell.created.v1) still emitted from application layer per ADR-024. Orphaned `_call_provision_cell_schema` removed.
+  5. **backend/tests/integration/test_e2e_auth_flow.py::override_get_db** tightened to issue `SET LOCAL ROLE oriion_app` — CI surface now matches production RLS behaviour (was previously masked by testcontainers superuser bypass).
+  6. **backend/tests/multitenancy/test_bootstrap_first_workspace_function.py** — focused integration test under `oriion_app` role asserting: 4-row provisioning + schema name format + cell.owner role assignment + replay idempotency + `resolve_user_first_membership` companion behaviour.
+  7. **ADR-014 §1 honesty-pass amendment** (E3 from grill, F-ST-4 from pre-Phase-05 audit): documents the bootstrap SECURITY DEFINER escape as the SOLE production-callable owner-context path. The «default-deny RLS» claim is no longer aspirational.
+  8. **ADR-009 §5 amendment** cross-references the same bootstrap escape; documents `get_tenant_db_session` as the single production caller of `set_tenant_context`.
+- Decisions resolved verbatim via grill (paste-target for HANDOFF.md):
+  - **T1 RLS:** Option A (SECURITY DEFINER `bootstrap_first_workspace` SQL function)
+  - **T2 Cut-list:** MUST-LAND F-P5-1/2/4(DS+Y+GC chat_stream)/5/6; SLIP F-P5-3 + GigaChat-OAuth; SKIP M2/cost-relax/frontend
+  - **T3 Mock pattern:** Custom stub at LLMGatewayModel level, `(role_key, scenario_id)` keying
+  - **T4 Demo shape:** Hybrid (b) — CI canned + `scripts/demo_market_brief.py` for 00.6 staging
+  - **T5 Prompts:** First-pass alignment hardening; stays 0.x first-draft per ADR-010
+  - **E2:** ADR-024 amendment for sanctioned `llm_gateway → billing.models` (deferred to Phase 00.5b which actually touches the import surface again)
+  - **E3:** ADR-014 honesty-pass with Option-A wording (LANDED THIS PR)
+  - **E4:** pytest-xdist remains disabled
+  - **E5:** No new cross-context model imports without ADR-024 amendment in same PR
+- Audit findings closed by this PR: Architecture H1 (RLS-on-register bootstrap), Architecture H2 (`set_tenant_context` dead code), Compliance H-1 (ADR-014 truthfulness). H3 (sanctioned `llm_gateway → billing.models`) deferred to Phase 00.5b which actually touches that import surface in router wiring.
+- Next (Phase 00.5b session — fresh worktree off post-merge main):
+  - Router wiring + provider DI + exception handlers (Commit 2 per plan)
+  - Per-module coverage gates + router-test convention (Commit 3)
+  - LLMGatewayModel adapter + `pydantic_ai_test_model` fixture (Commit 4)
+  - `agents` bounded context + 4 Pydantic-AI agents + role_prompt_loader (Commit 5)
+  - `tasks` context + runtime (orchestrator + SSE publisher + budget guard) (Commit 6)
+  - Demo flow integration test + 3 chat_stream SSE tests + `scripts/demo_market_brief.py` (Commit 7)
+  - 5-agent audit swarm (MANDATORY deliverable per founder brief)
+  - Final Exit ritual + Phase 00.5 ✅ Complete flip
+- Refs: branch `claude/admiring-chaplygin-7da2f7`; plan `C:\Users\KUklonskiy\.claude\plans\crispy-crunching-sunset.md`; phase spec [`roadmap/wave-0-foundation/phases/00.5-pydantic-ai-productivity-team.md`](./roadmap/wave-0-foundation/phases/00.5-pydantic-ai-productivity-team.md).
+
+---
+
 Append-only журнал AI-агентских сессий. Одна запись на каждую завершённую сессию. Не редактировать прошлые записи — фиксируют состояние на момент завершения.
 
 **Шаблон записи:**
