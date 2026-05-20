@@ -46,6 +46,11 @@ _EXPECTED_ROUTES: Final[list[tuple[str, str]]] = [
     ("/api/v1/agent-archetypes", "GET"),
     ("/api/v1/cells/{cell_id}/agents", "GET"),
     ("/api/v1/cells/{cell_id}/teams", "POST"),
+    # tasks (Phase 00.5b Commit 6)
+    ("/api/v1/cells/{cell_id}/tasks", "POST"),
+    ("/api/v1/cells/{cell_id}/tasks/{task_id}", "GET"),
+    ("/api/v1/cells/{cell_id}/tasks/{task_id}/cancel", "POST"),
+    ("/api/v1/cells/{cell_id}/tasks/{task_id}/stream", "GET"),
 ]
 
 

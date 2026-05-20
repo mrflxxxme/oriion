@@ -53,6 +53,9 @@ from src.multitenancy.exceptions import MultitenancyError
 from src.multitenancy.routers.cells import router as cells_router
 from src.multitenancy.routers.cells import workspace_cells_router
 from src.multitenancy.routers.workspaces import router as workspaces_router
+from src.tasks.exceptions import TasksError
+from src.tasks.routers.stream import router as task_stream_router
+from src.tasks.routers.tasks import router as tasks_router
 
 API_TITLE: Final[str] = "TEAMLY_RU Backend"
 API_DESCRIPTION: Final[str] = (
@@ -210,6 +213,10 @@ app.include_router(archetypes_router, prefix="/api/v1")
 app.include_router(agent_instances_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
 
+# tasks (Phase 00.5b Commit 6 wiring)
+app.include_router(tasks_router, prefix="/api/v1")
+app.include_router(task_stream_router, prefix="/api/v1")
+
 # mcp: Wave 0 is framework-only per ADR-013; no public HTTP surface yet.
 # A `mcp/routers/tools.py` router lands in Wave 1+ when real MCP servers
 # ship — see backend/src/mcp/__init__.py docstring.
@@ -239,6 +246,24 @@ async def iam_error_handler(request: Request, exc: IamError) -> JSONResponse:
         content=body,
         media_type="application/problem+json",
         headers=headers or None,
+    )
+
+
+@app.exception_handler(TasksError)
+async def tasks_error_handler(request: Request, exc: TasksError) -> JSONResponse:
+    body: dict[str, object] = {
+        "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
+        "title": exc.title,
+        "status": exc.status_code,
+        "code": exc.code,
+    }
+    if exc.detail:
+        body["detail"] = exc.detail
+    body["instance"] = str(request.url)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        media_type="application/problem+json",
     )
 
 
