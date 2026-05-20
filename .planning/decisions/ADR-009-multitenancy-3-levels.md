@@ -31,7 +31,7 @@
    `multitenancy.bootstrap_first_workspace(p_user_id, p_workspace_slug,
    p_display_name)` (migration `multitenancy/0005_bootstrap_first_workspace_function.py`).
    The function provisions the 4-row tuple (workspace + cell + cell_member with
-   `rbac.system_roles.cell.owner` + per-cell schema) atomically with the user
+   `rbac.system_roles.owner` (slug) + per-cell schema) atomically with the user
    INSERT done by `iam.auth_service.register`. Replay-idempotent on slug
    lookup. ADR-014 honesty-pass amendment (same date) documents this as the
    sole production-callable owner-context path. See also: ADR-014 §1.

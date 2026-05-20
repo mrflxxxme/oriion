@@ -112,10 +112,10 @@ async def test_inserts_workspace_cell_cell_member_under_oriion_app_role(
         assert cr[0] == "default"
         assert cr[1] == "Default cell"
 
-        # 3. cell_member persisted with cell.owner role
+        # 3. cell_member persisted with 'owner' role (rbac.system_roles seed)
         member_row = await session.execute(
             text(
-                "SELECT m.user_id::text, sr.code "
+                "SELECT m.user_id::text, sr.slug "
                 "FROM multitenancy.cell_members m "
                 "JOIN rbac.system_roles sr ON sr.id = m.role_id "
                 "WHERE m.cell_id = :c"
@@ -125,7 +125,7 @@ async def test_inserts_workspace_cell_cell_member_under_oriion_app_role(
         mr = member_row.first()
         assert mr is not None
         assert mr[0] == user_id
-        assert mr[1] == "cell.owner"
+        assert mr[1] == "owner"
 
         # 4. Per-cell schema materialized
         schema_row = await session.execute(

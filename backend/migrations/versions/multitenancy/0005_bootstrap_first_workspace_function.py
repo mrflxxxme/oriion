@@ -114,14 +114,14 @@ def upgrade() -> None:
             VALUES (v_workspace_id, 'default', 'Default cell')
             RETURNING id INTO v_cell_id;
 
-            -- Add the registrant as a cell_member. The role_id is the
-            -- well-known "system.owner" UUID seeded by rbac/0005_seed_built_in_roles.
-            -- We look it up by code so the seed identifier is the source of
-            -- truth, not a hardcoded UUID.
+            -- Add the registrant as a cell_member with the 'owner' role
+            -- (seeded by rbac/0005_seed_built_in_roles). We resolve by
+            -- `slug` (the rbac.system_roles natural key) so the seed
+            -- identifier is the source of truth, not a hardcoded UUID.
             INSERT INTO multitenancy.cell_members (cell_id, user_id, role_id, invited_by)
             SELECT v_cell_id, p_user_id, sr.id, p_user_id
             FROM rbac.system_roles sr
-            WHERE sr.code = 'cell.owner'
+            WHERE sr.slug = 'owner'
             LIMIT 1;
 
             -- Per-cell schema materialization (delegates to provision_cell_schema

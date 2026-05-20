@@ -22,7 +22,7 @@ The function:
   1. Idempotent slug lookup → on replay returns existing IDs.
   2. INSERT workspace (slug, display_name=email_localpart, plan_tier='free').
   3. INSERT cell (slug='default', display_name='Default cell').
-  4. INSERT cell_member (user → cell with rbac.system_roles 'cell.owner').
+  4. INSERT cell_member (user → cell with rbac.system_roles 'owner').
   5. CALL multitenancy.provision_cell_schema(cell.id) — per-cell schema.
 
 The application layer (this module) emits the CloudEvents (workspace.created.v1
