@@ -338,3 +338,36 @@ def backend_version() -> str:
     import src
 
     return src.__version__
+
+
+# ── Pydantic-AI canned model fixture (T3 mock pattern) ──────────────────
+
+
+@pytest.fixture
+def pydantic_ai_test_model():
+    """Build a ``FakeLLMGatewayModel`` pre-loaded with the «Market & content
+    brief» scenario canned responses.
+
+    Returns a single shared instance — tests that need multiple model
+    instances (one per role) call ``model.set_response(...)`` themselves
+    or instantiate ``FakeLLMGatewayModel`` directly. The fixture seeds the
+    default scenario so the common case ``model.set_scenario(...)`` +
+    ``Agent(model=model)`` works out of the box.
+
+    Per founder-resolved T3 (2026-05-20): NOT pydantic_ai's TestModel;
+    canned ``ModelResponse`` lists keyed by ``(role_key, scenario_id)``;
+    fail-loud on unknown key.
+    """
+    from tests._fixtures.canned_pydantic_ai import FakeLLMGatewayModel
+    from tests._fixtures.canned_pydantic_ai.market_brief_demo import (
+        RESPONSES,
+        SCENARIO_ID,
+    )
+
+    # Default role_key — tests can override per-role by constructing a
+    # second instance via FakeLLMGatewayModel("researcher") etc.
+    model = FakeLLMGatewayModel(role_key="coordinator")
+    for (role_key, scenario_id), responses in RESPONSES.items():
+        model.set_response(role_key, scenario_id, responses)
+    model.set_scenario(SCENARIO_ID)
+    return model

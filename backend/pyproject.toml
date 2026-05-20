@@ -30,6 +30,7 @@ dependencies = [
     "lxml>=6.1,<7.0",                 # readability-lxml dep (>=6.1 fixes CVE-2026-41066)
     "tenacity>=9.0,<10.0",            # circuit-breaker / retry decorators
     "pgvector>=0.3,<0.5",             # SQLAlchemy Vector column type (pgvector helper)
+    "pydantic-ai>=1.30.1",
 ]
 
 [dependency-groups]
@@ -99,6 +100,9 @@ ignore = [
 # since rate-limit is keyed on email only).
 "**/email_service.py" = ["ARG002"]
 "**/auth_service.py" = ["ARG002"]
+# Phase 00.5b: canned RU content for the «Market & content brief» demo.
+# Cyrillic + Latin lookalikes are intentional content, not code style noise.
+"tests/_fixtures/canned_pydantic_ai/*.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -168,6 +172,13 @@ filterwarnings = [
     # issue (HANDOFF.md:120) is cleared.
     "ignore:No path_separator found in configuration:DeprecationWarning:alembic",
     "ignore:The version_path_separator configuration parameter is deprecated:DeprecationWarning:alembic",
+    # Phase 00.5b: pydantic-ai 1.30 imports opentelemetry._events.NoOpEventLogger
+    # which subclasses EventLogger; opentelemetry 1.39+ marks EventLogger as
+    # deprecated in favour of Logger. Upstream pydantic-ai fix tracked at
+    # https://github.com/pydantic/pydantic-ai (issue not yet filed by us —
+    # Wave 1 task). The warning fires at import-time inside opentelemetry,
+    # not via our code, so we ignore the module-keyed pattern.
+    "ignore:You should use .[A-Za-z]+. instead. Deprecated since version 1\\.39\\.0:DeprecationWarning",
 ]
 
 [tool.coverage.run]
