@@ -82,6 +82,19 @@
 | Security | OWASP ZAP + custom | Перед public-релизами |
 | Golden role | LLM-as-judge на 50–200 задач | Каждое изменение role prompt |
 
+### Router-test convention (F-P5-5, ratified Phase 00.5b Commit 3)
+
+Two-layer pattern to cover both per-router handler behaviour AND main.py mount integrity, without duplicating assertions:
+
+| Layer | Where | Pattern | What it catches |
+|---|---|---|---|
+| **Mini-app router unit tests** | `tests/<context>/unit/test_routers.py` | Build a throw-away `FastAPI()` inside the test fixture, `app.include_router(...)` the router under test, install bounded-context exception handlers manually (mirror of `tests/multitenancy/test_workspaces_router.py::_install_multitenancy_handler`), drive via in-process `httpx.AsyncClient(transport=ASGITransport(app=app))`. DI overrides scoped to the throw-away app — no global state. | Handler logic regressions, DI seam wiring, exception envelope shape per RFC 7807. |
+| **Main-app mount smoke** | `tests/integration/test_main_app_routes.py` | Pull the live `app` from `src.main`, parametrize over the expected `(path, method)` pairs, inspect `app.routes` directly. No HTTP calls — purely static introspection. Stays in default `not integration and not live` filter. | "Router accidentally dropped from `main.include_router(...)`" regressions; path/prefix drift between router module and main wiring. |
+
+**Why both:** the mini-app pattern keeps router unit tests fast and isolated (no full app boot), but it can't catch "I forgot to include this router in main.py" — because the unit test always wires its own throw-away app. The mount-smoke layer plugs that gap at near-zero cost (15 parametrized cases, sub-second runtime, no fixtures).
+
+**When to extend:** new router → add a mini-app unit test under `tests/<context>/unit/test_routers.py` AND add the (path, method) pair to `_EXPECTED_ROUTES` in `tests/integration/test_main_app_routes.py`. The mount-smoke also has a `test_all_routers_mounted_under_api_v1` aggregate gap-listing helper that fires when multiple routes are missing simultaneously (e.g. someone deleted two `include_router(...)` lines in one commit).
+
 ## Documentation
 
 - README в каждом пакете/модуле (1 параграф + примеры).
