@@ -23,8 +23,10 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.agents.services.team_provisioning_service import TeamProvisioningService
 from src.audit.services.audit_service import emit_audit_event
 from src.iam import events
 from src.iam.exceptions import (
@@ -92,10 +94,16 @@ class AuthService:
         require_email_verification: bool,
         refresh_ttl_seconds: int,
         access_ttl_seconds: int,
+        team_provisioning_service: TeamProvisioningService | None = None,
     ) -> None:
         # Session is passed in so audit_log inserts + provision_initial_workspace
         # share the request's outer TX with the user / refresh-token writes.
         self._session = session
+        # Phase 00.5b Commit 5: optional injection. Production wiring in
+        # iam/deps.py supplies the real TeamProvisioningService so register()
+        # auto-spawns productivity-core team (AC1). Unit tests pass None to
+        # skip the cross-context call.
+        self._team_provisioning_service = team_provisioning_service
         self._user_repo = user_repo
         self._session_repo = session_repo
         self._refresh_repo = refresh_repo
@@ -158,6 +166,34 @@ class AuthService:
             user_id=user.id,
             email_localpart=cmd.email.split("@", 1)[0],
         )
+
+        # Phase 00.5b Commit 5 AC1: spawn the productivity-core team
+        # automatically when the user's first cell is provisioned. Set the
+        # 3-GUC tenant context first so the FORCE-RLS-protected
+        # agent_instances INSERT passes WITH CHECK under oriion_app role.
+        # The GUCs auto-reset at TX end so this leaks no state across
+        # requests. SAME-TX semantics: bootstrap + team provisioning land
+        # atomically — a failed team provisioning rolls back the workspace.
+        # Skipped when team_provisioning_service is None (unit-test mode);
+        # production wiring in iam/deps.py always supplies it.
+        if self._team_provisioning_service is not None:
+            await self._session.execute(
+                text("SELECT set_config('app.current_user_id', :u, true)"),
+                {"u": str(user.id)},
+            )
+            await self._session.execute(
+                text("SELECT set_config('app.current_workspace_id', :w, true)"),
+                {"w": str(provision.workspace_id)},
+            )
+            await self._session.execute(
+                text("SELECT set_config('app.current_cell_id', :c, true)"),
+                {"c": str(provision.cell_id)},
+            )
+            await self._team_provisioning_service.provision_team(
+                preset_slug="productivity-core",
+                cell_id=provision.cell_id,
+                user_id=user.id,
+            )
 
         # Issue email-verification token
         plaintext = _new_token_plaintext()

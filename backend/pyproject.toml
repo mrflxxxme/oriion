@@ -10,7 +10,7 @@ authors = [{ name = "Kirill Uklonskiy", email = "uklonskiy.k@gmail.com" }]
 dependencies = [
     # FastAPI 0.120+ ships starlette ≥0.49.1 (fixes CVE-2025-54121, CVE-2025-62727).
     "fastapi>=0.120,<0.130",
-    "uvicorn[standard]>=0.32,<0.33",
+    "uvicorn[standard]>=0.35,<0.40",  # bump to satisfy fastmcp >=3.2.0 (security)
     "pydantic>=2.9,<3.0",
     "pydantic-settings>=2.6,<3.0",
     "sqlalchemy[asyncio]>=2.0.36,<3.0",
@@ -25,11 +25,16 @@ dependencies = [
     "email-validator>=2.2,<3.0",
     # Phase 00.4 — LLM Gateway + MCP tools
     "cryptography>=46.0.6,<47.0",     # AES-256-GCM for LocalAESKMS (>=46.0.6 fixes CVE-2026-26007 + CVE-2026-34073)
-    "openai>=1.55,<2.0",              # DeepSeek SDK (uses OpenAI-compatible base_url)
+    "openai>=2.29,<3.0",              # bumped to satisfy pydantic-ai >=1.56 (security)
     "readability-lxml>=0.8,<1.0",     # MCP read_url tool main-content extraction
     "lxml>=6.1,<7.0",                 # readability-lxml dep (>=6.1 fixes CVE-2026-41066)
     "tenacity>=9.0,<10.0",            # circuit-breaker / retry decorators
     "pgvector>=0.3,<0.5",             # SQLAlchemy Vector column type (pgvector helper)
+    # Phase 00.5b post-PR-CI fix: bump to >=1.56.0 closes CVE-2026-25580; also
+    # transitively pulls fastmcp >=3.2.0 which closes 3 fastmcp CVEs at once
+    # (GHSA-rcfx-77hg-w2wv, CVE-2025-69196, CVE-2025-64340, CVE-2026-27124).
+    "pydantic-ai>=1.56.0",
+    "fastmcp>=3.2.0",
 ]
 
 [dependency-groups]
@@ -99,6 +104,9 @@ ignore = [
 # since rate-limit is keyed on email only).
 "**/email_service.py" = ["ARG002"]
 "**/auth_service.py" = ["ARG002"]
+# Phase 00.5b: canned RU content for the «Market & content brief» demo.
+# Cyrillic + Latin lookalikes are intentional content, not code style noise.
+"tests/_fixtures/canned_pydantic_ai/*.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -127,6 +135,7 @@ module = [
     "testcontainers.*",
     "fakeredis.*",
     "pgvector.*",
+    "yaml",
 ]
 ignore_missing_imports = true
 
@@ -168,6 +177,13 @@ filterwarnings = [
     # issue (HANDOFF.md:120) is cleared.
     "ignore:No path_separator found in configuration:DeprecationWarning:alembic",
     "ignore:The version_path_separator configuration parameter is deprecated:DeprecationWarning:alembic",
+    # Phase 00.5b: pydantic-ai 1.30 imports opentelemetry._events.NoOpEventLogger
+    # which subclasses EventLogger; opentelemetry 1.39+ marks EventLogger as
+    # deprecated in favour of Logger. Upstream pydantic-ai fix tracked at
+    # https://github.com/pydantic/pydantic-ai (issue not yet filed by us —
+    # Wave 1 task). The warning fires at import-time inside opentelemetry,
+    # not via our code, so we ignore the module-keyed pattern.
+    "ignore:You should use .[A-Za-z]+. instead. Deprecated since version 1\\.39\\.0:DeprecationWarning",
 ]
 
 [tool.coverage.run]

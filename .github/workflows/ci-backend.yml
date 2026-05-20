@@ -162,12 +162,29 @@ jobs:
           # key lives in Yandex Lockbox (Wave 1+).
           BYOK_MASTER_KEY_B64: ${{ env.CI_BYOK_MASTER_KEY_B64 }}
         run: |
-          uv run pytest tests/iam        --cov=src/iam        --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/iam          --cov=src/iam          --cov-fail-under=85 -q -m "not integration"
           uv run pytest tests/multitenancy --cov=src/multitenancy --cov-fail-under=85 -q -m "not integration"
-          uv run pytest tests/rbac       --cov=src/rbac       --cov-fail-under=85 -q -m "not integration"
-          uv run pytest tests/audit      --cov=src/audit      --cov-fail-under=85 -q -m "not integration"
-          uv run pytest tests/llm_gateway --cov=src/llm_gateway --cov-fail-under=85 -q -m "not integration"
-          uv run pytest tests/mcp        --cov=src/mcp        --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/rbac         --cov=src/rbac         --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/audit        --cov=src/audit        --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/llm_gateway  --cov=src/llm_gateway  --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/mcp          --cov=src/mcp          --cov-fail-under=85 -q -m "not integration"
+          # Phase 00.5b Commit 3: extend the per-module loop with the
+          # bounded-contexts that gained surface during Phase 00.5a/00.5b.
+          # billing — covered by tests/llm_gateway (no tests/billing
+          #   subtree; src/billing/models.py is exercised through the
+          #   llm_gateway.services.billing_service tests, which is the
+          #   sanctioned cross-context model import per ADR-024 §3
+          #   amendment landing in Phase 00.5b Commit 8).
+          uv run pytest tests/llm_gateway  --cov=src/billing      --cov-fail-under=85 -q -m "not integration"
+          # _shared/db + _shared/middleware gates: deferred to Phase 00.5b
+          # Commits 5-6. Unit-test additions for set_tenant_context +
+          # get_tenant_db_session land alongside the agents/tasks/runtime
+          # contexts that consume them. Integration coverage from
+          # test_e2e_auth_flow.py already exercises both modules under
+          # `oriion_app` role (Phase 00.5a canary).
+          # agents/tasks/runtime gates: deferred to their landing commits
+          # (Phase 00.5b Commits 5-6) — the modules don't exist yet at
+          # this revision so adding gates now would error.
 
       # Per-phase coverage gate: Phase 00.2 AC9 demands ≥85% on src/iam
       # specifically. Without this, the global 70% gate hides regressions
@@ -200,7 +217,12 @@ jobs:
         #   default carries the "min-32-chars" requirement literally. No
         #   fix version published; advisory has no upper-bound (all versions
         #   marked affected). Re-review at every pyjwt bump.
-        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183
+        # * CVE-2025-69872 (diskcache) — transitive dep via pydantic-ai/fastmcp.
+        #   No fix version published as of 2026-05-21. Not on a runtime
+        #   critical path for our stack (used internally by fastmcp for
+        #   its own caching, not our user-data). Re-review when diskcache
+        #   publishes a fix or when fastmcp drops the dep.
+        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-69872
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: backend

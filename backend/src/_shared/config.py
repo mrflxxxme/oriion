@@ -113,6 +113,43 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── LLM providers (Phase 00.5b — DeepSeek/YandexGPT/GigaChat DI) ─────
+    # All credentials default to empty SecretStr so app boot does NOT require
+    # them — providers are constructed regardless and fail at request-time if
+    # the credential is missing. The router_service failover chain skips
+    # providers whose circuit is OPEN, so an empty key simply means that
+    # provider is permanently failed-over until a key is supplied.
+    deepseek_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "DeepSeek Bearer API key. Provisioned per environment via "
+            "YC Lockbox (Wave 1+) or .env (Wave 0 dev/staging). Empty in test."
+        ),
+    )
+    yandex_iam_token: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "Yandex Cloud IAM token (Bearer) used by YandexGPTProvider. "
+            "Long-lived OAuth token Wave 0; auto-refresh via yc-iam-token "
+            "lands Wave 1+."
+        ),
+    )
+    yandex_catalog_id: str = Field(
+        default="TBD_YANDEX_CATALOG_ID",
+        description=(
+            "Yandex Cloud catalog (folder) id used in the modelUri scheme: "
+            "`gpt://<catalog_id>/<model>/latest`. Required when "
+            "yandex_iam_token is set."
+        ),
+    )
+    gigachat_auth_key: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "Sber GigaChat Basic auth key (base64-encoded `client_id:client_secret`). "
+            "Used by GigaChatProvider to obtain OAuth tokens on demand."
+        ),
+    )
+
     # ── MCP tools (Phase 00.4 — web_search + read_url) ──────────────────
     web_search_mock_mode: bool = Field(
         default=True,
