@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src._shared.config import Settings, get_settings
 from src._shared.db.redis import get_redis
 from src._shared.db.session import get_db
+from src.agents.services.team_provisioning_service import TeamProvisioningService
 from src.iam.middleware import get_token_service
 from src.iam.repositories.consent_repository import ConsentRepository
 from src.iam.repositories.email_verification_repository import (
@@ -81,4 +82,5 @@ def get_auth_service(
         require_email_verification=settings.require_email_verification,
         refresh_ttl_seconds=settings.refresh_ttl_seconds,
         access_ttl_seconds=settings.jwt_access_ttl_seconds,
+        team_provisioning_service=TeamProvisioningService(db),
     )

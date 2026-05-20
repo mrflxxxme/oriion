@@ -29,6 +29,10 @@ from pydantic import BaseModel
 from src import __version__
 from src._shared.config import Settings, get_settings
 from src._shared.logging import configure_structlog
+from src.agents.exceptions import AgentsError
+from src.agents.routers.archetypes import router as archetypes_router
+from src.agents.routers.instances import router as agent_instances_router
+from src.agents.routers.teams import router as teams_router
 from src.iam.exceptions import IamError, RateLimitExceeded
 from src.iam.routers.auth import router as auth_router
 from src.iam.routers.me import router as me_router
@@ -201,6 +205,11 @@ app.include_router(byok_router, prefix="/api/v1")
 app.include_router(providers_router, prefix="/api/v1")
 app.include_router(usage_router, prefix="/api/v1")
 
+# agents (Phase 00.5b Commit 5 wiring)
+app.include_router(archetypes_router, prefix="/api/v1")
+app.include_router(agent_instances_router, prefix="/api/v1")
+app.include_router(teams_router, prefix="/api/v1")
+
 # mcp: Wave 0 is framework-only per ADR-013; no public HTTP surface yet.
 # A `mcp/routers/tools.py` router lands in Wave 1+ when real MCP servers
 # ship — see backend/src/mcp/__init__.py docstring.
@@ -230,6 +239,24 @@ async def iam_error_handler(request: Request, exc: IamError) -> JSONResponse:
         content=body,
         media_type="application/problem+json",
         headers=headers or None,
+    )
+
+
+@app.exception_handler(AgentsError)
+async def agents_error_handler(request: Request, exc: AgentsError) -> JSONResponse:
+    body: dict[str, object] = {
+        "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
+        "title": exc.title,
+        "status": exc.status_code,
+        "code": exc.code,
+    }
+    if exc.detail:
+        body["detail"] = exc.detail
+    body["instance"] = str(request.url)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        media_type="application/problem+json",
     )
 
 

@@ -42,6 +42,10 @@ _EXPECTED_ROUTES: Final[list[tuple[str, str]]] = [
     ("/api/v1/llm/byok-keys", "GET"),
     ("/api/v1/llm/providers", "GET"),
     ("/api/v1/llm/usage", "GET"),
+    # agents (Phase 00.5b Commit 5)
+    ("/api/v1/agent-archetypes", "GET"),
+    ("/api/v1/cells/{cell_id}/agents", "GET"),
+    ("/api/v1/cells/{cell_id}/teams", "POST"),
 ]
 
 
