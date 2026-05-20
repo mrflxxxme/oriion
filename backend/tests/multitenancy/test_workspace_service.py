@@ -1,13 +1,14 @@
 """Unit: workspace_service — provision_initial_workspace orchestration.
 
-Mocks repos + emit_cloudevent and asserts the call order + arguments. No
-DB touched.
+Mocks session.execute + emit_cloudevent and asserts the call shape +
+arguments to the new SECURITY DEFINER `multitenancy.bootstrap_first_workspace`
+SQL function (introduced in migration
+``multitenancy/0005_bootstrap_first_workspace_function.py`` per Phase 00.5
+Topic 1, RLS Option A, 2026-05-20). No DB touched.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -36,45 +37,35 @@ def test_sanitize_slug_trims_leading_trailing_dashes() -> None:
     assert _sanitize_slug("---abc---") == "abc"
 
 
-def _fake_session_returning(expected_schema: str) -> AsyncMock:
-    """Build an AsyncMock that yields the expected schema name from execute()."""
+def _fake_session_returning(row: tuple[str, str, str, bool] | None) -> AsyncMock:
+    """Build an AsyncMock whose execute() result.first() returns the given row.
+
+    Row tuple shape matches the SQL function output:
+        (workspace_id::text, cell_id::text, schema_name, was_replay)
+    """
     session = AsyncMock()
     result = MagicMock()
-    result.scalar.return_value = expected_schema
+    result.first.return_value = row
     session.execute = AsyncMock(return_value=result)
     return session
 
 
 @pytest.mark.asyncio
 async def test_provision_initial_workspace_happy_path() -> None:
+    """Fresh-create path: bootstrap function returns was_replay=False,
+    both CloudEvents emitted, WorkspaceProvisionResult populated.
+    """
     user_id = uuid4()
     workspace_id = uuid4()
     cell_id = uuid4()
     expected_schema = f"cell_{str(cell_id).replace('-', '_')}"
 
-    session = _fake_session_returning(expected_schema)
-
-    fake_workspace = SimpleNamespace(
-        id=workspace_id, slug="user", display_name="user", plan_tier="free"
-    )
-    fake_cell = SimpleNamespace(
-        id=cell_id,
-        workspace_id=workspace_id,
-        slug="default",
-        created_at=datetime.now(UTC),
-        vertical_template_slug=None,
-    )
+    session = _fake_session_returning((str(workspace_id), str(cell_id), expected_schema, False))
 
     with (
-        patch("src.multitenancy.services.workspace_service.WorkspaceRepository") as mock_wr,
-        patch("src.multitenancy.services.workspace_service.CellRepository") as mock_cr,
         patch("src.multitenancy.services.workspace_service.emit_workspace_created") as mock_emit_ws,
         patch("src.multitenancy.services.workspace_service.emit_cell_created") as mock_emit_cell,
     ):
-        mock_wr.return_value.find_by_slug_active = AsyncMock(return_value=None)
-        mock_wr.return_value.create = AsyncMock(return_value=fake_workspace)
-        mock_cr.return_value.create = AsyncMock(return_value=fake_cell)
-        mock_cr.return_value.find_by_workspace_slug = AsyncMock(return_value=None)
         mock_emit_ws.return_value = None
         mock_emit_cell.return_value = None
 
@@ -88,48 +79,50 @@ async def test_provision_initial_workspace_happy_path() -> None:
     assert result.workspace_id == workspace_id
     assert result.cell_id == cell_id
 
-    # workspace created with the sanitized slug + free plan
-    mock_wr.return_value.create.assert_awaited_once()
-    create_kwargs = mock_wr.return_value.create.await_args.kwargs
-    assert create_kwargs["slug"] == "user"
-    assert create_kwargs["plan_tier"] == "free"
+    # SQL function called once with sanitized slug + email_localpart
+    session.execute.assert_awaited_once()
+    call_args = session.execute.await_args
+    statement = str(call_args.args[0])
+    params = call_args.args[1]
+    assert "multitenancy.bootstrap_first_workspace" in statement
+    assert params["user_id"] == str(user_id)
+    assert params["slug"] == "user"
+    assert params["display_name"] == "user"
 
-    # cell created with slug='default' under the new workspace
-    mock_cr.return_value.create.assert_awaited_once()
-    cell_kwargs = mock_cr.return_value.create.await_args.kwargs
-    assert cell_kwargs["slug"] == "default"
-    assert cell_kwargs["workspace_id"] == workspace_id
-
-    # provision_cell_schema invoked
-    session.execute.assert_awaited()
-
-    # Both CloudEvents emitted
+    # Both CloudEvents emitted with correct workspace_id + cell_id
     mock_emit_ws.assert_awaited_once()
+    ws_kwargs = mock_emit_ws.await_args.kwargs
+    assert ws_kwargs["workspace_id"] == workspace_id
+    assert ws_kwargs["slug"] == "user"
+    assert ws_kwargs["plan_tier"] == "free"
+    assert ws_kwargs["created_by_user_id"] == user_id
+
     mock_emit_cell.assert_awaited_once()
+    cell_kwargs = mock_emit_cell.await_args.kwargs
+    assert cell_kwargs["cell_id"] == cell_id
+    assert cell_kwargs["workspace_id"] == workspace_id
+    # Wave-0 productivity-core: vertical_template_slug is always None
+    assert cell_kwargs["vertical_template_slug"] is None
 
 
 @pytest.mark.asyncio
 async def test_provision_initial_workspace_idempotent_replay() -> None:
-    """Re-invocation with same email_localpart returns existing IDs."""
+    """Replay path: bootstrap function returns was_replay=True with existing
+    IDs; NO CloudEvents emitted (already fired on first registration).
+    """
     user_id = uuid4()
     existing_workspace_id = uuid4()
     existing_cell_id = uuid4()
+    expected_schema = f"cell_{str(existing_cell_id).replace('-', '_')}"
 
-    session = AsyncMock()
+    session = _fake_session_returning(
+        (str(existing_workspace_id), str(existing_cell_id), expected_schema, True)
+    )
 
     with (
-        patch("src.multitenancy.services.workspace_service.WorkspaceRepository") as mock_wr,
-        patch("src.multitenancy.services.workspace_service.CellRepository") as mock_cr,
         patch("src.multitenancy.services.workspace_service.emit_workspace_created") as mock_emit_ws,
         patch("src.multitenancy.services.workspace_service.emit_cell_created") as mock_emit_cell,
     ):
-        existing_workspace = SimpleNamespace(id=existing_workspace_id, slug="user")
-        existing_cell = SimpleNamespace(id=existing_cell_id)
-        mock_wr.return_value.find_by_slug_active = AsyncMock(return_value=existing_workspace)
-        mock_cr.return_value.find_by_workspace_slug = AsyncMock(return_value=existing_cell)
-        mock_wr.return_value.create = AsyncMock()
-        mock_cr.return_value.create = AsyncMock()
-
         result = await provision_initial_workspace(
             session=session, user_id=user_id, email_localpart="user"
         )
@@ -137,42 +130,38 @@ async def test_provision_initial_workspace_idempotent_replay() -> None:
     assert result.workspace_id == existing_workspace_id
     assert result.cell_id == existing_cell_id
 
-    # No new rows created
-    mock_wr.return_value.create.assert_not_awaited()
-    mock_cr.return_value.create.assert_not_awaited()
-    # No events emitted on replay
+    # SQL function called once (idempotency lives inside the function itself)
+    session.execute.assert_awaited_once()
+
+    # No CloudEvents on replay
     mock_emit_ws.assert_not_awaited()
     mock_emit_cell.assert_not_awaited()
-    # No SQL provisioning either
-    session.execute.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_provision_initial_workspace_provision_cell_schema_mismatch() -> None:
-    """A bogus schema name from the SQL function bubbles up as CellProvisioningError."""
+async def test_provision_initial_workspace_schema_mismatch_raises() -> None:
+    """SQL function returns mismatched schema_name → CellProvisioningError."""
     user_id = uuid4()
     workspace_id = uuid4()
     cell_id = uuid4()
+    bogus_schema = "cell_BOGUS"
 
-    session = _fake_session_returning("cell_BOGUS")
+    session = _fake_session_returning((str(workspace_id), str(cell_id), bogus_schema, False))
 
-    fake_workspace = SimpleNamespace(id=workspace_id)
-    fake_cell = SimpleNamespace(
-        id=cell_id,
-        workspace_id=workspace_id,
-        created_at=datetime.now(UTC),
-        vertical_template_slug=None,
-    )
+    with pytest.raises(CellProvisioningError, match="returned schema"):
+        await provision_initial_workspace(session=session, user_id=user_id, email_localpart="user")
 
-    with (
-        patch("src.multitenancy.services.workspace_service.WorkspaceRepository") as mock_wr,
-        patch("src.multitenancy.services.workspace_service.CellRepository") as mock_cr,
-    ):
-        mock_wr.return_value.find_by_slug_active = AsyncMock(return_value=None)
-        mock_wr.return_value.create = AsyncMock(return_value=fake_workspace)
-        mock_cr.return_value.create = AsyncMock(return_value=fake_cell)
 
-        with pytest.raises(CellProvisioningError):
-            await provision_initial_workspace(
-                session=session, user_id=user_id, email_localpart="user"
-            )
+@pytest.mark.asyncio
+async def test_provision_initial_workspace_no_row_raises() -> None:
+    """SQL function returns None (RETURNING no row) → CellProvisioningError.
+
+    Defensive check — bootstrap_first_workspace always returns exactly one
+    row per contract, but the application surface treats the absence as a
+    500-class operator-investigates error.
+    """
+    user_id = uuid4()
+    session = _fake_session_returning(None)
+
+    with pytest.raises(CellProvisioningError, match="returned no row"):
+        await provision_initial_workspace(session=session, user_id=user_id, email_localpart="user")

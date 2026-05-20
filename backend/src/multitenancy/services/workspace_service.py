@@ -182,8 +182,7 @@ async def provision_initial_workspace(
     row = result.first()
     if row is None:
         raise CellProvisioningError(
-            "multitenancy.bootstrap_first_workspace returned no row "
-            "(expected exactly 1)."
+            "multitenancy.bootstrap_first_workspace returned no row " "(expected exactly 1)."
         )
     workspace_id_str, cell_id_str, schema_name, was_replay = row
     workspace_id = UUID(str(workspace_id_str))

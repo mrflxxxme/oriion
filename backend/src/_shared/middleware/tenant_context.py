@@ -41,7 +41,7 @@ from src._shared.db.session import get_db
 from src.iam.middleware import AuthenticatedUser, get_current_user
 
 
-class TenantContextMissing(RuntimeError):
+class TenantContextMissingError(RuntimeError):
     """Raised when an authenticated user has no workspace membership.
 
     Wave-0 invariant violation. Bubbles to a 500 unless the caller maps it.
@@ -71,7 +71,7 @@ async def _resolve_tenant_ids(
     )
     row = result.first()
     if row is None:
-        raise TenantContextMissing(
+        raise TenantContextMissingError(
             f"User {user_id} has no cell membership — Wave-0 invariant violation "
             "(every user must have a workspace + default cell from register)."
         )

@@ -92,6 +92,7 @@ ignore = [
 # FastAPI idiom: Depends() / Header() in argument defaults is the canonical pattern.
 "**/routers/**" = ["B008"]
 "**/middleware.py" = ["B008"]
+"**/middleware/**" = ["B008"]
 "**/deps.py" = ["B008"]
 # Protocol implementations + anti-enum stubs intentionally ignore some args
 # (NoOpEmailSender drops token/expires_at; resend/forgot ignore user_agent
