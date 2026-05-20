@@ -490,33 +490,10 @@ async def test_consent_pdn_missing_blocks_register_before_provision(
     assert (row.scalar() or 0) == 0
 
 
-async def test_llm_chat_endpoint_is_not_yet_wired(app: FastAPI) -> None:
-    """Phase 00.5 contract gate: /api/v1/llm/* is not yet included in main.py.
-
-    This test pins the current reality so anyone wiring the LLM routers
-    in Phase 00.5 sees a flipped assertion and re-routes the relevant
-    smoke from "404 expected" to "200 (or 501 until provider DI)".
-    """
-    async with _client(app) as client:
-        r = await client.post(
-            "/api/v1/llm/chat/completions",
-            json={
-                "model": "deepseek-chat",
-                "messages": [{"role": "user", "content": "ping"}],
-            },
-        )
-        # main.py only includes auth + me routers; /api/v1/llm/* returns 404.
-        assert r.status_code == 404, (
-            "If this flipped to 501 (or 200), Phase 00.5 has wired the LLM "
-            "router — update this assertion + extend the E2E to cover the "
-            "full provider matrix per launch-checklist Section 5."
-        )
-
-        # Same for embeddings + byok — pin all three.
-        r = await client.post(
-            "/api/v1/llm/embeddings",
-            json={"model": "text-embedding-3-small", "input": "hi"},
-        )
-        assert r.status_code == 404
-        r = await client.get("/api/v1/llm/byok-keys")
-        assert r.status_code == 404
+# Phase 00.5b Commit 2 (2026-05-20): the `test_llm_chat_endpoint_is_not_yet_wired`
+# negative-canary test that previously pinned the un-wired /api/v1/llm/* surface
+# has been deleted now that main.py mounts the llm_gateway routers under
+# /api/v1. The replacement positive-smoke for router mounting lives in
+# `tests/integration/test_main_app_routes.py::test_all_routers_mounted_under_api_v1`.
+# Full provider-matrix coverage (chat, embeddings, byok end-to-end) lands in
+# Phase 00.5b Commit 7 via `tests/agents/test_market_brief_demo_flow.py`.
