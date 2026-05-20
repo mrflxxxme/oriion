@@ -338,6 +338,7 @@ _LLM_GATEWAY_STATUS: dict[str, int] = {
     "llm_gateway.byok_key_not_found": 404,
     "llm_gateway.kms_error": 500,
     "llm_gateway.circuit_open": 503,
+    "llm_gateway.lifespan_not_ready": 503,
     "llm_gateway.unknown": 502,
 }
 _LLM_GATEWAY_TITLES: dict[str, str] = {
@@ -347,6 +348,7 @@ _LLM_GATEWAY_TITLES: dict[str, str] = {
     "llm_gateway.byok_key_not_found": "BYOK key not found",
     "llm_gateway.kms_error": "KMS operation failed",
     "llm_gateway.circuit_open": "LLM provider circuit open",
+    "llm_gateway.lifespan_not_ready": "LLM gateway not initialized",
     "llm_gateway.unknown": "LLM gateway error",
 }
 

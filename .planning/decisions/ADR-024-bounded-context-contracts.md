@@ -1,6 +1,6 @@
 ﻿# ADR-024: Bounded-context contracts — 10 контекстов в `contracts/` + CloudEvents 1.0 + naming corrections
 
-- **Status:** Accepted (amendments 2026-05-19: «Naming bridge: organization → workspace» + «Sanctioned cross-context exceptions»)
+- **Status:** Accepted (amendments 2026-05-19: «Naming bridge: organization → workspace» + «Sanctioned cross-context exceptions»; re-confirmed 2026-05-21 by Phase 00.5b audit — no new sanctioned imports added by Commits 2-7 router wiring + agents/tasks/runtime contexts)
 
 ## Naming bridge: organization → workspace (2026-05-19)
 
@@ -126,8 +126,15 @@ PR #30 architecture audit:
   require a distributed transaction (out of Wave 0 scope).
 - **Audit history:** flagged as architecture H1 by the PR #30 audit;
   re-confirmed as sanctioned by the PR #32 architecture audit + the
-  cross-phase pre-Phase-05 architecture audit. This amendment makes it
-  explicit so future agents don't re-litigate the same trade-off.
+  cross-phase pre-Phase-05 architecture audit + the Phase 00.5b 5-agent
+  audit (2026-05-21, AUDIT-2026-05-20-PHASE-00-5/section-04). Phase 00.5b
+  Commit 2 router wiring re-touched the import surface (lifespan
+  provider DI + llm_gateway/deps.py) without introducing any new
+  cross-context model imports — verified via
+  `git grep "^from src\.[a-z_]+\.models" backend/src/` returning only
+  the pre-sanctioned line at `llm_gateway/services/billing_service.py:26`.
+  This amendment makes it explicit so future agents don't re-litigate
+  the same trade-off.
 - **Wave-1 follow-up candidates** (when extracting llm_gateway to a
   microservice or splitting billing/credits into a separate context):
   1. Move `CreditTransaction` write into `llm_gateway.repositories.cost_ledger`
@@ -138,9 +145,52 @@ PR #30 architecture audit:
   3. Distributed transaction via 2PC (only if/when the contexts physically
      split across services)
 
+### Exception #2 — `runtime → tasks.{models.Task, events, exceptions}` (2026-05-21)
+
+- **Importing files:**
+  - `backend/src/runtime/orchestrator.py`: `from src.tasks.models import Task`
+  - `backend/src/runtime/orchestrator.py`: `from src.tasks import events as tasks_events`
+  - `backend/src/runtime/orchestrator.py`: `from src.tasks.exceptions import BudgetExceeded` (via budget_guard)
+- **Justification:** the `runtime` bounded context is by design the
+  **execution layer** for `tasks`. Per Phase 00.5 phase-spec the runtime
+  drives the Task state machine (queued → running → succeeded/failed/
+  cancelled) and persists per-step rows. The two contexts have separate
+  surfaces (tasks owns "what to record", runtime owns "how it runs") but
+  share a single physical schema. Pure event-driven decoupling would
+  require an outbox + idempotent processor for every state transition —
+  out of Wave-0 scope.
+- **Audit history:** flagged + re-approved by the Phase 00.5b 5-agent
+  audit (F-ARC-H1 in
+  `_session-context/AUDIT-2026-05-20-PHASE-00-5/section-04-architecture.md`).
+- **Wave-1 follow-up candidates:**
+  1. Move `Task` mutations behind a `TaskRepository` port in
+     `src/tasks/repositories/`; runtime depends on the port, not the
+     model directly
+  2. Adopt an outbox pattern with `task.state_changed` events for state
+     transitions
+  3. Promote `runtime` to a sibling top-level bounded context with its
+     own `contracts/runtime/` if it grows beyond the orchestrator
+     (currently ~250 LoC across 5 files)
+
+### Service-call edges (sanctioned by default — NOT model imports)
+
+The following cross-context dependencies are **service-class imports**,
+not model imports, so they fall outside the strict "no cross-context
+model imports" rule. Listed here for transparency only; no amendment is
+required to add them:
+
+| Importing file | Imported class | Purpose |
+|---|---|---|
+| `backend/src/iam/services/auth_service.py` | `agents.services.TeamProvisioningService` | AC1 — auto-spawn productivity-core team at register |
+| `backend/src/iam/deps.py` | `agents.services.TeamProvisioningService` | DI wiring for `AuthService` |
+| `backend/src/agents/{coordinator,researcher,writer,analyst}.py` | `llm_gateway.pydantic_ai_model.LLMGatewayModel` | Pydantic-AI Model adapter (T3) |
+
+These edges are DAG (no cycles — verified by Phase 00.5b Backend
+Architect audit).
+
 ### Adding new sanctioned exceptions
 
-Any new cross-context model import must:
+Any new cross-context **model** import must:
 1. Be approved by an audit (PR-scoped or cross-phase) with explicit
    architectural justification
 2. Be added to this amendment list with importing-file:line + Wave-1

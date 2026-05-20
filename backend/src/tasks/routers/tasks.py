@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src._shared.db.session import get_db
+from src._shared.middleware.tenant_context import get_tenant_db_session
 from src.iam.middleware import AuthenticatedUser, get_current_user
 from src.tasks.schemas import TaskCreateRequest, TaskOut
 from src.tasks.services.task_service import TaskService
@@ -15,7 +15,9 @@ from src.tasks.services.task_service import TaskService
 router = APIRouter(prefix="/cells/{cell_id}/tasks", tags=["tasks"])
 
 
-def get_task_service(db: AsyncSession = Depends(get_db)) -> TaskService:
+def get_task_service(db: AsyncSession = Depends(get_tenant_db_session)) -> TaskService:
+    """F-SEC-H1 fix: tenant-scoped session so FORCE-RLS on tasks.tasks
+    passes WITH CHECK on INSERT + filters on SELECT under oriion_app."""
     return TaskService(db)
 
 

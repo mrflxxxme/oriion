@@ -149,11 +149,42 @@ async def execute_agent_task(
         runner=runner_with_orchestration,
     )
 
-    # Run the agent. Pydantic-AI returns an AgentRunResult with .output (or
-    # .data, depending on version) — defensive access keeps the bridge
-    # version-tolerant.
-    run_result = await coordinator_agent.run(user_prompt, deps=deps)
-    output = getattr(run_result, "output", None) or getattr(run_result, "data", None)
+    # F-ARC-M2 audit fix: wrap Agent.run() in a try/except so any uncaught
+    # exception (budget exceeded, provider failure, tool-call error) emits
+    # task.failed via SSE — subscribers exit cleanly instead of hanging,
+    # and reserved budget is refunded before propagation.
+    try:
+        # Pydantic-AI returns an AgentRunResult with .output (or .data,
+        # depending on version) — defensive access keeps the bridge
+        # version-tolerant.
+        run_result = await coordinator_agent.run(user_prompt, deps=deps)
+        output = getattr(run_result, "output", None) or getattr(run_result, "data", None)
+    except Exception as exc:
+        completed_at = datetime.now(UTC)
+        if task is not None:
+            task.status = "failed"
+            task.completed_at = completed_at
+            task.total_cost_credits = ctx.accumulated_cost
+        refund_unused(ctx.accumulated_cost, reserved)
+        error_code = getattr(exc, "code", exc.__class__.__name__)
+        await sse_publisher.publish(
+            TaskStreamEvent(
+                event_type="task.failed",
+                task_id=task_id,
+                payload={
+                    "error_code": str(error_code),
+                    "error_message": str(exc),
+                    "retry_possible": False,
+                    "total_cost_credits": str(ctx.accumulated_cost),
+                },
+            )
+        )
+        await tasks_events.emit_task_failed(
+            task_id=task_id,
+            error_code=str(error_code),
+            retry_possible=False,
+        )
+        raise
 
     # Cost rollup + completion stamp.
     completed_at = datetime.now(UTC)
@@ -162,8 +193,14 @@ async def execute_agent_task(
         task.status = "succeeded"
         task.completed_at = completed_at
         task.total_cost_credits = ctx.accumulated_cost
-        task.total_input_tokens = sum(r.tokens_used // 2 for r in ctx.leaf_outputs)  # rough split
-        task.total_output_tokens = sum(r.tokens_used // 2 for r in ctx.leaf_outputs)
+        # F-CR-M1 audit fix: per-leaf result already encodes tokens_used as
+        # a single total; honest accounting is to sum them on output_tokens
+        # (matches provider-side convention where the completion is the
+        # downstream-billable side) and leave input_tokens as zero at
+        # Wave-0 granularity. Per-step persistence with proper split lands
+        # Wave-1 alongside the Pydantic-AI per-step instrumentation hook.
+        task.total_input_tokens = 0
+        task.total_output_tokens = sum(r.tokens_used for r in ctx.leaf_outputs)
     refund_unused(ctx.accumulated_cost, reserved)
 
     output_dict: dict[str, Any] = (

@@ -24,8 +24,9 @@ from __future__ import annotations
 from types import ModuleType
 from typing import TYPE_CHECKING
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 
+from src.llm_gateway.exceptions import LLMGatewayException
 from src.llm_gateway.services import byok_service as _byok_service_module
 
 if TYPE_CHECKING:
@@ -33,24 +34,28 @@ if TYPE_CHECKING:
     from src.llm_gateway.services.router_service import LLMRouter
 
 
-def _require_state(request: Request, attr: str) -> object:
-    """Pull an attribute off ``request.app.state`` or 503 if lifespan didn't run.
+class _LLMGatewayLifespanNotReady(LLMGatewayException):
+    """F-CR-M3 audit fix: pass through the LLMGatewayException handler
+    (RFC-7807 problem+json envelope) instead of bare HTTPException so the
+    503 surface matches the iam canonical error shape."""
 
-    Returning 503 (rather than 500) gives the founder a clear signal: the
-    process started but the lifespan boot-path didn't populate state. This
-    most commonly happens in test contexts that forgot to wrap the app
-    with `LifespanManager` AND forgot to add a ``dependency_overrides``
-    entry — that's a wiring bug, not a runtime fault.
+    code = "llm_gateway.lifespan_not_ready"
+
+
+def _require_state(request: Request, attr: str) -> object:
+    """Pull an attribute off ``request.app.state`` or raise if lifespan didn't run.
+
+    The LLMGatewayException handler in src.main maps unknown codes to 502
+    by default; this class lands at 503 via the _LLM_GATEWAY_STATUS map
+    entry below. Either way the response carries the RFC-7807 envelope
+    the iam handler established as the canonical shape.
     """
     value = getattr(request.app.state, attr, None)
     if value is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                f"llm_gateway.{attr} is not on app.state. Lifespan startup "
-                "did not run, or a test forgot to override the dependency. "
-                "See src/llm_gateway/deps.py for guidance."
-            ),
+        raise _LLMGatewayLifespanNotReady(
+            f"llm_gateway.{attr} is not on app.state. Lifespan startup did "
+            "not run, or a test forgot to override the dependency. See "
+            "src/llm_gateway/deps.py for guidance."
         )
     return value
 

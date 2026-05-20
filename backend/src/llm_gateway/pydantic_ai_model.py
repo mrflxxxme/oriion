@@ -132,6 +132,27 @@ class LLMGatewayModel(Model):
             provider_name=provider.name,
         )
 
+    async def request_stream(  # type: ignore[override]
+        self,
+        messages: list[ModelRequest | ModelResponse],  # noqa: ARG002
+        model_settings: ModelSettings | None,  # noqa: ARG002
+        model_request_parameters: ModelRequestParameters,  # noqa: ARG002
+        run_context: object | None = None,  # noqa: ARG002
+    ):
+        """F-ARC-M1 audit fix: explicit loud NotImplementedError instead of
+        relying on Pydantic-AI's inherited default. The streaming sibling
+        wires up in Wave 1 once SSE-on-runtime hooks the per-token surface
+        through `runtime.sse_publisher.TaskStreamEvent('task.step_token')`.
+        """
+        raise NotImplementedError(
+            "LLMGatewayModel.request_stream is not implemented in Wave 0. "
+            "Pydantic-AI Agent.run_stream() is not exercised by the "
+            "productivity-core demo flow yet. Wave-1 hardening pass (AC14) "
+            "lands the streaming bridge — see ADR-003 and "
+            "phases/00.5-pydantic-ai-productivity-team.md notes."
+        )
+        yield  # pragma: no cover — for type-checker, never reached
+
 
 # ── helpers ──────────────────────────────────────────────────────────────
 

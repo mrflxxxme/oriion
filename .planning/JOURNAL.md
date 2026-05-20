@@ -1,5 +1,48 @@
 # Development Journal
 
+## 2026-05-21 · phase-00-5b-runtime · @claude-opus
+- Scope: Phase 00.5b — code-complete. 6 atomic commits 2-7 + MANDATORY 5-agent audit swarm + Commit 8 (ADR-024 §3 amendment expansion + in-loop audit fixes + Exit ritual). Closes Wave 0 anchor (`internal_demo_passed=true` testable end-to-end via canned data; staging validation in Phase 00.6 per T4 hybrid). Continues from 2026-05-20 mid-session checkpoint (Commits 2-3 had already landed on the same branch).
+- Done (8 atomic commits off post-merge main = origin/main HEAD `0360955`):
+  1. **Commit 2** `7c00b43` (carryover from 2026-05-20) — main.py router wiring + lifespan provider DI + llm_gateway/deps.py + Settings provider credentials promotion. 5 files / +452 / -32. mcp routers intentionally NOT mounted (Wave-0 framework-only per ADR-013).
+  2. **Commit 3** `e0aaba3` (carryover) — CI per-module gate for billing + F-P5-5 router-test two-layer convention doc. 2 files / +35 / -5.
+  3. **Commit 4** `8cbc7f7` — pydantic-ai 1.30.1 dep + `LLMGatewayModel(Model)` adapter wrapping LLMRouter + `FakeLLMGatewayModel` canned-response Model subclass + `tests/_fixtures/canned_pydantic_ai/market_brief_demo.py` with `(role_key, scenario_id)`-keyed canned `ModelResponse` lists. T3 fail-loud invariants (RuntimeError / KeyError / IndexError) exercised by 4 dedicated tests. AC9 invariants validated by ledger functions: brief 1554 RU words (≥1500), matrix 5 rows (≥5), content-plan exactly 10 posts. `pydantic_ai_test_model` fixture in tests/conftest.py pre-seeds all 4 roles. 9 files / +1041. Added opentelemetry-deprecation-warning ignore for the pydantic-ai 1.30 transitive chain.
+  4. **Commit 5** `3da3bac` — `agents` bounded context. 3 migrations (agent_archetypes, team_presets, agent_instances) with FORCE-RLS via `app.current_cell_id` GUC + 14 src/agents/ files (models / schemas / exceptions / events / 3 services / 3 routers / delegate tool / seed_data / 4 agent factories) + role-prompt 9-section parser with frontmatter validation. `TeamProvisioningService(session=db)` wired into `auth_service.register` (AC1) with inline 3-GUC `set_config()` calls. Optional `team_provisioning_service=None` constructor default so unit-only AuthService tests stay mock-friendly; production wiring in `iam/deps.py::get_auth_service` always supplies the real service. 31 files / +1733. Cross-context import note: `iam → agents` service-class import + `agents → llm_gateway.LLMGatewayModel` adapter — both sanctioned-by-default service-call edges (NOT model imports — see ADR-024 §3 amendment in Commit 8).
+  5. **Commit 6** `fbf23d8` — `tasks` + `runtime`. 3 migrations (tasks, task_steps, task_artifacts) with FORCE-RLS + Task/TaskStep/TaskArtifact SQLAlchemy 2.x models + Pydantic schemas + TasksError hierarchy + `task_service.create_task` (delegation-depth guard) + `cancel_task` (BFS-walker cascade) + `cost_rollup_service.rollup_task_cost` (atomic parent-chain walk) + tasks routers (CRUD + SSE stream). `src/runtime/`: `SSEPublisher` Protocol + `InProcessSSEPublisher` with drain-replay queue, `TaskStreamEvent` model, `BudgetGuard` (50 T-credit cap stateless guard), orchestrator (Agent.run() + runner-adapter wrapping with SSE delegation events + cost accumulation). `test_record_llm_cost_raises_budget_exceeded_above_50_credits` lands as canonical F-P5-2 closure (AC10 anchor). 22 files / +1320.
+  6. **Commit 7** `6cd8808` — Demo flow + 3 provider chat_stream tests + runnable demo script. `tests/agents/test_market_brief_demo_flow.py` exercises SSE event order + cost rollup + AC9 artifact-shape invariants via the orchestrator's runner directly with canned DelegateResults (the full Agent.run() tool-call path lands in Wave-1 hardening per AC14 — docstring annotates the scope clarification). `tests/agents/test_cancel_cascade.py` covers AC12 BFS walker behaviour via `_StubSession` shim. `tests/llm_gateway/test_provider_{deepseek,yandex,gigachat}_chat_stream.py` — 8 tests across 3 providers covering SSE (`data: ...`) + NDJSON (Yandex) + OAuth refresh (GigaChat double-endpoint MockTransport) + malformed-chunk + keepalive tolerance. `backend/scripts/demo_market_brief.py` runnable end-to-end against deployed API: args `--api-base-url --jwt --cell-id --runs N --output dir`; per-run JSON + summary.json with p95/cost cohort stats; exit codes 0/1/2 for AC pass / AC fail / infra error. 6 files / +1012.
+  7. **5-agent audit swarm (MANDATORY per founder brief, 2026-05-21)** — 5 parallel `Agent` calls writing to `_session-context/AUDIT-2026-05-20-PHASE-00-5/section-XX.md`:
+     - Code Reviewer (PASS-WITH-FIXES; 0H/3M/6L)
+     - Security Engineer (APPROVE WITH CAVEATS; 1H/3M/2L)
+     - Test Results Analyzer (PASS-WITH-FIXES; 0H/2M/3L — section file flushed by consolidator after agent terminated pre-write)
+     - Backend Architect (APPROVE WITH FOLLOW-UPS; 2H/5M/3L)
+     - Compliance Auditor (PASS WITH DEFERRED; 0H/2M/3L)
+     Total: 3 HIGH / 15 MEDIUM / 17 LOW across 5 sections. Master AUDIT-REPORT.md consolidates verdicts + disposition matrix.
+  8. **Commit 8** — `.planning/decisions/ADR-024-bounded-context-contracts.md` §3 amendment expansion: Exception #2 added for `runtime → tasks.{models, events, exceptions}` per F-ARC-H1 with full justification + Wave-1 follow-up candidates; service-call edges enumerated as transparency-only DAG (iam→agents, agents→llm_gateway). In-loop audit fixes: F-SEC-H1 (3 routers migrated to `get_tenant_db_session`), F-ARC-M2 (orchestrator emits `task.failed` SSE + CloudEvent on exception + refunds budget), F-ARC-M1 (`LLMGatewayModel.request_stream` explicit `NotImplementedError`), F-CR-M3 (`deps.py` `_LLMGatewayLifespanNotReady(LLMGatewayException)` with 503 in `_LLM_GATEWAY_STATUS`), F-CR-M1 (orchestrator token-split bug removed; tokens_used sums into output_tokens). Exit ritual: STATUS.md + HANDOFF.md + JOURNAL.md + Phase 00.5 ✅ Complete flip + PR open.
+- HIGH findings disposition:
+  - **F-SEC-H1** (agents/tasks routers using raw `get_db`) — FIXED IN-LOOP
+  - **F-ARC-H1** (ADR-024 §3 enumerate Phase 00.5b cross-context imports) — FIXED IN-LOOP
+  - **F-ARC-H2** (SSEPublisher singleton vs app.state multi-worker) — DEFERRED to Wave-1 AC pin AC-W1-1 (Redis pubsub swap)
+- Wave-1 AC pin block (lift verbatim into `phases/01.1-retro.md`):
+  - AC-W1-1..10 enumerated in AUDIT-REPORT.md (SSE-pubsub swap, per-step TaskStep persistence, Master-Agent schema extension, TaskRepository port + outbox, cancel_cascade real-PG testcontainers, GUC helper extraction, NullTeamProvisioningService, DelegateInput pattern constraint, YC Lockbox key rotation, GigaChat OAuth refresh-after-expiry)
+- Decisions: no new grills. All Phase 00.5a topics (T1-T5 + E2-E5) stand verbatim. ADR-024 §3 expansion follows the existing structure with Exception #2 added.
+- Verification:
+  ```
+  cd backend
+  uv run python -c 'from src.main import app; print(len(app.routes))'   # -> 39
+  uv run pytest tests -q -m 'not integration'                            # -> 440 PASS, 23 deselected
+  uv run ruff check src tests                                            # -> All checks passed!
+  uv run ruff format --check src tests                                   # -> 237 files already formatted
+  uv run python scripts/demo_market_brief.py --help                      # -> argparse OK
+  ```
+- AC scoreboard final:
+  - ✅ AC1, AC2, AC3, AC4, AC5, AC6, AC9, AC11, AC12, AC14
+  - 🟡 AC7 (Phase 00.7 UI dependency), AC8/AC10 (PROVEN-IN-CI-canned / VALIDATED-IN-STAGING pending Phase 00.6), AC13 (agents 100%; tasks/runtime per-module ≥85% gate deferred to Phase 00.6)
+- Pitfalls confirmed (carryover):
+  - Worktree-prefixed paths only; oriion_app role canary in CI; rbac.system_roles natural key `slug`; ADR-024 §3 amendment landed in SAME PR; no pytest-xdist; `.claude/settings.local.json` gitignored; CVE drift registry per ADR-014
+- Refs: branch `claude/phase-00-5b-runtime`; commits `7c00b43..6cd8808` + Commit 8 (ADR-024 + audit fixes + Exit ritual); plan persists at `C:\Users\KUklonskiy\.claude\plans\crispy-crunching-sunset.md`; audit master at `_session-context/AUDIT-2026-05-20-PHASE-00-5/AUDIT-REPORT.md`; phase-spec at `roadmap/wave-0-foundation/phases/00.5-pydantic-ai-productivity-team.md`.
+- Next: Phase 00.6 (deploy + observability + staging demo run via `scripts/demo_market_brief.py --runs 10` to collect AC8/AC10 gate evidence). Wave 0 anchor `internal_demo_passed=true` flips upon staging-run success.
+
+---
+
 ## 2026-05-20 · phase-00-5b-runtime · @claude-opus
 - Scope: Phase 00.5b — mid-session checkpoint after Commits 2-3 (router wiring + provider DI + CI gate extension + router-test convention). Commits 4-8 + 5-agent audit swarm + Exit-ritual-Phase-Complete flip deferred to a follow-up session due to scope-vs-budget realism (Commit 4 requires `uv add pydantic-ai` + Pydantic-AI Model ABC research; Commits 5-6 land 3 new bounded contexts with ~25 new files + 6 migrations; the founder-mandated 5-agent audit + consolidation needs to run against a code-complete Phase 00.5b surface, not a partial one).
 - Done (2 atomic commits off post-merge main = origin/main HEAD `0360955`):

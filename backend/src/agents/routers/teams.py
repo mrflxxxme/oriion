@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src._shared.db.session import get_db
+from src._shared.middleware.tenant_context import get_tenant_db_session
 from src.agents.models import TeamPreset
 from src.agents.schemas import (
     AgentInstanceOut,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/cells/{cell_id}/teams", tags=["agents"])
 
 
 def get_team_provisioning_service(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db_session),
 ) -> TeamProvisioningService:
     return TeamProvisioningService(db)
 
@@ -35,7 +35,7 @@ def get_team_provisioning_service(
 async def provision_team(
     cell_id: UUID,
     payload: TeamProvisionRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db_session),
     auth: AuthenticatedUser = Depends(get_current_user),
     service: TeamProvisioningService = Depends(get_team_provisioning_service),
 ) -> TeamProvisionResponse:
