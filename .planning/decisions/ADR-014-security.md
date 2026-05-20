@@ -2,6 +2,16 @@
 
 - **Status:** Accepted (amendments 2026-05-19 + 2026-05-20, see «Wave 0 security decisions»)
 
+## Pip-audit ignored advisories registry (audit-trail)
+
+> Each ignored advisory MUST be re-reviewed at the next dependency bump
+> of the affected package. CI hooks: `.github/workflows/ci-backend.yml`
+> step `pip-audit (CVE scan)`.
+
+| Advisory | Package | Status | Justification | Re-review trigger |
+|---|---|---|---|---|
+| `PYSEC-2025-183` / `CVE-2025-45768` | `pyjwt` (all versions) | DISPUTED by upstream (jpadilla) | Claim is "weak encryption when key length is short". Our policy: HS256 + mandatory 32+ char secret per `Settings.jwt_secret_access_v1` field default literally encoding "min-32-chars". No fix version published; advisory has no upper-bound (all versions marked affected). | Re-review at every `pyjwt` bump or when fix version published |
+
 ## Wave 0 security decisions (2026-05-19, amended 2026-05-20)
 
 > Adopted in the pre-Phase-00.3 contract extension (Phase 00.3 + 00.4 combined PR).

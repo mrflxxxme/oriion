@@ -191,7 +191,16 @@ jobs:
         # --skip-editable: skip local project (teamly-backend) — not on PyPI.
         # --strict NOT used: treats skip-editable как error. Default exit
         # behavior still fails CI если найдены CVE в audited packages.
-        run: uv run pip-audit --skip-editable
+        #
+        # Ignored vulnerabilities (each requires a documented rationale):
+        # * PYSEC-2025-183 (pyjwt, CVE-2025-45768) — DISPUTED by upstream
+        #   maintainer (jpadilla). Claim: "weak encryption" if key length
+        #   chosen by application is short. Our usage: HS256 with mandatory
+        #   32+ char secret per ADR-014 + Settings.jwt_secret_access_v1
+        #   default carries the "min-32-chars" requirement literally. No
+        #   fix version published; advisory has no upper-bound (all versions
+        #   marked affected). Re-review at every pyjwt bump.
+        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: backend
