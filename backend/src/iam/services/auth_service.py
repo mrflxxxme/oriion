@@ -23,9 +23,9 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src._shared.db.rls import set_tenant_context
 from src.agents.services.team_provisioning_service import TeamProvisioningService
 from src.audit.services.audit_service import emit_audit_event
 from src.iam import events
@@ -167,33 +167,30 @@ class AuthService:
             email_localpart=cmd.email.split("@", 1)[0],
         )
 
-        # Phase 00.5b Commit 5 AC1: spawn the productivity-core team
-        # automatically when the user's first cell is provisioned. Set the
-        # 3-GUC tenant context first so the FORCE-RLS-protected
-        # agent_instances INSERT passes WITH CHECK under oriion_app role.
-        # The GUCs auto-reset at TX end so this leaks no state across
-        # requests. SAME-TX semantics: bootstrap + team provisioning land
-        # atomically — a failed team provisioning rolls back the workspace.
-        # Skipped when team_provisioning_service is None (unit-test mode);
-        # production wiring in iam/deps.py always supplies it.
+        # Phase 00.5b Commit 5 AC1 / Phase 00.6 Commit 3 hygiene refactor:
+        # spawn the productivity-core team automatically when the user's
+        # first cell is provisioned. The 3-GUC tenant context must be set
+        # before the FORCE-RLS-protected agent_instances INSERT passes WITH
+        # CHECK under oriion_app. We delegate to the canonical async-cm
+        # `set_tenant_context` helper from `_shared/db/rls.py` instead of
+        # repeating inline `SELECT set_config()` plumbing (closes F-CR-M2 +
+        # F-ARC-M4 from Phase 00.5b audit). GUCs auto-reset at TX end so no
+        # state leaks across requests; SAME-TX semantics preserved — a
+        # failed team provisioning rolls back the workspace. Skipped when
+        # team_provisioning_service is None (unit-test mode); production
+        # wiring in iam/deps.py always supplies it.
         if self._team_provisioning_service is not None:
-            await self._session.execute(
-                text("SELECT set_config('app.current_user_id', :u, true)"),
-                {"u": str(user.id)},
-            )
-            await self._session.execute(
-                text("SELECT set_config('app.current_workspace_id', :w, true)"),
-                {"w": str(provision.workspace_id)},
-            )
-            await self._session.execute(
-                text("SELECT set_config('app.current_cell_id', :c, true)"),
-                {"c": str(provision.cell_id)},
-            )
-            await self._team_provisioning_service.provision_team(
-                preset_slug="productivity-core",
+            async with set_tenant_context(
+                self._session,
+                workspace_id=provision.workspace_id,
                 cell_id=provision.cell_id,
                 user_id=user.id,
-            )
+            ):
+                await self._team_provisioning_service.provision_team(
+                    preset_slug="productivity-core",
+                    cell_id=provision.cell_id,
+                    user_id=user.id,
+                )
 
         # Issue email-verification token
         plaintext = _new_token_plaintext()
