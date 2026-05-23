@@ -12,6 +12,7 @@ Multi-version operation per ADR-024:
 from __future__ import annotations
 
 import asyncio
+import configparser
 import os
 from logging.config import fileConfig
 from typing import TYPE_CHECKING
@@ -25,8 +26,21 @@ if TYPE_CHECKING:
 
 config = context.config
 
+# Force UTF-8 read of alembic.ini. Python's configparser (and Alembic's
+# memoized Config.file_config) default to locale.getencoding(), which on
+# Windows ru-RU is cp1251 — non-ASCII commentary inside alembic.ini blows up
+# with UnicodeDecodeError. We shadow Alembic's memoized_property by pre-
+# loading alembic.ini with explicit encoding="utf-8" and writing the parsed
+# instance directly into config.__dict__, sidestepping the lazy descriptor.
+# logging.config.fileConfig (Python 3.10+) accepts an encoding kwarg of its
+# own, so the logger section is loaded with the same encoding contract.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    _here = os.path.abspath(os.path.dirname(config.config_file_name))
+    _utf8_parser = configparser.ConfigParser({"here": _here})
+    with open(config.config_file_name, encoding="utf-8") as _ini_f:
+        _utf8_parser.read_file(_ini_f)
+    config.__dict__["file_config"] = _utf8_parser
+    fileConfig(config.config_file_name, encoding="utf-8")
 
 # Phase 00.3 entry-point: импортировать MetaData всех bounded contexts.
 # Пока target_metadata = None, autogenerate disabled до появления models.
