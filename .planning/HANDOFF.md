@@ -95,17 +95,54 @@ Then for Phase 00.6 continuation:
 6. `git log eb31ff8..HEAD --oneline` для cross-check Phase 00.6 commits landed so far
 7. TaskList — 14-task PR-A ledger; resume task #4 (C4 — OpenTelemetry SDK setup)
 
-## Founder action (parallel с next agent C4-C14 work)
+## Founder action — ✅ COMPLETE (2026-05-23, mid-session)
 
-Provision live LLM keys для Stage A local validation acceptance (per decision #6):
-1. **DeepSeek API key** — https://platform.deepseek.com/api_keys. Save в `backend/.env.local` as `DEEPSEEK_API_KEY=sk-...`
-2. **YandexGPT** — Yandex Cloud service account → `iam token` + `folder/catalog ID`. Save:
-   ```
-   YANDEX_IAM_TOKEN=t1...
-   YANDEX_CATALOG_ID=b1g...
-   ```
-3. **GigaChat OAuth** — https://developers.sber.ru/portal/products/gigachat. Save `GIGACHAT_AUTH_KEY=Basic ...`
-4. Optional: install Terraform для Stage B prep — `winget install Hashicorp.Terraform`
+Provisioning + smoke-verification of Stage A local validation environment landed in this session. `backend/.env` (gitignored via `.gitignore:2` exact match) populated by Claude after founder handed over keys + SA ID.
+
+### Provider state matrix
+
+| Provider | Key in .env | Live API smoke | Notes |
+|---|---|---|---|
+| **DeepSeek** | `DEEPSEEK_API_KEY` (35 chars, `sk-...`) | ✅ HTTP 200 `GET /v1/models` returns 2 reachable models | Models now `deepseek-v4-flash` + `deepseek-v4-pro` (ADR-018 spec referenced V3/R1 — V4 generation now active; may need ADR-018 amendment when Phase 00.6 PR-B wires real provider calls) |
+| **YandexGPT** | `YANDEX_IAM_TOKEN` (309 chars, `t1.9...`) + `YANDEX_CATALOG_ID=b1g74vf7snhebom5avhu` | ✅ HTTP 200 `POST /foundationModels/v1/completion` returns alternative from `yandexgpt-lite` | SA `multiofiice` (id `ajen5nokvbqalrt97tbd`), folder `b1g74vf7snhebom5avhu`, cloud `b1g51vfp3equ73s7hv94`. IAM token minted via `yc iam create-token --impersonate-service-account-id ajen5nokvbqalrt97tbd`. **TTL ~12h — refresh required before each long session** (see runbook below) |
+| **GigaChat** | `GIGACHAT_AUTH_KEY` (100 chars, `Basic ...`) | ⚠️ Format-valid; OAuth exchange BLOCKED by TLS trust | `ngw.devices.sberbank.ru:9443` uses Russian Trusted Root CA which is NOT в Windows default trust store NOR in Python certifi bundle. Founder-action resolution needed before C13 local-smoke runs GigaChat. Three paths documented в C13 runbook plan |
+| **BYOK_MASTER_KEY_B64** | 44 chars (32-byte AES key, fresh) | ✅ KMS_BACKEND=local; LocalAESKMS ready | Generated via `python -c "import secrets, base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"` |
+
+### Tooling state matrix
+
+| Tool | Status |
+|---|---|
+| Docker Desktop 28.5.1 + Compose v2.40.0 + WSL2 | ✅ Working |
+| yc CLI 0.150.0 | ✅ Authenticated; cloud=`b1g51vfp3equ73s7hv94`, folder=`b1g74vf7snhebom5avhu` |
+| Terraform v1.15.4 | ✅ Installed at `%LOCALAPPDATA%\Microsoft\WinGet\Links\terraform.exe` — **PATH refresh required** (open new shell or run `refreshenv`) before `terraform init` |
+| Python 3.13 + uv + httpx | ✅ Working; 73/73 iam unit tests pass on this branch |
+| Settings load smoke | ✅ Verified: `Settings()` reads all 8 critical env vars (deepseek/yandex/gigachat/kms/byok/fx) without UnicodeDecodeError or ValidationError |
+
+### YC IAM token refresh runbook (TTL ~12h)
+
+```powershell
+# Mint fresh IAM token and replace value in backend/.env
+$tok = (yc iam create-token --impersonate-service-account-id ajen5nokvbqalrt97tbd).Trim()
+(Get-Content backend\.env) -replace '^YANDEX_IAM_TOKEN=.*', "YANDEX_IAM_TOKEN=$tok" | Set-Content backend\.env -Encoding utf8
+"Token refreshed: $($tok.Length) chars"
+```
+
+Stage B (PR-B Terraform deploy) will replace this manual refresh с YC Lockbox + lifespan-injected SA key per ADR-014 §2 KMSProvider migration path.
+
+### GigaChat TLS trust resolution paths (C13 runbook will pick one)
+
+| Path | Pros | Cons |
+|---|---|---|
+| **(a) Install Russian Trusted Root CA system-wide** | Persistent across reboots; works for any tool на машине | Founder runs `certutil` from gosuslugi.ru bundle once; system-trust mutation |
+| **(b) Append RU CA to Python certifi bundle** | Per-Python-install; reversible | Hack — breaks on Python upgrade; needs `python -m pip install certifi-yandex-ca` or manual cacert.pem patch |
+| **(c) GIGACHAT_VERIFY_SSL=false (dev only)** | Zero setup | Defeats TLS; never в staging/prod; provider class already supports via `verify_ssl=False` ctor arg |
+
+**Stage A local recommendation**: path (a). C13 runbook will document step-by-step + cite https://www.gosuslugi.ru/crt as source.
+
+### Carryover hygiene noted during provisioning (not blocking)
+
+- **`.env.example` стale**: lines 69-70 use `YANDEX_GPT_API_KEY` + `YANDEX_GPT_CATALOG_ID` (legacy Phase 00.4 naming) but Settings actually uses `YANDEX_IAM_TOKEN` + `YANDEX_CATALOG_ID`. Fix in C13 docs commit (1-line edit к .env.example).
+- **ADR-018 model gen drift**: spec references DeepSeek V3/R1; live API now ships V4-flash + V4-pro. Add ADR-018 amendment в PR-B Stage B finalization (model-routing table refresh).
 
 ## Phase 00.6 PR-A — C4-C14 work plan (for next session)
 
