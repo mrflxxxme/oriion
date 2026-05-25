@@ -35,6 +35,16 @@ dependencies = [
     # (GHSA-rcfx-77hg-w2wv, CVE-2025-69196, CVE-2025-64340, CVE-2026-27124).
     "pydantic-ai>=1.56.0",
     "fastmcp>=3.2.0",
+    # Phase 00.6 — observability stack. pydantic-ai pulls opentelemetry-api/sdk
+    # transitively; we pin explicit versions for our own setup_otel() control
+    # and add auto-instrumentation + OTLP gRPC exporter + prometheus_client.
+    "opentelemetry-api>=1.39,<2.0",
+    "opentelemetry-sdk>=1.39,<2.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.39,<2.0",
+    "opentelemetry-instrumentation-fastapi>=0.60b0",
+    "opentelemetry-instrumentation-httpx>=0.60b0",
+    "opentelemetry-instrumentation-asyncpg>=0.60b0",
+    "prometheus-client>=0.21,<0.22",
 ]
 
 [dependency-groups]

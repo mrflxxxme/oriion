@@ -29,6 +29,7 @@ from pydantic import BaseModel
 from src import __version__
 from src._shared.config import Settings, get_settings
 from src._shared.logging import configure_structlog
+from src._shared.observability import setup_otel, shutdown_otel
 from src.agents.exceptions import AgentsError
 from src.agents.routers.archetypes import router as archetypes_router
 from src.agents.routers.instances import router as agent_instances_router
@@ -129,6 +130,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     settings = get_settings()
 
+    # ── Observability (Phase 00.6 Commit 4) ──────────────────────────────
+    # Setup OpenTelemetry BEFORE provider construction so outbound httpx
+    # calls (DeepSeek/YandexGPT/GigaChat) are auto-instrumented from the
+    # very first request. setup_otel is idempotent + feature-gated via
+    # Settings.otel_traces_enabled — unit tests с in-memory exporters can
+    # short-circuit cleanly.
+    setup_otel(
+        service_name=settings.otel_service_name,
+        otlp_endpoint=settings.otel_exporter_otlp_endpoint,
+        enabled=settings.otel_traces_enabled,
+    )
+    # FastAPI instrumentation needs the app object; safe to call after
+    # FastAPI() construction. The instrumentor handles "already instrumented"
+    # idempotently when lifespan re-enters in tests.
+    if settings.otel_traces_enabled:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+
     # ── KMS provider ─────────────────────────────────────────────────────
     kms_provider: KMSProvider
     if settings.kms_backend == "yandex":
@@ -183,6 +203,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         _logger.info("lifespan.shutdown")
+        shutdown_otel()
 
 
 app = FastAPI(
