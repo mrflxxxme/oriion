@@ -190,6 +190,16 @@ class Settings(BaseSettings):
             "don't need an exporter and want fastest startup."
         ),
     )
+    log_format: Literal["auto", "json", "console"] = Field(
+        default="auto",
+        description=(
+            "structlog renderer selection. 'auto' = JSON в staging/prod, "
+            "ConsoleRenderer в dev/test (legacy behaviour). 'json' force-overrides "
+            "так что docker-compose-staging-local stack can emit Loki-parseable "
+            "JSON even with app_env=dev. 'console' force-overrides для local "
+            "human-debug runs."
+        ),
+    )
 
     # ── Helpers ─────────────────────────────────────────────────────────
     @property
