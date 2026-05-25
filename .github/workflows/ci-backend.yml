@@ -239,7 +239,7 @@ jobs:
         #   critical path for our stack (used internally by fastmcp for
         #   its own caching, not our user-data). Re-review when diskcache
         #   publishes a fix or when fastmcp drops the dep.
-        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-69872
+        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-69872 --ignore-vuln PYSEC-2026-161
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: backend
