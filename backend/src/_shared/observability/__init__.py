@@ -15,12 +15,31 @@ cross-context import — observability uses only `_shared/config.py` to read
 Settings.
 """
 
+from src._shared.observability.metrics import (
+    LLM_COST_RUB,
+    LLM_LATENCY,
+    LLM_PROVIDER_HEALTH,
+    LLM_REQUEST_TOTAL,
+    LLM_TOKENS_INPUT,
+    LLM_TOKENS_OUTPUT,
+    TASK_DURATION,
+    TASK_QUEUE_DEPTH,
+    TASK_TOTAL,
+    register_default_metrics,
+)
 from src._shared.observability.otel_setup import setup_otel, shutdown_otel
 
-# Prometheus metrics module lands в Commit C5; until then this package
-# exposes only OpenTelemetry surface.
-
 __all__ = [
+    "LLM_COST_RUB",
+    "LLM_LATENCY",
+    "LLM_PROVIDER_HEALTH",
+    "LLM_REQUEST_TOTAL",
+    "LLM_TOKENS_INPUT",
+    "LLM_TOKENS_OUTPUT",
+    "TASK_DURATION",
+    "TASK_QUEUE_DEPTH",
+    "TASK_TOTAL",
+    "register_default_metrics",
     "setup_otel",
     "shutdown_otel",
 ]

@@ -29,7 +29,7 @@ from pydantic import BaseModel
 from src import __version__
 from src._shared.config import Settings, get_settings
 from src._shared.logging import configure_structlog
-from src._shared.observability import setup_otel, shutdown_otel
+from src._shared.observability import register_default_metrics, setup_otel, shutdown_otel
 from src.agents.exceptions import AgentsError
 from src.agents.routers.archetypes import router as archetypes_router
 from src.agents.routers.instances import router as agent_instances_router
@@ -149,6 +149,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         FastAPIInstrumentor.instrument_app(app)
 
+    # Prometheus metrics — register defaults + assert all 9 metrics present.
+    # /metrics endpoint mounted ниже в module-level code (after app
+    # construction). Phase 00.6 ships REGISTRATION ONLY; per-callsite
+    # instrumentation в orchestrator/router_service is Wave-1 AC-W1-2.
+    register_default_metrics()
+
     # ── KMS provider ─────────────────────────────────────────────────────
     kms_provider: KMSProvider
     if settings.kms_backend == "yandex":
@@ -215,12 +221,28 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Prometheus /metrics — mounted at module-level так что endpoint доступен
+# даже когда lifespan ещё не отработал (e.g. health-probe от docker compose
+# в первые секунды до register_default_metrics). The ASGI app reads from
+# the global REGISTRY which has all 9 metrics registered at import-time
+# (Counter/Gauge/Histogram constructors run on metrics.py import).
+from prometheus_client import make_asgi_app  # noqa: E402
+
+app.mount("/metrics", make_asgi_app())
+
 
 # ── routes ────────────────────────────────────────────────────────────────
 
 
 @app.get("/health", response_model=HealthResponse, tags=["meta"])
 async def health() -> HealthResponse:
+    return HealthResponse(status="ok", version=__version__)
+
+
+@app.get("/healthz", response_model=HealthResponse, tags=["meta"])
+async def healthz() -> HealthResponse:
+    """Kubernetes-style liveness probe alias. Used by docker-compose
+    healthcheck + Caddy upstream health-check per Phase 00.6 spec."""
     return HealthResponse(status="ok", version=__version__)
 
 
