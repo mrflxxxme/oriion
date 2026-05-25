@@ -1,0 +1,105 @@
+# Caddyfile.staging — Phase 00.6 Stage A + Stage B.
+#
+# Single Caddyfile serving both real YC staging (CADDY_TLS=on + STAGING_
+# DOMAIN=staging.${BRAND_DOMAIN}) и local founder validation (CADDY_TLS=
+# off + STAGING_DOMAIN=localhost).
+#
+# Behaviour:
+#   * CADDY_TLS=on  → Caddy auto-issues Let's Encrypt cert через ACME for
+#                      the configured STAGING_DOMAIN. Real DNS required.
+#   * CADDY_TLS=off → Caddy serves plain HTTP only; useful для local
+#                      validation where founder hits http://localhost:8080.
+#
+# Routes:
+#   /api/*                    → backend:8000 (FastAPI)
+#   /api/cells/.+/tasks/.+/stream → backend:8000 (SSE — flush_interval -1)
+#   /metrics                  → backend:8000 (Prometheus exposition)
+#   /grafana/*                → grafana:3000 (gated by Caddy basic-auth)
+#   /                         → frontend (Phase 00.7) ИЛИ placeholder
+
+{
+    # Global options. auto_https off allows STAGING_DOMAIN=localhost к work
+    # без ACME. When CADDY_TLS=on, founder removes this line OR sets
+    # STAGING_DOMAIN к a real FQDN so Caddy switches к auto-HTTPS path.
+    auto_https off
+
+    # Admin API bound к 0.0.0.0:2019 so Prometheus can scrape /metrics
+    # (caddy job in prometheus.yml).
+    admin {$CADDY_ADMIN_LISTEN:0.0.0.0:2019}
+}
+
+{$STAGING_DOMAIN:localhost} {
+    # Backend API
+    @api {
+        path /api/*
+    }
+    handle @api {
+        reverse_proxy backend:8000
+    }
+
+    # SSE long-poll endpoint — disable Caddy buffering так что events
+    # реachate the client immediately (per Phase 00.6 spec).
+    @sse_stream {
+        path_regexp ^/api/cells/[^/]+/tasks/[^/]+/stream/?$
+    }
+    handle @sse_stream {
+        reverse_proxy backend:8000 {
+            flush_interval -1
+        }
+    }
+
+    # Prometheus /metrics — backend ASGI mount
+    @metrics {
+        path /metrics /metrics/*
+    }
+    handle @metrics {
+        reverse_proxy backend:8000
+    }
+
+    # Grafana — basic-auth gated. Wave-0 ships empty bcrypt; founder
+    # generates via `docker run --rm caddy:2-alpine caddy hash-password
+    # --plaintext '<pwd>'` and sets env GRAFANA_BASIC_AUTH_BCRYPT.
+    @grafana {
+        path /grafana/*
+    }
+    handle_path /grafana/* {
+        basic_auth {
+            {$GRAFANA_BASIC_AUTH_USER:admin} {$GRAFANA_BASIC_AUTH_BCRYPT}
+        }
+        reverse_proxy grafana:3000
+    }
+
+    # Frontend SPA fallback. Phase 00.7 frontend ship populates /srv/
+    # frontend volume; until then Caddy returns 404 на root которое
+    # Wave-0 API-only demo flow OK с (founder hits /api/* directly через
+    # scripts/demo_market_brief.py).
+    handle {
+        @has_frontend file /srv/frontend/index.html
+        handle @has_frontend {
+            root * /srv/frontend
+            try_files {path} /index.html
+            file_server
+        }
+        # No frontend present yet — return 503 с pointer.
+        respond <<HTML
+            <!doctype html>
+            <html><head><title>TEAMLY_RU Staging</title></head>
+            <body><h1>Phase 00.6 Stage A — API up; frontend lands в Phase 00.7</h1>
+            <p>Try <a href="/healthz">/healthz</a> · <a href="/metrics">/metrics</a> · <a href="/api/v1/llm/providers">/api/v1/llm/providers</a></p>
+            </body></html>
+        HTML 503
+    }
+
+    # Access logs к stdout (JSON; promtail / Loki picks up from container).
+    log {
+        output stdout
+        format json
+    }
+}
+
+# Healthz alias на same listener (no auth)
+:8000 {
+    handle /healthz {
+        reverse_proxy backend:8000
+    }
+}
