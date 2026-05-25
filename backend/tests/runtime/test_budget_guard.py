@@ -9,7 +9,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-
 from src.runtime.budget_guard import (
     DEFAULT_TASK_CAP_TCREDITS,
     check_budget,

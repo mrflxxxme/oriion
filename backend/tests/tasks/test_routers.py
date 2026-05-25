@@ -17,13 +17,12 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from src._shared.middleware.tenant_context import get_tenant_db_session
 from src.iam.middleware import AuthenticatedUser, get_current_user
 from src.tasks.models import Task
 from src.tasks.routers.stream import router as stream_router
-from src.tasks.routers.tasks import get_task_service, router as tasks_router
-from src.tasks.services.task_service import TaskService
+from src.tasks.routers.tasks import get_task_service
+from src.tasks.routers.tasks import router as tasks_router
 
 
 @dataclass
@@ -136,9 +135,7 @@ def test_get_task_returns_200(app: FastAPI, fake_service: _FakeTaskService) -> N
     assert body["id"] == str(task_id)
 
 
-def test_cancel_task_returns_202_with_cascade(
-    app: FastAPI, fake_service: _FakeTaskService
-) -> None:
+def test_cancel_task_returns_202_with_cascade(app: FastAPI, fake_service: _FakeTaskService) -> None:
     client = TestClient(app)
     cell_id, task_id = uuid4(), uuid4()
     r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/cancel")

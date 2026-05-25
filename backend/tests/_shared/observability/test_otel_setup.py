@@ -19,11 +19,11 @@ def test_setup_with_empty_endpoint_still_initializes() -> None:
     """otlp_endpoint='' is the in-memory-test path: SDK init runs (so
     span context is real в logs), but no OTLP exporter attached."""
     # Reset module state so test is isolated.
+    import contextlib
+
     if otel_mod._tracer_provider is not None:
-        try:
+        with contextlib.suppress(Exception):
             otel_mod._tracer_provider.shutdown()
-        except Exception:
-            pass
     otel_mod._instrumented = False
     otel_mod._tracer_provider = None
 
@@ -47,7 +47,7 @@ def test_shutdown_clears_module_state() -> None:
     assert otel_mod._tracer_provider is not None
     shutdown_otel()
     assert otel_mod._tracer_provider is None
-    assert otel_mod._instrumented is False
+    assert otel_mod._instrumented is False  # type: ignore[unreachable]
 
 
 def test_shutdown_safe_when_never_setup() -> None:

@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
-
 from src.tasks import events as tasks_events
 
 

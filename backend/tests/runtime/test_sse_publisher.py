@@ -6,7 +6,6 @@ import asyncio
 from uuid import uuid4
 
 import pytest
-
 from src.runtime.sse_events import TaskStreamEvent
 from src.runtime.sse_publisher import (
     InProcessSSEPublisher,
@@ -22,7 +21,7 @@ async def test_subscribe_replays_drained_events_before_subscription() -> None:
     tid = uuid4()
     # Publish 3 events BEFORE any subscriber connects.
     for et in ["task.started", "task.step_started", "task.step_completed"]:
-        await pub.publish(TaskStreamEvent(event_type=et, task_id=tid))  # type: ignore[arg-type]
+        await pub.publish(TaskStreamEvent(event_type=et, task_id=tid))
     # Now subscribe — must replay all 3.
     received: list[str] = []
 
@@ -50,8 +49,8 @@ async def test_terminal_event_emits_sentinel_к_exit_subscribers() -> None:
     # Start subscriber so the queue exists when we publish.
     consumer = asyncio.create_task(consume())
     await asyncio.sleep(0.05)
-    await pub.publish(TaskStreamEvent(event_type="task.started", task_id=tid))  # type: ignore[arg-type]
-    await pub.publish(TaskStreamEvent(event_type="task.completed", task_id=tid))  # type: ignore[arg-type]
+    await pub.publish(TaskStreamEvent(event_type="task.started", task_id=tid))
+    await pub.publish(TaskStreamEvent(event_type="task.completed", task_id=tid))
     await asyncio.wait_for(consumer, timeout=2.0)
     assert received == ["task.started", "task.completed"]
 
@@ -68,7 +67,7 @@ async def test_failed_event_also_emits_sentinel() -> None:
 
     consumer = asyncio.create_task(consume())
     await asyncio.sleep(0.05)
-    await pub.publish(TaskStreamEvent(event_type="task.failed", task_id=tid))  # type: ignore[arg-type]
+    await pub.publish(TaskStreamEvent(event_type="task.failed", task_id=tid))
     await asyncio.wait_for(consumer, timeout=2.0)
     assert received == ["task.failed"]
 
@@ -87,8 +86,8 @@ async def test_multiple_subscribers_each_receive_events() -> None:
     c1 = asyncio.create_task(consume(received_a))
     c2 = asyncio.create_task(consume(received_b))
     await asyncio.sleep(0.05)
-    await pub.publish(TaskStreamEvent(event_type="task.started", task_id=tid))  # type: ignore[arg-type]
-    await pub.publish(TaskStreamEvent(event_type="task.completed", task_id=tid))  # type: ignore[arg-type]
+    await pub.publish(TaskStreamEvent(event_type="task.started", task_id=tid))
+    await pub.publish(TaskStreamEvent(event_type="task.completed", task_id=tid))
     await asyncio.wait_for(asyncio.gather(c1, c2), timeout=2.0)
     assert received_a == ["task.started", "task.completed"]
     assert received_b == ["task.started", "task.completed"]

@@ -14,7 +14,6 @@ from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
-
 from src.tasks.exceptions import DelegationDepthExceeded, TaskNotFound
 from src.tasks.models import Task
 from src.tasks.services.task_service import TaskService
@@ -50,9 +49,12 @@ class _StubSession:
         return _StubResult()
 
     def add(self, task: Task) -> None:
-        if task.id is None:
+        # SQLAlchemy assigns id at flush-time normally; in this stub
+        # `add` simulates the post-flush state directly so subsequent
+        # session.flush() in TaskService can populate timing fields.
+        if getattr(task, "id", None) is None:
             task.id = uuid4()
-        if task.total_cost_credits is None:
+        if getattr(task, "total_cost_credits", None) is None:
             task.total_cost_credits = Decimal(0)
         self.added.append(task)
 
@@ -118,9 +120,7 @@ async def test_create_task_depth_exceeded() -> None:
     """Sub-task at depth ≥ max_delegation_depth raises DelegationDepthExceeded."""
     parent_id = uuid4()
     # Walk 5 levels: return parent UUIDs ad-infinitum (bounded by safety).
-    session = _StubSession(
-        execute_queue=[_StubResult(scalar=uuid4()) for _ in range(10)]
-    )
+    session = _StubSession(execute_queue=[_StubResult(scalar=uuid4()) for _ in range(10)])
     svc = TaskService(session)  # type: ignore[arg-type]
     with pytest.raises(DelegationDepthExceeded):
         await svc.create_task(

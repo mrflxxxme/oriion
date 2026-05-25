@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
-
 from src.runtime.sse_events import TaskStreamEvent
 
 
@@ -34,7 +33,7 @@ def test_full_event_with_payload() -> None:
 
 def test_invalid_event_type_rejected() -> None:
     with pytest.raises(ValidationError):
-        TaskStreamEvent(event_type="task.invented", task_id=uuid4())  # type: ignore[arg-type]
+        TaskStreamEvent(event_type="task.invented", task_id=uuid4())
 
 
 def test_all_canonical_event_types_accepted() -> None:
@@ -50,7 +49,7 @@ def test_all_canonical_event_types_accepted() -> None:
         "task.failed",
     ]
     for et in canonical:
-        ev = TaskStreamEvent(event_type=et, task_id=uuid4())  # type: ignore[arg-type]
+        ev = TaskStreamEvent(event_type=et, task_id=uuid4())
         assert ev.event_type == et
 
 

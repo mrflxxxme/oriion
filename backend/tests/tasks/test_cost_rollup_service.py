@@ -13,7 +13,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-
 from src.tasks.models import Task
 from src.tasks.services.cost_rollup_service import rollup_task_cost
 

@@ -122,6 +122,13 @@ ignore = [
 # Phase 00.5b: canned RU content for the «Market & content brief» demo.
 # Cyrillic + Latin lookalikes are intentional content, not code style noise.
 "tests/_fixtures/canned_pydantic_ai/*.py" = ["RUF001", "RUF002", "RUF003"]
+# Phase 00.6 Commits 10/11/13: mixed Russian + English commentary в new
+# tests/tasks/, tests/runtime/, tests/_shared/observability/ docstrings
+# matches project documentation idiom (HANDOFF.md + audit reports use
+# the same blend). Extends precedent from canned_pydantic_ai fixture.
+"tests/tasks/*.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/runtime/*.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/_shared/observability/*.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.format]
 quote-style = "double"

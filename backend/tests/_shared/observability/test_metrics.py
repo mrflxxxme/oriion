@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from prometheus_client import REGISTRY
-
 from src._shared.observability import (
     LLM_COST_RUB,
     LLM_LATENCY,
@@ -68,8 +67,7 @@ def test_counter_increments_emit_samples() -> None:
         s
         for s in samples
         if s[0] == "llm_request_total"
-        and s[1]
-        == {"provider": "deepseek", "model": "v3", "status": "success"}
+        and s[1] == {"provider": "deepseek", "model": "v3", "status": "success"}
     ]
     assert len(matched) == 1
     assert matched[0][2] >= 1.0

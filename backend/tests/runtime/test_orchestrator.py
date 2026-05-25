@@ -10,19 +10,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
 from pydantic import BaseModel
-
 from src.agents.tools.delegate import DelegateInput, DelegateResult
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
-from src.runtime.sse_events import TaskStreamEvent
 from src.runtime.sse_publisher import InProcessSSEPublisher
 from src.tasks.models import Task
-
 
 # ── Test doubles ────────────────────────────────────────────────────────
 
@@ -134,10 +131,10 @@ async def test_happy_path_emits_full_sse_ledger(mock_emit: Any) -> None:
     assert task.total_output_tokens == 0  # no leaf delegations = 0 tokens
 
     # SSE event ledger — drain buffer holds all published events.
-    drained = publisher._drain.get(task_id, [])  # noqa: SLF001
+    drained = publisher._drain.get(task_id, [])
     types = [ev.event_type for ev in drained]
     assert types == ["task.started", "task.completed"]
-    assert task_id in publisher._completed  # noqa: SLF001
+    assert task_id in publisher._completed
 
     # CloudEvents fired.
     mock_emit.emit_task_started.assert_awaited_once()
@@ -160,9 +157,7 @@ async def test_happy_path_with_delegation(mock_emit: Any) -> None:
 
     leaf_calls: list[DelegateInput] = []
 
-    async def _leaf_runner(
-        inp: DelegateInput, _ctx: OrchestratorContext
-    ) -> DelegateResult:
+    async def _leaf_runner(inp: DelegateInput, _ctx: OrchestratorContext) -> DelegateResult:
         leaf_calls.append(inp)
         return DelegateResult(
             sub_task_id=uuid4(),
@@ -173,7 +168,7 @@ async def test_happy_path_with_delegation(mock_emit: Any) -> None:
         )
 
     class _FakeAgentDispatching:
-        run_calls: list[Any] = []
+        run_calls: ClassVar[list[Any]] = []
 
         async def run(self, _prompt: str, *, deps: Any) -> _FakeRunResult:
             # Simulate Coordinator invoking delegate_task twice through deps.runner.
@@ -200,7 +195,7 @@ async def test_happy_path_with_delegation(mock_emit: Any) -> None:
     )
 
     assert len(leaf_calls) == 2
-    drained = publisher._drain.get(task_id, [])  # noqa: SLF001
+    drained = publisher._drain.get(task_id, [])
     types = [ev.event_type for ev in drained]
     assert types == [
         "task.started",
@@ -257,7 +252,7 @@ async def test_agent_run_exception_emits_task_failed_and_reraises(
     assert task.total_cost_credits == Decimal(0)
 
     # SSE ledger — task.started followed by task.failed (no task.completed).
-    drained = publisher._drain.get(task_id, [])  # noqa: SLF001
+    drained = publisher._drain.get(task_id, [])
     types = [ev.event_type for ev in drained]
     assert types == ["task.started", "task.failed"]
     # The .failed event carries the error code per F-ARC-M2 contract.
@@ -297,7 +292,7 @@ async def test_agent_run_exception_without_code_uses_classname(mock_emit: Any) -
             session=session,  # type: ignore[arg-type]
         )
 
-    drained = publisher._drain.get(task_id, [])  # noqa: SLF001
+    drained = publisher._drain.get(task_id, [])
     failed_event = next(ev for ev in drained if ev.event_type == "task.failed")
     assert failed_event.payload["error_code"] == "ValueError"
 
@@ -329,5 +324,5 @@ async def test_task_missing_in_session_still_completes(mock_emit: Any) -> None:
         session=session,  # type: ignore[arg-type]
     )
     assert result["summary"] == "demo output"
-    drained = publisher._drain.get(task_id, [])  # noqa: SLF001
+    drained = publisher._drain.get(task_id, [])
     assert [ev.event_type for ev in drained] == ["task.started", "task.completed"]

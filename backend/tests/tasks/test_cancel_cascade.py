@@ -58,7 +58,7 @@ class _StubSession:
 
 
 @pytest.mark.asyncio
-async def test_cancel_task_cascade_collects_descendants():
+async def test_cancel_task_cascade_collects_descendants() -> None:
     """BFS walker returns the full set of descendant task IDs."""
     from src.tasks.models import Task
     from src.tasks.services.task_service import TaskService
@@ -94,7 +94,7 @@ async def test_cancel_task_cascade_collects_descendants():
 
 
 @pytest.mark.asyncio
-async def test_cancel_task_with_no_descendants_returns_empty():
+async def test_cancel_task_with_no_descendants_returns_empty() -> None:
     """Cancelling a leaf task returns an empty descendant list (still
     flips the task itself)."""
     from src.tasks.models import Task
@@ -125,7 +125,7 @@ async def test_cancel_task_with_no_descendants_returns_empty():
 
 
 @pytest.mark.asyncio
-async def test_cancel_task_not_found_raises():
+async def test_cancel_task_not_found_raises() -> None:
     """get_task raises TaskNotFound when the row doesn't exist."""
     from src.tasks.exceptions import TaskNotFound
     from src.tasks.services.task_service import TaskService
