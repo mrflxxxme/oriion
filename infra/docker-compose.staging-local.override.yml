@@ -26,7 +26,11 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector image bundles pgvector extension — required by
+    # `_shared/0001_init.py` migration (CREATE EXTENSION vector). Alpine
+    # plain postgres:16 doesn't include pgvector. Yandex Managed Postgres
+    # (YC staging) ships pgvector preinstalled per ADR-005 amendment.
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: oriion

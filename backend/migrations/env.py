@@ -59,6 +59,51 @@ if not _env_url:
 config.set_main_option("sqlalchemy.url", _env_url)
 
 
+# Bounded-context revision IDs (e.g. '_shared_0002_current_user_id_helper'
+# = 35 chars) exceed Alembic's default version_num varchar(32). Monkey-patch
+# `MigrationContext._ensure_version_table` to create the table with
+# varchar(128) instead. Phase 00.6 Commit 15 in-loop fix.
+from sqlalchemy import Column as _SAColumn
+from sqlalchemy import MetaData as _SAMetaData
+from sqlalchemy import String as _SAString
+from sqlalchemy import Table as _SATable
+
+import alembic.runtime.migration as _alembic_migration
+
+
+def _wide_ensure_version_table(self: _alembic_migration.MigrationContext, purge: bool = False) -> None:
+    """Replaces Alembic's default varchar(32) version_num column with
+    varchar(128). Honours `purge` semantic from the original method —
+    if True, deletes all rows from an existing version table."""
+    md = _SAMetaData()
+    table = _SATable(
+        self.version_table,
+        md,
+        _SAColumn(
+            "version_num",
+            _SAString(128),
+            nullable=False,
+            primary_key=True,
+        ),
+        schema=self.version_table_schema,
+    )
+    if not self.as_sql:
+        existing = self.connection.dialect.has_table(
+            self.connection,
+            self.version_table,
+            schema=self.version_table_schema,
+        )
+        if not existing:
+            table.create(self.connection, checkfirst=True)
+        elif purge:
+            self.connection.execute(table.delete())
+
+
+_alembic_migration.MigrationContext._ensure_version_table = (  # type: ignore[method-assign]
+    _wide_ensure_version_table
+)
+
+
 def run_migrations_offline() -> None:
     """Run migrations в offline mode (emit SQL без подключения)."""
     url = config.get_main_option("sqlalchemy.url")
