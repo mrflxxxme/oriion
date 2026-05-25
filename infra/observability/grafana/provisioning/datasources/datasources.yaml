@@ -1,0 +1,68 @@
+# Grafana datasource provisioning — Phase 00.6 Stage A.
+#
+# Three datasources auto-provisioned at Grafana startup:
+#   * Prometheus — metrics (PRIMARY default)
+#   * Loki — logs; linked к Tempo via derivedFields для log→trace jump
+#   * Tempo — traces; serviceMap on; lookback 24h
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    uid: loki
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # Match `trace_id: <32-hex>` in JSON-rendered logs (per
+        # _shared/logging.py::_inject_otel_context). Click takes к Tempo.
+        - name: TraceID
+          matcherRegex: '"trace_id":"(\w+)"'
+          url: '$${__value.raw}'
+          datasourceUid: tempo
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: true
+    uid: tempo
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: -1m
+        spanEndTimeShift: 1m
+        filterByTraceID: true
+        filterBySpanID: false
+        tags:
+          - key: service.name
+            value: service
+      tracesToMetrics:
+        datasourceUid: prometheus
+        tags:
+          - key: service.name
+            value: service
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: loki

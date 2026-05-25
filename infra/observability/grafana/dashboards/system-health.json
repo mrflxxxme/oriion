@@ -1,0 +1,84 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "title": "System Health — Phase 00.6",
+  "uid": "oriion-system-health",
+  "tags": ["oriion", "phase-00-6", "health"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Backend availability (up{job=oriion-backend})",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "avg_over_time(up{job=\"oriion-backend\"}[5m])", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "graphMode": "area", "colorMode": "value"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"value": null, "color": "red"},
+            {"value": 0.95, "color": "yellow"},
+            {"value": 0.995, "color": "green"}
+          ]}
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "LLM provider health (closed=1, open=0)",
+      "gridPos": {"x": 6, "y": 0, "w": 18, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "llm_provider_health", "refId": "A", "legendFormat": "{{provider}}"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "graphMode": "none", "colorMode": "value"},
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {"mode": "absolute", "steps": [
+            {"value": null, "color": "red"},
+            {"value": 0.5, "color": "yellow"},
+            {"value": 1, "color": "green"}
+          ]}
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP request rate",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "sum by (status_code) (rate(oriion_http_server_requests_total[1m]))",
+        "refId": "A",
+        "legendFormat": "{{status_code}}"
+      }],
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Backend healthcheck (up over time)",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "up{job=\"oriion-backend\"}", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0, "max": 1}}
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Recent backend logs (Loki)",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 10},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{
+        "expr": "{service=\"oriion-backend\"} | json | level=~\"warning|error|critical\"",
+        "refId": "A"
+      }],
+      "options": {"showLabels": true, "showTime": true, "wrapLogMessage": true}
+    }
+  ]
+}

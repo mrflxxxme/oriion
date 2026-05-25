@@ -1,0 +1,86 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "title": "LLM Usage & Cost — Phase 00.6",
+  "uid": "oriion-llm-usage",
+  "tags": ["oriion", "phase-00-6", "llm", "cost"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "LLM requests / 1m by provider",
+      "gridPos": {"x": 0, "y": 0, "w": 12, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "sum by (provider) (rate(llm_request_total[1m]))",
+        "refId": "A",
+        "legendFormat": "{{provider}}"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "graphMode": "area"}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Daily LLM cost (RUB)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "sum(increase(llm_cost_rub_total[24h]))",
+        "refId": "A"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "graphMode": "area", "colorMode": "value"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyRUB",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"value": null, "color": "green"},
+            {"value": 2250, "color": "yellow"},
+            {"value": 3000, "color": "red"}
+          ]}
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "LLM request latency — p50 / p95 / p99",
+      "gridPos": {"x": 0, "y": 4, "w": 24, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum(rate(llm_request_latency_seconds_bucket[5m])) by (le, provider))", "refId": "p50", "legendFormat": "{{provider}} p50"},
+        {"expr": "histogram_quantile(0.95, sum(rate(llm_request_latency_seconds_bucket[5m])) by (le, provider))", "refId": "p95", "legendFormat": "{{provider}} p95"},
+        {"expr": "histogram_quantile(0.99, sum(rate(llm_request_latency_seconds_bucket[5m])) by (le, provider))", "refId": "p99", "legendFormat": "{{provider}} p99"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Cumulative tokens (input + output)",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "sum by (provider) (rate(llm_tokens_input_total[5m]))", "refId": "in", "legendFormat": "{{provider}} input"},
+        {"expr": "sum by (provider) (rate(llm_tokens_output_total[5m]))", "refId": "out", "legendFormat": "{{provider}} output"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Cost burn rate (RUB / hour) by cell",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "sum by (cell_id) (rate(llm_cost_rub_total[1h]) * 3600)",
+        "refId": "A",
+        "legendFormat": "{{cell_id}}"
+      }],
+      "fieldConfig": {"defaults": {"unit": "currencyRUB"}}
+    }
+  ]
+}
