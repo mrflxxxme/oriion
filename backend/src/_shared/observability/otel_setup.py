@@ -90,10 +90,12 @@ def setup_otel(
     # Auto-instrument outbound + DB layers. FastAPI instrumentation is
     # applied lazily by FastAPIInstrumentor when it sees the app object —
     # we don't have the app here, so `src/main.py` calls
-    # `FastAPIInstrumentor.instrument_app(app)` ОН САМ right after
+    # `FastAPIInstrumentor.instrument_app(app)` itself right after
     # FastAPI() construction. We pre-arm the httpx and asyncpg sides here.
     HTTPXClientInstrumentor().instrument()
-    AsyncPGInstrumentor().instrument()
+    # opentelemetry-instrumentation-asyncpg untyped в 0.60b1; HTTPX
+    # instrumentor ships type info already.
+    AsyncPGInstrumentor().instrument()  # type: ignore[no-untyped-call]
 
     _instrumented = True
     _logger.info(

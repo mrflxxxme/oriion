@@ -134,7 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Setup OpenTelemetry BEFORE provider construction so outbound httpx
     # calls (DeepSeek/YandexGPT/GigaChat) are auto-instrumented from the
     # very first request. setup_otel is idempotent + feature-gated via
-    # Settings.otel_traces_enabled — unit tests с in-memory exporters can
+    # Settings.otel_traces_enabled — unit tests with in-memory exporters can
     # short-circuit cleanly.
     setup_otel(
         service_name=settings.otel_service_name,

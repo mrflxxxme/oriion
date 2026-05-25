@@ -36,7 +36,7 @@ def _inject_otel_context(_: Any, __: str, event_dict: EventDict) -> EventDict:
 
     No-op if OpenTelemetry isn't initialized (setup_otel skipped) — the
     SDK returns INVALID_SPAN as current span and we don't pollute the
-    event_dict с zero-valued trace_id keys. Loki + Tempo correlation
+    event_dict with zero-valued trace_id keys. Loki + Tempo correlation
     only fires when a real request span is active.
     """
     try:

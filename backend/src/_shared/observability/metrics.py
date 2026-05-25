@@ -1,20 +1,20 @@
-"""Prometheus custom metrics для Phase 00.6 staging stack.
+"""Prometheus custom metrics for the Phase 00.6 staging stack.
 
-Метрики делятся на три семейства:
+Three metric families:
 
 * **llm_*** — LLM provider observability (requests, tokens, cost, latency,
-  health). Labels: provider, model, status, cell_id (где уместно).
+  health). Labels: provider, model, status, cell_id (where applicable).
 * **task_*** — task pipeline observability (duration, total, queue_depth).
   Labels: role_key, outcome, cell_id.
-* **billing_*** — RU-currency cost ledger (delegates к llm_cost_rub).
+* **billing_*** — RU-currency cost ledger (delegates to llm_cost_rub).
 
-Все метрики регистрируются один раз через `register_default_metrics()`
-которая идемпотентна (guard via prometheus_client REGISTRY presence-check).
-Per-callsite instrumentation в orchestrator/router_service/cost_recorder
-ландит в Wave-1 hardening — Phase 00.6 ships ТОЛЬКО registration + /metrics
-endpoint (см. AUDIT-W1-2 pin block).
+All metrics register once via `register_default_metrics()` which is
+idempotent (guarded via prometheus_client REGISTRY presence-check).
+Per-callsite instrumentation in orchestrator/router_service/cost_recorder
+lands in Wave-1 hardening — Phase 00.6 ships ONLY registration + /metrics
+endpoint (see AUDIT-W1-2 pin block).
 
-Wired в `src/main.py`:
+Wired in `src/main.py`:
     from src._shared.observability import register_default_metrics
     from prometheus_client import make_asgi_app
     register_default_metrics()
@@ -61,9 +61,9 @@ LLM_TOKENS_OUTPUT = Counter(
 
 LLM_COST_RUB = Counter(
     "llm_cost_rub_total",
-    "Cumulative billable cost в RUB per provider/model/cell. RU-currency "
-    "settlement per ADR-018 amendment 2026-05-19; `cost_rub = cost_usd × "
-    "fx_rate_usd_to_rub`.",
+    "Cumulative billable cost in RUB per provider/model/cell. RU-currency "
+    "settlement per ADR-018 amendment 2026-05-19; cost_rub = cost_usd * "
+    "fx_rate_usd_to_rub.",
     ["provider", "model", "cell_id"],
 )
 
@@ -89,7 +89,7 @@ LLM_PROVIDER_HEALTH = Gauge(
 
 TASK_DURATION = Histogram(
     "task_duration_seconds",
-    "End-to-end task duration from queued → terminal (succeeded/failed/"
+    "End-to-end task duration from queued to terminal (succeeded/failed/"
     "cancelled). Labelled by role_key (coordinator/researcher/writer/analyst) "
     "and outcome.",
     ["role_key", "outcome"],
@@ -115,7 +115,7 @@ def register_default_metrics() -> None:
     """Force-import + sanity-check Prometheus metric registration.
 
     Idempotent. The 9 module-level Counter/Gauge/Histogram constructors above
-    auto-register с the global `prometheus_client.REGISTRY` at import-time
+    auto-register with the global `prometheus_client.REGISTRY` at import-time
     (Python module import is cached, so re-calling this function does NOT
     re-register — the touch is just to defeat lazy-import pruning).
 
