@@ -99,9 +99,29 @@ Then для Stage B continuation:
 6. [`_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md) — Wave-1 AC pin block extension AC-W1-11..15
 7. [`gates/wave-0-to-1.md`](./gates/wave-0-to-1.md) — D5 amendment ландит в PR-B per α decision-7
 
+## CRITICAL FINDING — Phase 00.5b architectural gap discovered during Stage A smoke (2026-05-25)
+
+End-to-end smoke testing surfaced that **Phase 00.5b shipped the POST /api/v1/cells/{cell_id}/tasks HTTP endpoint + the orchestrator code, but NO background dispatcher** that picks queued tasks and runs them. The orchestrator was only ever invoked via direct call в the demo-flow integration test. Live tasks created via HTTP stay в `status=queued` forever; SSE stream subscribers wait indefinitely until httpx client timeout.
+
+Phase 00.5b STATUS «AC3: orchestrator drives state machine» was technically true (state machine exists) but tested only via canned-data CI flow.
+
+**Impact on Stage A local-smoke:**
+* Steps 1-4, 7-9 от runbook (compose up, /healthz, /metrics, Grafana, Loki, Tempo, teardown) ✅ — validates observability infrastructure end-to-end
+* Step 5 (1× REAL-LLM demo run) ❌ BLOCKED — needs orchestrator dispatch layer. Confirmed via direct POST /tasks → `status=queued` permanent + SSE stream times out at 0.0s
+
+**Resolution paths** (founder choice):
+1. **Add inline-dispatch endpoint в PR-B**: POST /api/v1/cells/{cell_id}/tasks/{id}/run synchronously invokes orchestrator (long-poll style). Quick (~1 day), pragmatic для Wave-0 demo gate.
+2. **Add Dramatiq worker в PR-B**: Background queue picks up queued tasks. Production-shape but +2-3 days scope.
+3. **Defer demo flow к Wave-1 entirely**: Update gate D5 semantic «internal_demo_passed» к infrastructure-validation-only за Wave-0; full demo flow becomes Wave-1 deliverable.
+
+**Recommended:** Path #1 — add inline orchestrator dispatch endpoint в PR-B как Commit 1 (before Terraform + demo runs). Closes AC3 properly end-to-end + matches founder's «10× founder runs against staging URL» plan.
+
+**New Wave-1 AC pin:**
+* AC-W1-16 — Replace inline-dispatch endpoint с proper Dramatiq worker for multi-tenant concurrency
+
 ## Founder action
 
-1. **Run Stage A local-smoke** per [`docs/runbooks/local-smoke.md`](../docs/runbooks/local-smoke.md) (~15-20 min). Sign-off comment template в Step 9 of runbook.
+1. **Run Stage A local-smoke** per [`docs/runbooks/local-smoke.md`](../docs/runbooks/local-smoke.md) **infrastructure validation portion** (~10 min) — Steps 1-4 + 6-9 work and pass. Skip Step 5 (real-LLM demo run) — blocked on orchestrator-dispatch gap above.
 2. **Refresh YC IAM token** if last refresh >10h ago (one-liner в HANDOFF «YC IAM token refresh runbook» section).
 3. **Optional pre-PR-B prep:** Install Russian Trusted Root CA для GigaChat TLS (runbook Pre-flight Step 2).
 4. **Review + merge PR-A** через GitHub UI после sign-off.
