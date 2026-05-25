@@ -1,0 +1,180 @@
+# infra/docker-compose.staging.yml — canonical staging stack (Phase 00.6 PR-A)
+#
+# 9 services: backend + frontend + caddy + otel-collector + prometheus +
+# grafana + loki + tempo + (optional) alertmanager.
+#
+# Managed services NOT in this compose (per ADR-009 HA/auto-backup):
+#   * Postgres 16 — Yandex Managed PostgreSQL (DATABASE_URL env)
+#   * Redis 7 — Yandex Managed Redis (REDIS_URL env)
+#
+# For LOCAL founder validation, layer on infra/docker-compose.staging-local.
+# override.yml which adds inline postgres + redis services and toggles
+# Caddy к HTTP-only mode. See docs/runbooks/local-smoke.md.
+#
+# Secrets: production reads from Yandex Lockbox via ${LOCKBOX_*} env-vars.
+# Stage A local validation reads from backend/.env (gitignored). See
+# C13 local-smoke runbook for full env-var checklist.
+
+services:
+  backend:
+    image: ${YC_CR_REGISTRY:-oriion-staging}/oriion-backend:${IMAGE_TAG:-latest}
+    build:
+      context: ../backend
+      target: prod
+    restart: always
+    environment:
+      DATABASE_URL: ${LOCKBOX_DATABASE_URL:-${DATABASE_URL}}
+      REDIS_URL: ${LOCKBOX_REDIS_URL:-${REDIS_URL}}
+      DEEPSEEK_API_KEY: ${LOCKBOX_DEEPSEEK_API_KEY:-${DEEPSEEK_API_KEY}}
+      YANDEX_IAM_TOKEN: ${LOCKBOX_YANDEX_IAM_TOKEN:-${YANDEX_IAM_TOKEN}}
+      YANDEX_CATALOG_ID: ${LOCKBOX_YANDEX_CATALOG_ID:-${YANDEX_CATALOG_ID}}
+      GIGACHAT_AUTH_KEY: ${LOCKBOX_GIGACHAT_AUTH_KEY:-${GIGACHAT_AUTH_KEY}}
+      JWT_SECRET_ACCESS_V1: ${LOCKBOX_JWT_SECRET:-${JWT_SECRET_ACCESS_V1}}
+      BYOK_MASTER_KEY_B64: ${LOCKBOX_BYOK_MASTER_KEY_B64:-${BYOK_MASTER_KEY_B64}}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_SERVICE_NAME: oriion-backend
+      OTEL_TRACES_ENABLED: "true"
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      APP_ENV: staging
+    # Phase 00.6 spec mandates workers=1 per F-ARC-H2 (multi-worker SSE-pub
+    # swap is Wave-1 AC-W1-1). Gunicorn used purely as process supervisor +
+    # graceful-shutdown helper; the single uvicorn worker handles все routing
+    # and SSE streaming.
+    command: >
+      gunicorn src.main:app
+      -k uvicorn.workers.UvicornWorker
+      -w 1
+      -b 0.0.0.0:8000
+      --access-logfile -
+      --error-logfile -
+      --graceful-timeout 30
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  # Frontend skeleton lands в Phase 00.7. Compose profile `with-ui` gates
+  # the service так что Stage A local validation can run без UI image
+  # built. Once Phase 00.7 ships frontend/Dockerfile properly, founder
+  # can enable via `--profile with-ui` flag on compose-up.
+  frontend:
+    image: ${YC_CR_REGISTRY:-oriion-staging}/oriion-frontend:${IMAGE_TAG:-latest}
+    build:
+      context: ../frontend
+    restart: always
+    profiles: ["with-ui"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    environment:
+      STAGING_DOMAIN: ${STAGING_DOMAIN:-localhost}
+      CADDY_TLS: ${CADDY_TLS:-on}
+      GRAFANA_BASIC_AUTH_USER: ${GRAFANA_BASIC_AUTH_USER:-admin}
+      GRAFANA_BASIC_AUTH_BCRYPT: ${GRAFANA_BASIC_AUTH_BCRYPT:-}
+    volumes:
+      - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    expose:
+      - "4317" # OTLP gRPC
+      - "4318" # OTLP HTTP
+      - "8888" # Collector self-metrics (Prometheus scrape)
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    restart: always
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerting:/etc/prometheus/alerting:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    expose:
+      - "9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: ${LOCKBOX_GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${LOCKBOX_GRAFANA_ADMIN_PASSWORD:-admin-dev-only-replace}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+  loki:
+    image: grafana/loki:3.2.0
+    restart: always
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/loki
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    expose:
+      - "3100"
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    restart: always
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    expose:
+      - "3200" # Tempo HTTP API (for Grafana datasource)
+      - "4317" # OTLP gRPC (Tempo can receive directly; we route via collector
+               # but expose for direct-write debugging)
+
+  # Alertmanager — Wave-0 SHIP с in-stack mock-receiver (logs alerts только).
+  # PagerDuty/Telegram webhook wiring = Wave-1 hardening pin.
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    restart: always
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    expose:
+      - "9093"
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  prometheus_data: {}
+  grafana_data: {}
+  loki_data: {}
+  tempo_data: {}
+  alertmanager_data: {}

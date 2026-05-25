@@ -1,0 +1,113 @@
+# infra/docker-compose.staging-local.override.yml — Phase 00.6 Stage A.
+#
+# Local founder validation overlay для infra/docker-compose.staging.yml.
+# Adds inline Postgres + Redis (Yandex Managed equivalents в YC), points
+# backend к internal hostnames, toggles Caddy к HTTP-only mode, и
+# publishes select ports на host машину для founder smoke-testing.
+#
+# Usage:
+#   docker compose \
+#       -f infra/docker-compose.staging.yml \
+#       -f infra/docker-compose.staging-local.override.yml \
+#       --env-file backend/.env \
+#       up -d
+#
+# Founder validation criteria (Q5 decision-6):
+#   * 9 services healthy ≤180s (docker compose ps)
+#   * http://localhost:8000/healthz → 200
+#   * http://localhost:8000/metrics → Prometheus exposition
+#   * http://localhost:3000 — Grafana admin login + 3 dashboards
+#   * 1× scripts/demo_market_brief.py --runs 1 с real LLM keys
+#   * AC4 alert test — kill backend → alertmanager fires (logs)
+#   * Loki receives logs ≤30s of emission
+#   * Tempo trace visible для task.created→orchestrator→llm_gateway
+#
+# See docs/runbooks/local-smoke.md для step-by-step (lands C13).
+
+services:
+  postgres:
+    # pgvector/pgvector image bundles pgvector extension — required by
+    # `_shared/0001_init.py` migration (CREATE EXTENSION vector). Alpine
+    # plain postgres:16 doesn't include pgvector. Yandex Managed Postgres
+    # (YC staging) ships pgvector preinstalled per ADR-005 amendment.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oriion
+      POSTGRES_PASSWORD: oriion-dev
+      POSTGRES_DB: oriion_dev
+    volumes:
+      - postgres_data_local:/var/lib/postgresql/data
+    ports:
+      - "${PG_LOCAL_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oriion -d oriion_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis_data_local:/data
+    ports:
+      - "${REDIS_LOCAL_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    # Override managed-service references к internal hostnames + add
+    # dependency на newly-inline postgres + redis services.
+    environment:
+      DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@postgres:5432/oriion_dev
+      REDIS_URL: redis://redis:6379/0
+      APP_ENV: dev
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      LOG_FORMAT: json
+    ports:
+      - "${BACKEND_LOCAL_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  caddy:
+    environment:
+      STAGING_DOMAIN: ${STAGING_DOMAIN:-localhost}
+      CADDY_TLS: "off"
+      # Bind admin endpoint так что Prometheus может scrape :2019 metrics.
+      CADDY_ADMIN_LISTEN: 0.0.0.0:2019
+    ports:
+      # Local-only: avoid privileged :80 — publish HTTP on :8080.
+      - "${CADDY_HTTP_PORT:-8080}:80"
+
+  prometheus:
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
+  alertmanager:
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+
+  loki:
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+
+  tempo:
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+
+  # Grafana port уже published в base compose; нет необходимости
+  # переопределять — оставлен здесь для документирования.
+
+volumes:
+  postgres_data_local: {}
+  redis_data_local: {}

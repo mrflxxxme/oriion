@@ -168,6 +168,39 @@ class Settings(BaseSettings):
         description="Yandex Search API key. Fallback backend for mcp.tools.web_search.",
     )
 
+    # ── Observability (Phase 00.6) ──────────────────────────────────────
+    otel_service_name: str = Field(
+        default="oriion-backend",
+        description="OpenTelemetry service.name resource attribute. Surfaces in Tempo trace UI.",
+    )
+    otel_exporter_otlp_endpoint: str = Field(
+        default="http://otel-collector:4317",
+        description=(
+            "OTLP gRPC endpoint of the collector. Staging value points at the "
+            "in-stack otel-collector container (docker-compose.staging.yml). "
+            "Empty string DISABLES exporter (unit/integration tests run with "
+            "in-memory span exporter via setup_otel's no-op branch)."
+        ),
+    )
+    otel_traces_enabled: bool = Field(
+        default=True,
+        description=(
+            "Master kill-switch для OpenTelemetry instrumentation. Set False "
+            "to short-circuit setup_otel() — useful in unit-test contexts that "
+            "don't need an exporter and want fastest startup."
+        ),
+    )
+    log_format: Literal["auto", "json", "console"] = Field(
+        default="auto",
+        description=(
+            "structlog renderer selection. 'auto' = JSON в staging/prod, "
+            "ConsoleRenderer в dev/test (legacy behaviour). 'json' force-overrides "
+            "так что docker-compose-staging-local stack can emit Loki-parseable "
+            "JSON even with app_env=dev. 'console' force-overrides для local "
+            "human-debug runs."
+        ),
+    )
+
     # ── Helpers ─────────────────────────────────────────────────────────
     @property
     def is_dev(self) -> bool:

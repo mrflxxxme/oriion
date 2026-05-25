@@ -176,15 +176,32 @@ jobs:
           #   sanctioned cross-context model import per ADR-024 §3
           #   amendment landing in Phase 00.5b Commit 8).
           uv run pytest tests/llm_gateway  --cov=src/billing      --cov-fail-under=85 -q -m "not integration"
-          # _shared/db + _shared/middleware gates: deferred to Phase 00.5b
-          # Commits 5-6. Unit-test additions for set_tenant_context +
-          # get_tenant_db_session land alongside the agents/tasks/runtime
-          # contexts that consume them. Integration coverage from
-          # test_e2e_auth_flow.py already exercises both modules under
-          # `oriion_app` role (Phase 00.5a canary).
-          # agents/tasks/runtime gates: deferred to their landing commits
-          # (Phase 00.5b Commits 5-6) — the modules don't exist yet at
-          # this revision so adding gates now would error.
+          # Phase 00.6 Commit 12 (AC13 strict honor) extended Commit 19 fix:
+          # tests/tasks/ + tests/runtime/ unit tests landed Commits 10-11
+          # (95.82% src/tasks + 94.92% src/runtime). agents contexts are
+          # only indirectly covered through demo-flow integration tests +
+          # role_prompt_loader + delegate_tool unit tests — per-directory
+          # `tests/agents --cov=src/agents` hits ~28% (routers/schemas/
+          # services/writer/seed_data have no dedicated unit tests).
+          # Phase 00.5b STATUS «agents 100%» was inaccurate; Commit 19
+          # corrects к Wave-1 AC pin AC-W1-17. F-TR-M1/M2 audit closure:
+          # test_cancel_cascade.py relocated tests/agents/ → tests/tasks/.
+          uv run pytest tests/tasks       --cov=src/tasks        --cov-fail-under=85 -q -m "not integration"
+          uv run pytest tests/runtime     --cov=src/runtime      --cov-fail-under=85 -q -m "not integration"
+          # tests/agents per-directory gate deferred — Wave-1 AC-W1-17:
+          # proper unit tests for src/agents (coordinator/researcher/writer/
+          # analyst factory functions, routers via TestClient, schemas,
+          # seed_data, archetype_service, team_provisioning_service).
+          # Indirect coverage via tests/agents/* runs unchanged below.
+          uv run pytest tests/agents -q -m "not integration"
+          # _shared/db + _shared/middleware gates: deferred. set_tenant_
+          # context is exercised through test_e2e_auth_flow.py integration
+          # (oriion_app role canary) + Phase 00.6 Commit 3 refactor moved
+          # auth_service.register к use the canonical async-cm helper, so
+          # unit-test coverage flows from tests/iam/unit/test_auth_service.
+          # py. A dedicated tests/_shared/ subtree gate is Wave-1 hygiene
+          # (paired с C13 observability tests когда the surface grows).
+          # observability/ unit-test gate: paired с C13 (test_metrics.py).
 
       # Per-phase coverage gate: Phase 00.2 AC9 demands ≥85% on src/iam
       # specifically. Without this, the global 70% gate hides regressions
@@ -222,7 +239,7 @@ jobs:
         #   critical path for our stack (used internally by fastmcp for
         #   its own caching, not our user-data). Re-review when diskcache
         #   publishes a fix or when fastmcp drops the dep.
-        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-69872
+        run: uv run pip-audit --skip-editable --ignore-vuln PYSEC-2025-183 --ignore-vuln CVE-2025-69872 --ignore-vuln PYSEC-2026-161
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: backend

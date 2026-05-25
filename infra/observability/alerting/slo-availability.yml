@@ -1,0 +1,37 @@
+# SLO availability alerts — Phase 00.6 Stage A.
+#
+# Backend /healthz must return 200 99.5% of the time over 15 min.
+
+groups:
+  - name: slo-availability
+    interval: 30s
+    rules:
+      - alert: BackendHealthzDown
+        expr: |
+          avg_over_time(up{job="oriion-backend"}[5m]) < 1
+        for: 2m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "Backend /healthz unreachable for ≥2 minutes"
+          description: |
+            Prometheus scrape of oriion-backend has been failing.
+            up{job=oriion-backend} = {{ $value }} over the last 5m.
+            Runbook: docs/runbooks/incident-llm-provider-down.md (similar
+            severity playbook; replace «LLM provider» с «backend container»).
+
+      - alert: BackendAvailabilityBudgetBurn
+        # 99.5% SLO means 0.5% error budget over a 15-min window = 4.5s of
+        # downtime. Fire when error rate exceeds 0.5% over 15m.
+        expr: |
+          (1 - avg_over_time(up{job="oriion-backend"}[15m])) > 0.005
+        for: 1m
+        labels:
+          severity: warning
+          slo: availability
+        annotations:
+          summary: "Backend availability SLO budget burn"
+          description: |
+            up{job=oriion-backend} dropped к {{ $value | humanizePercentage }}
+            over 15m, exceeding 0.5% error-budget threshold.

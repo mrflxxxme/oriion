@@ -1,0 +1,96 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "title": "Tasks Pipeline — Phase 00.6",
+  "uid": "oriion-tasks-pipeline",
+  "tags": ["oriion", "phase-00-6", "tasks", "ac8"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Task queue depth (pending tasks)",
+      "gridPos": {"x": 0, "y": 0, "w": 8, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{"expr": "sum(task_queue_depth)", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "graphMode": "area"}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Task p95 duration (AC8 target ≤120s)",
+      "gridPos": {"x": 8, "y": 0, "w": 8, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum(rate(task_duration_seconds_bucket[10m])) by (le))",
+        "refId": "A"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "graphMode": "area", "colorMode": "value"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {"mode": "absolute", "steps": [
+            {"value": null, "color": "green"},
+            {"value": 60, "color": "yellow"},
+            {"value": 120, "color": "red"}
+          ]}
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Tasks total / 5m by outcome",
+      "gridPos": {"x": 16, "y": 0, "w": 8, "h": 4},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "sum by (outcome) (increase(task_total[5m]))",
+        "refId": "A",
+        "legendFormat": "{{outcome}}"
+      }],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Task duration distribution — p50/p95/p99",
+      "gridPos": {"x": 0, "y": 4, "w": 24, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum(rate(task_duration_seconds_bucket[5m])) by (le, role_key))", "refId": "p50", "legendFormat": "{{role_key}} p50"},
+        {"expr": "histogram_quantile(0.95, sum(rate(task_duration_seconds_bucket[5m])) by (le, role_key))", "refId": "p95", "legendFormat": "{{role_key}} p95"},
+        {"expr": "histogram_quantile(0.99, sum(rate(task_duration_seconds_bucket[5m])) by (le, role_key))", "refId": "p99", "legendFormat": "{{role_key}} p99"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Task throughput by outcome",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "sum by (outcome) (rate(task_total[5m]))",
+        "refId": "A",
+        "legendFormat": "{{outcome}}"
+      }],
+      "fieldConfig": {"defaults": {"unit": "ops"}}
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Queue depth over time by cell",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [{
+        "expr": "task_queue_depth",
+        "refId": "A",
+        "legendFormat": "{{cell_id}}"
+      }],
+      "fieldConfig": {"defaults": {"unit": "short", "min": 0}}
+    }
+  ]
+}

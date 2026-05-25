@@ -1,0 +1,19 @@
+# Grafana dashboard file-provider — Phase 00.6 Stage A.
+#
+# Loads all JSON dashboards в /var/lib/grafana/dashboards (volume-mounted
+# from infra/observability/grafana/dashboards) на startup. Auto-reload
+# enabled, so editing JSON в host triggers refresh без Grafana restart.
+
+apiVersion: 1
+
+providers:
+  - name: oriion-default
+    orgId: 1
+    folder: Oriion
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

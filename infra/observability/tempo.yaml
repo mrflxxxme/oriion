@@ -1,0 +1,58 @@
+# Tempo config — Phase 00.6 Stage A staging stack.
+#
+# Receives OTLP traces from otel-collector (which receives from backend).
+# Local filesystem backend Wave-0 (suitable до ~10M spans/day); Wave-1+
+# к S3 (Yandex Object Storage) если ingestion grows.
+#
+# Grafana datasource (configured в provisioning) hits tempo:3200 HTTP API.
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9095
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  trace_idle_period: 10s
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    block_retention: 168h  # 7 дней Wave-0; raise к 720h (30d) Wave-1+
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: oriion-staging
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics

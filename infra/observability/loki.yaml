@@ -1,0 +1,61 @@
+# Loki config — Phase 00.6 Stage A staging stack.
+#
+# Single-binary mode (no microservices); filesystem storage for Wave-0
+# (BoltDB index + filesystem chunks). Suitable до ~1 GB ingestion/day —
+# adequate для Wave-0 demo traffic. Wave-1 migrates к S3-compatible
+# object storage (Yandex Object Storage) если ingestion grows.
+#
+# Loki tails docker container stdout — backend emits structlog JSON
+# к stdout (LOG_FORMAT=json), so each container's docker logs driver
+# routes к Loki via promtail-style scrape OR direct Docker logging
+# driver. Wave-0: rely on Docker default json-file driver + Promtail-
+# equivalent stream from filesystem. Stage A local can use Docker
+# logging-driver=loki (compose.staging-local.override.yml C8).
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+schema_config:
+  configs:
+    - from: 2025-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+limits_config:
+  # metric_aggregation_enabled landed в Loki 3.3+; Phase 00.6 ships Loki
+  # 3.2.0 без этого поля. Wave-1 bump к 3.3+ re-enables.
+  allow_structured_metadata: true
+  retention_period: 168h  # 7 дней — Wave-0 short window. Wave-1+ к 30d when
+                          #  log volume justifies S3 backend.
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h

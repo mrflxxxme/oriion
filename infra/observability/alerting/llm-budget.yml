@@ -1,0 +1,56 @@
+# LLM cost budget alerts — Phase 00.6 Stage A.
+#
+# R-04 (runaway cost) mitigation per ADR-014 §5. Cost-budget каp lives в
+# `.claude/agents/_shared/cost-budget.yaml` (Conservative defaults: per-
+# day $30 dev_team partition); Phase 00.6 wires Prometheus alerts на
+# llm_cost_rub_total против runtime spend-rate.
+
+groups:
+  - name: llm-budget
+    interval: 1m
+    rules:
+      - alert: LLMDailySpendApproachingCap
+        # USD-equivalent at FX 100 RUB/USD: $30/day = ₽3000/day budget cap.
+        # Fire at 75% (₽2250 cumulative по cluster в last 24h).
+        expr: |
+          sum(increase(llm_cost_rub_total[24h])) > 2250
+        for: 5m
+        labels:
+          severity: warning
+          slo: cost
+        annotations:
+          summary: "LLM spend reached 75% of daily cap (₽2250 / ₽3000)"
+          description: |
+            Cumulative llm_cost_rub_total в last 24h = ₽{{ $value | humanize }}.
+            Daily budget cap in cost-budget.yaml dev_team partition = ₽3000.
+            Inspect per-cell breakdown: sum by (cell_id) (llm_cost_rub_total).
+
+      - alert: LLMDailySpendExceededCap
+        expr: |
+          sum(increase(llm_cost_rub_total[24h])) > 3000
+        for: 1m
+        labels:
+          severity: critical
+          slo: cost
+        annotations:
+          summary: "LLM spend EXCEEDED daily cap — runaway cost"
+          description: |
+            Cumulative llm_cost_rub_total в last 24h = ₽{{ $value | humanize }}.
+            Exceeds daily cap ₽3000 per cost-budget.yaml. R-04 mitigation:
+            inspect provider invocation rate, check для autonomous-loop
+            stuck-state, consider kill-switch via deadman.
+
+      - alert: PerCellHourlySpendSpike
+        # Per-cell budget anomaly: cell normally ~₽5/hour; spike >₽50 = anomaly
+        expr: |
+          sum by (cell_id) (rate(llm_cost_rub_total[1h]) * 3600) > 50
+        for: 10m
+        labels:
+          severity: warning
+          slo: cost-per-cell
+        annotations:
+          summary: "Cell {{ $labels.cell_id }} hourly spend > ₽50"
+          description: |
+            Per-cell hourly burn-rate = ₽{{ $value | humanize }}/h, exceeds
+            typical baseline (~₽5/h Wave-0). Possible runaway agent loop or
+            test traffic. Inspect orchestrator logs for cell.

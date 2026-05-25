@@ -1,0 +1,31 @@
+# Alertmanager config — Phase 00.6 Stage A.
+#
+# Wave-0 SHIP: log-only receiver (alerts surfaced в alertmanager UI +
+# Prometheus alerts panel). Telegram + PagerDuty webhooks = Wave-1
+# hardening pin (AC-W1-x).
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "severity", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: log-only-receiver
+
+receivers:
+  - name: log-only-receiver
+    # Wave-0 mock-receiver. Webhook к /dev/null. Founder reads alerts
+    # via alertmanager UI (http://localhost:9093 — gated by Caddy basic-
+    # auth or local-override port-publish per C8).
+    webhook_configs:
+      - url: http://otel-collector:4318/v1/logs
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ["alertname", "service"]

@@ -30,6 +30,44 @@ Per session-decision (11 развилок resolved):
 
 ## Текущая активная фаза
 
+**Phase 00.6 PR-A (Stage A — local-first validation)** — ✅ **Code-complete** on branch `claude/great-engelbart-8aa6fc` (2026-05-25). 13 atomic commits (eb31ff8 → 30c0051) + consolidated self-audit + Exit ritual. Stage B (PR-B Terraform + YC deploy + 10× demo + Wave-0 anchor flip) pending.
+
+* ✅ **Commit 1** `eb31ff8` — docs(planning,roadmap): Phase 00.6 spec amendment к 2-stage version + STATUS.md In Progress flip
+* ✅ **Commit 2** `dd9fa2d` — chore(alembic): force UTF-8 alembic.ini read via env.py patch (closes Pitfalls cp1251 carryover)
+* ✅ **Commit 3** `588e979` — refactor(iam): auth_service.register → async-with set_tenant_context (closes F-CR-M2 + F-ARC-M4)
+* ✅ **Commit 4** `29fcbf1` — feat(_shared/observability): OpenTelemetry SDK setup + auto-instrumentation (FastAPI + httpx + asyncpg)
+* ✅ **Commit 5** `eb96039` — feat(_shared/observability): Prometheus 9-metric family + /metrics ASGI mount
+* ✅ **Commit 6** `b5a0f6c` — feat(_shared/logging): structlog OTel correlation (trace_id/span_id injection) + LOG_FORMAT override
+* ✅ **Commit 7** `8c70f50` — feat(infra): docker-compose.staging.yml + 9 observability service configs + backend Dockerfile prod target
+* ✅ **Commit 8** `55e2ae1` — feat(infra): docker-compose.staging-local.override.yml + Caddyfile.staging с env-driven TLS toggle
+* ✅ **Commit 9** `a518621` — feat(infra/observability/grafana): provisioning + 3 dashboards (system-health, llm-usage, tasks-pipeline)
+* ✅ **Commit 10** `6773dad` — test(tasks): tests/tasks/ — 35 unit tests, 47% → 95.82% coverage, test_cancel_cascade relocated
+* ✅ **Commit 11** `4801891` — test(runtime): tests/runtime/ — 28 unit tests (incl. orchestrator fail-path F-ARC-M2 coverage), 49% → 94.92% coverage
+* ✅ **Commit 12** `d462532` — ci(backend): per-module ≥85% gate for agents/tasks/runtime (AC13 strict honor closed)
+* ✅ **Commit 13** `30c0051` — test,docs(observability): metrics + otel unit tests + local-smoke runbook + .env.example hygiene fix
+
+**Phase 00.6 PR-A** — closes Wave-1 hygiene carryover (alembic.ini cp1251 ✅; F-CR-M2 + F-ARC-M4 GUC duplication ✅; F-TR-M1/M2 test relocation ✅). Self-audit verdict PASS-WITH-FIXES-APPLIED: 0 HIGH; 9 MEDIUM (2 fixed in-loop, 2 deferred Stage B, 5 deferred Wave-1); 10 LOW deferred. AC13 (per-module ≥85% gates) ✅ CLOSED.
+
+**AC scoreboard (PR-A deliverable):**
+- ✅ AC13 (coverage ≥85% agents/tasks/runtime) — agents 100%, tasks 95.82%, runtime 94.92%; ci-backend.yml per-module loop wired
+- 🟡 AC1-AC10 — Stage B founder validation (10× demo run against real staging URL) closes evidence collection
+- 🟡 AC7 (UI demo) — переезжает в Phase 01.1 retro post-Phase-00.7 frontend ship
+
+**Wave-1 explicit AC pin block extension (Phase 00.6 PR-A audit):**
+- AC-W1-11: OTel header-sanitization processor (F-SEC-M2)
+- AC-W1-12: OTel SDK thread-safety (F-ARC-M1)
+- AC-W1-13: Per-callsite metric instrumentation (F-ARC-L1)
+- AC-W1-14: Loki retention 90d + audit_log archival (F-CMP-M2)
+- AC-W1-15: Alertmanager Telegram/PagerDuty receivers (F-CMP-L1)
+
+Audit report: [`_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md).
+
+**Founder action:** Run Stage A local-smoke per [`docs/runbooks/local-smoke.md`](../docs/runbooks/local-smoke.md) — sign-off в PR-A comments → merge.
+
+**Phase 00.6 (Deploy + Observability baseline) — pre-PR-A in-progress entry** (preserved для cross-ref):
+
+Phase 00.6 PR-A In Progress on branch `claude/great-engelbart-8aa6fc` (started 2026-05-23). Two-stage execution per founder grill 2026-05-23. Stage A (PR-A) = local-first validation: infra-as-code + observability stack (Otel + Prom + Loki + Tempo + Grafana) + Wave-1 hygiene cleanup (alembic.ini cp1251 real-fix via env.py utf-8 + 3-GUC tenant-context helper extract / F-CR-M2 + F-ARC-M4 closure) + AC13 strict ≥85% per-module gates for agents/tasks/runtime. Founder локально валидирует stack на Windows + Docker Desktop + WSL2 (verified working) перед PR-A merge. Stage B (PR-B) = real YC deploy via Terraform (founder installs `winget install Hashicorp.Terraform` between stages) + `scripts/demo_market_brief.py --runs 10` against staging URL → AC8 cohort p95 + AC9 per-run all-pass + AC10 per-run cost cap → Wave-0 anchor flip `internal_demo_passed=true` via `gates/wave-0-to-1.md` D5 amendment к API-based founder run. Audit scope: 5-agent on PR-A (Code Reviewer + Security + Test Results + Backend Architect + Compliance) + 2-agent lightweight on PR-B (Security + Compliance). GLM-5 4-th provider integration explicitly skipped без ADR-N (founder grill 2026-05-23: GLM-5 дублирует DeepSeek для Wave-0 SMB, self-host = GPU-infra Wave-5+ scope, no unique value-add). AC7 (UI demo) переезжает в Phase 01.1 retro post-Phase-00.7 frontend ship.
+
 **Phase 00.5a (RLS foundation)** — ✅ **Code-complete** on branch `claude/admiring-chaplygin-7da2f7` (2026-05-20). Chunked deliverable per Topic 2 cut-list philosophy from /grill-me session. Closes Architecture H1 (RLS-on-register bootstrap, carryover from PR #32 H-DEFER-2) + H2 (`set_tenant_context` dead-code finding from pre-Phase-05 audit) + Compliance H-1 (ADR-014 default-deny truthfulness). 1 atomic commit, 8 files, 754 insertions / 95 deletions.
 
 Per Phase 00.5 Topic 1 (founder-resolved 2026-05-20, RLS Option A): two SECURITY DEFINER SQL functions land in migration `multitenancy/0005_bootstrap_first_workspace_function.py`:
