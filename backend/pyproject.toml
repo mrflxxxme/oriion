@@ -2,7 +2,11 @@
 name = "teamly-backend"
 version = "0.1.0"
 description = "TEAMLY_RU backend — Pydantic-AI agent runtime + FastAPI + SQLAlchemy"
-readme = "../README.md"
+# readme field intentionally omitted — Phase 00.6 Commit 7 prod Dockerfile
+# uses `backend/` as Docker build context, so `../README.md` resolves outside
+# context и hatchling validate_fields raises OSError при `uv sync --frozen`.
+# Repository README lives в worktree root (../README.md) for git tooling but
+# isn't needed inside the Python wheel metadata for a private image.
 requires-python = ">=3.12,<3.13"
 license = { text = "Proprietary" }
 authors = [{ name = "Kirill Uklonskiy", email = "uklonskiy.k@gmail.com" }]

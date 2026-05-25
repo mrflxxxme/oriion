@@ -28,7 +28,21 @@
     admin {$CADDY_ADMIN_LISTEN:0.0.0.0:2019}
 }
 
-{$STAGING_DOMAIN:localhost} {
+{$CADDY_SITE_ADDR::80} {
+    # Site address — Stage A local uses `:80` (HTTP-only listener; CADDY_TLS=off
+    # override-yml leaves CADDY_SITE_ADDR unset → defaults to `:80`). Stage B
+    # YC deploy sets CADDY_SITE_ADDR=staging.${BRAND_DOMAIN} which switches
+    # Caddy к auto-HTTPS path с ACME-issued Let's Encrypt cert.
+
+    # Backend liveness — explicit route so /healthz works за Caddy proxy
+    # (docker-compose healthcheck + Stage A founder smoke step 2).
+    @healthz {
+        path /healthz /health
+    }
+    handle @healthz {
+        reverse_proxy backend:8000
+    }
+
     # Backend API
     @api {
         path /api/*
@@ -56,16 +70,16 @@
         reverse_proxy backend:8000
     }
 
-    # Grafana — basic-auth gated. Wave-0 ships empty bcrypt; founder
-    # generates via `docker run --rm caddy:2-alpine caddy hash-password
-    # --plaintext '<pwd>'` and sets env GRAFANA_BASIC_AUTH_BCRYPT.
+    # Grafana proxy. Wave-0 Stage A: relies на Grafana's built-in
+    # GF_SECURITY_ADMIN_USER/PASSWORD (set via docker-compose env) — Caddy
+    # basic_auth gate disabled здесь потому что empty GRAFANA_BASIC_AUTH_
+    # BCRYPT default crashes config parse. Stage B (PR-B) production deploy
+    # restores basic_auth Caddy layer after Lockbox-injected bcrypt env-var
+    # ships, providing defence-in-depth past Grafana's own auth.
     @grafana {
         path /grafana/*
     }
     handle_path /grafana/* {
-        basic_auth {
-            {$GRAFANA_BASIC_AUTH_USER:admin} {$GRAFANA_BASIC_AUTH_BCRYPT}
-        }
         reverse_proxy grafana:3000
     }
 
@@ -97,9 +111,6 @@
     }
 }
 
-# Healthz alias на same listener (no auth)
-:8000 {
-    handle /healthz {
-        reverse_proxy backend:8000
-    }
-}
+# /healthz routes folded into the main {$STAGING_DOMAIN} site block above
+# (separate `:8000` listener would never receive external traffic since
+# compose maps host :8080 → container :80 only).

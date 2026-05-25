@@ -3,11 +3,10 @@
 # Receives OTLP gRPC + HTTP from backend, fans out:
 #   * traces → tempo (via OTLP exporter)
 #   * metrics → prometheus (via Prometheus exporter scraped at :8889)
-#   * logs    → loki (via Loki exporter; backend already structlog-JSON
-#                     to stdout, so loki tails container stdout directly;
-#                     this is the explicit OTLP-log path for future use)
 #
-# Self-metrics exposed at :8888 so Prometheus can scrape collector health.
+# Self-metrics exposed at :8888 by default (collector built-in
+# `service.telemetry.metrics.address` — no explicit reader config needed,
+# which would race the built-in on the same port).
 
 receivers:
   otlp:
@@ -38,14 +37,8 @@ exporters:
     verbosity: basic
 
 service:
-  telemetry:
-    metrics:
-      readers:
-        - pull:
-            exporter:
-              prometheus:
-                host: 0.0.0.0
-                port: 8888
+  # Default collector self-metrics exposed at :8888 — Prometheus scrapes it
+  # via the `otel-collector` job в infra/observability/prometheus.yml.
   pipelines:
     traces:
       receivers: [otlp]
