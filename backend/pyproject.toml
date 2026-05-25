@@ -45,6 +45,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.60b0",
     "opentelemetry-instrumentation-asyncpg>=0.60b0",
     "prometheus-client>=0.21,<0.22",
+    "gunicorn>=26.0.0",
 ]
 
 [dependency-groups]

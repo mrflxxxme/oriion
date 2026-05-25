@@ -33,8 +33,34 @@ EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # ─────────────────────────────────────────────────────────────
-# Prod target — returns Phase 00.6 deliverable. Удалён из Phase 00.1 потому
-# что (а) compose targets только `dev`, (b) prod stage требует переноса COPY
-# src ДО `uv sync` (иначе hatchling fails build local project), (c) prod
-# entrypoint должен использовать gunicorn worker pool а не --reload uvicorn.
-# Все эти решения принимает Phase 00.6 owner.
+FROM base AS prod
+# Prod target — Phase 00.6 Commit 7 deliverable. Single-worker Gunicorn +
+# UvicornWorker per ADR F-ARC-H2 (multi-worker SSE-pub swap = Wave-1
+# AC-W1-1). Frozen lockfile so prod build is reproducible.
+#
+# Build order matters: COPY src/ ДО `uv sync --frozen` — hatchling treats
+# `teamly-backend` as a local editable install, and the sync resolves
+# package metadata from src/ (pyproject.toml `[tool.hatch.build.targets.
+# wheel] packages = ["src"]`).
+
+COPY pyproject.toml uv.lock ./
+COPY src ./src
+COPY migrations ./migrations
+COPY scripts ./scripts
+COPY alembic.ini ./
+
+RUN uv sync --frozen --no-dev --compile-bytecode
+
+ENV PATH="/app/.venv/bin:${PATH}"
+EXPOSE 8000
+
+# Gunicorn process supervisor + single uvicorn worker (workers=1 per
+# Phase 00.6 spec F-ARC-H2 Wave-0 invariant). --access-logfile + --error-
+# logfile к stdout so Docker logging driver routes к Loki tail.
+CMD ["gunicorn", "src.main:app", \
+     "-k", "uvicorn.workers.UvicornWorker", \
+     "-w", "1", \
+     "-b", "0.0.0.0:8000", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--graceful-timeout", "30"]

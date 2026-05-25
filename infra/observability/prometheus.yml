@@ -1,0 +1,65 @@
+# Prometheus config — Phase 00.6 Stage A staging stack.
+#
+# Scrapes:
+#   * oriion-backend /metrics (custom LLM_* + TASK_* metrics from
+#                              src/_shared/observability/metrics.py)
+#   * caddy admin endpoint (built-in HTTP + TLS metrics)
+#   * otel-collector self-metrics
+#   * prometheus self-metrics
+#
+# Alert rules in alerting/*.yml fired k alertmanager:9093.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: oriion-staging
+    region: ru-central-1
+
+rule_files:
+  - /etc/prometheus/alerting/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: oriion-backend
+    static_configs:
+      - targets: ["backend:8000"]
+        labels:
+          env: staging
+          service: backend
+    metrics_path: /metrics
+
+  - job_name: caddy
+    static_configs:
+      - targets: ["caddy:2019"]
+        labels:
+          env: staging
+          service: caddy
+    metrics_path: /metrics
+
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]
+        labels:
+          env: staging
+          service: otel-collector
+
+  - job_name: otel-collector-exported
+    # Metrics that backend sent via OTLP and collector re-exposed via
+    # `prometheus` exporter at :8889 (see otel-collector-config.yaml).
+    static_configs:
+      - targets: ["otel-collector:8889"]
+        labels:
+          env: staging
+          service: oriion-backend-otlp
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          env: staging
+          service: prometheus

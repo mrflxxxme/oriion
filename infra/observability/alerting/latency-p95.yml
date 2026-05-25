@@ -1,0 +1,47 @@
+# LLM + task latency alerts — Phase 00.6 Stage A.
+#
+# AC8 cohort target: p95 ≤120s for the «Market & content brief» demo flow.
+# Per-LLM p95 should stay well below that (~30s typical DeepSeek-V3).
+
+groups:
+  - name: latency-p95
+    interval: 30s
+    rules:
+      - alert: LLMRequestP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(llm_request_latency_seconds_bucket[5m]))
+              by (le, provider, model)
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "LLM {{ $labels.provider }}/{{ $labels.model }} p95 > 30s"
+          description: |
+            histogram_quantile(0.95, llm_request_latency_seconds) =
+            {{ $value | humanizeDuration }} over 5m. AC8 cohort budget is
+            120s end-to-end; per-call >30s leaves no headroom для multi-step
+            tasks. Inspect provider circuit-breaker state +
+            llm_provider_health{provider="{{ $labels.provider }}"}.
+
+      - alert: TaskDurationP95High
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(task_duration_seconds_bucket[10m]))
+              by (le, role_key)
+          ) > 120
+        for: 5m
+        labels:
+          severity: critical
+          slo: latency
+        annotations:
+          summary: "Task {{ $labels.role_key }} p95 > 120s (AC8 breach)"
+          description: |
+            End-to-end task p95 = {{ $value | humanizeDuration }} for role
+            {{ $labels.role_key }} over 10m. AC8 cohort target is ≤120s p95
+            for the Wave-0 demo. Stage B 10× founder run will use this
+            metric для gate D5 evidence (gates/wave-0-to-1.md).
