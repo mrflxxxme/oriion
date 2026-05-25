@@ -116,8 +116,9 @@ Phase 00.5b STATUS «AC3: orchestrator drives state machine» was technically tr
 
 **Recommended:** Path #1 — add inline orchestrator dispatch endpoint в PR-B как Commit 1 (before Terraform + demo runs). Closes AC3 properly end-to-end + matches founder's «10× founder runs against staging URL» plan.
 
-**New Wave-1 AC pin:**
+**New Wave-1 AC pins:**
 * AC-W1-16 — Replace inline-dispatch endpoint с proper Dramatiq worker for multi-tenant concurrency
+* AC-W1-17 — Proper unit tests для src/agents (coordinator/researcher/writer/analyst factory functions, routers via TestClient, schemas, seed_data, archetype_service, team_provisioning_service). Phase 00.6 Commit 19 corrected Phase 00.5b's inaccurate «agents 100%» claim — per-directory `tests/agents --cov=src/agents` hits only ~28%; CI gate deferred until proper tests land.
 
 ## Founder action
 
