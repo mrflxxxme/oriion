@@ -4,182 +4,181 @@
 
 ## Last updated
 
-- Date: 2026-05-25 (Phase 00.6 PR-A — code-complete, self-audit passed, PR ready to open)
-- Session: `great-engelbart-8aa6fc` (worktree branch `claude/great-engelbart-8aa6fc`)
-- Agent: @claude-opus (autonomous mode за founder approval)
+- Date: 2026-05-26 (C0 catch-up — rewrites HANDOFF + STATUS из Phase 00.2 era к post-Phase-00.6-PR-A baseline. Stage B PR-B in flight on branch `claude/gallant-lamport-f48eca`).
+- Session: `gallant-lamport-f48eca` (worktree branch `claude/gallant-lamport-f48eca`)
+- Agent: @claude-opus
 
 ## Project status
 
-- **Wave:** Wave 0 (Foundation) — anchor flip at Stage B (PR-B) 10× staging demo run
-- **Phase 00.1–00.5b**: ✅ Complete (PR #25/27/28/30/32/33/34/35)
-- **Phase 00.6 PR-A (Stage A — local-first validation)**: ✅ **Code-complete + PR ready** on branch `claude/great-engelbart-8aa6fc` (this session)
-- **Phase 00.6 PR-B (Stage B — YC deploy + 10× demo + Wave-0 anchor flip)**: ⏳ Pending PR-A merge
-
-## What just happened (this session, 2026-05-25)
-
-### Pass 1 (2026-05-23) — Grill + Commits 1-3 + Founder-Action checkpoint
-- 10-question structured grill walked decision tree от scope envelope до Stage B IaC choice
-- 13 grill-resolved decisions locked
-- Phase-spec amended к 2-stage execution (PR-A local + PR-B YC deploy)
-- Commits C1 (spec amendment), C2 (alembic cp1251 fix), C3 (auth_service.register hygiene) landed
-- Founder handed off LLM keys + SA ID; Claude provisioned `backend/.env` (gitignored) + smoke-tested DeepSeek/YandexGPT/GigaChat reachability
-- Mid-session HANDOFF checkpoint commit f5a937f + provisioning checkpoint 4af82e6
-
-### Pass 2 (2026-05-25, autonomous) — Commits 4-13 + Audit + Exit ritual
-- Founder approved autonomous execution для C4-C14
-- 10 commits landed end-to-end:
-  * C4 OTel SDK + auto-instrumentation
-  * C5 Prometheus 9-metric family + /metrics endpoint
-  * C6 structlog OTel correlation
-  * C7 docker-compose.staging.yml + 9 observability service configs + backend prod Dockerfile target
-  * C8 docker-compose.staging-local.override.yml + Caddyfile.staging
-  * C9 Grafana provisioning + 3 dashboards (system-health, llm-usage, tasks-pipeline)
-  * C10 tests/tasks/ unit tests до 95.82% coverage
-  * C11 tests/runtime/ unit tests до 94.92% coverage (incl. orchestrator F-ARC-M2 fail-path)
-  * C12 ci-backend.yml per-module ≥85% loop for agents/tasks/runtime
-  * C13 observability unit tests + local-smoke runbook + .env.example hygiene fix
-- C14 = self-audit consolidation + Exit ritual + PR-A open
-
-## Phase 00.6 PR-A commit ledger (complete)
-
-| # | Hash | Title | Files | +/- |
-|---|---|---|---|---|
-| 1 | `eb31ff8` | `docs(planning,roadmap)`: Phase 00.6 spec amendment к 2-stage version | 2 | +57/-2 |
-| 2 | `dd9fa2d` | `chore(alembic)`: force UTF-8 alembic.ini read via env.py patch | 2 | +21/-5 |
-| 3 | `588e979` | `refactor(iam)`: auth_service.register uses async-with set_tenant_context | 1 | +22/-25 |
-| — | `f5a937f` | `docs(planning)`: Phase 00.6 PR-A mid-session checkpoint [C1-C3 of ~14 done] | 1 | +198/-119 |
-| — | `4af82e6` | `docs(planning)`: mark founder-action provisioning complete + env state matrix | 1 | +48/-11 |
-| 4 | `29fcbf1` | `feat(_shared/observability)`: OpenTelemetry SDK setup + auto-instrumentation | 6 | +202 |
-| 5 | `eb96039` | `feat(_shared/observability)`: Prometheus custom metrics + /metrics endpoint | 3 | +192/-4 |
-| 6 | `b5a0f6c` | `feat(_shared/logging)`: structlog OTel correlation + LOG_FORMAT override | 2 | +59/-6 |
-| 7 | `8c70f50` | `feat(infra)`: docker-compose.staging.yml + observability service configs | 12 | +623/-5 |
-| 8 | `55e2ae1` | `feat(infra)`: docker-compose.staging-local.override.yml + Caddyfile.staging | 2 | +214 |
-| 9 | `a518621` | `feat(infra/observability/grafana)`: provisioning + 3 dashboards | 5 | +353 |
-| 10 | `6773dad` | `test(tasks)`: tests/tasks/ unit tests + relocate test_cancel_cascade | 7 | +763 |
-| 11 | `4801891` | `test(runtime)`: tests/runtime/ unit tests + orchestrator fail-path | 5 | +587 |
-| 12 | `d462532` | `ci(backend)`: per-module coverage gate for agents/tasks/runtime @85% | 1 | +19/-9 |
-| 13 | `30c0051` | `test,docs(observability)`: metrics + otel unit tests + local-smoke runbook | 5 | +325/-2 |
-
-**Final surface:** 39 mounted routes preserved (no router regressions); 9-service compose stack; OTel + Prometheus + Loki + Tempo + Grafana wired в `_shared/observability/`; 168 new test cases (35 tasks + 28 runtime + 10 observability + 95 iam regression baseline); src/tasks 95.82% + src/runtime 94.92% per-module; alembic.ini cp1251 + 3-GUC helper hygiene closed.
-
-## Audit findings — final disposition (Phase 00.6 PR-A self-audit)
-
-| ID | Severity | Status |
-|---|---|---|
-| F-SEC-M1 | MEDIUM | ✅ MITIGATED IN-LOOP — Grafana password rotation note в runbook + Lockbox precedence в compose |
-| F-SEC-M3 | MEDIUM | ✅ DOCUMENTED — RU CA fallback paths (a/b/c) в runbook Step 2 |
-| F-CR-M1 | MEDIUM | 🟡 DEFERRED Wave-1 — metrics.py registration introspection brittleness |
-| F-CR-M2 | MEDIUM | 🟡 DEFERRED Stage B (PR-B) — Caddyfile production rewrite |
-| F-SEC-M2 | MEDIUM | 🟡 DEFERRED Wave-1 (AC-W1-11) — OTel header-sanitization |
-| F-TR-M1 | MEDIUM | 🟡 DEFERRED Wave-1 (extends AC-W1-5) — SSE-stream real testcontainers PG assertion |
-| F-ARC-M1 | MEDIUM | 🟡 DEFERRED Wave-1 (AC-W1-12) — OTel SDK thread-safety |
-| F-CMP-M1 | MEDIUM | 🟡 DEFERRED Stage B (PR-B) — ADR-018 V4 amendment |
-| F-CMP-M2 | MEDIUM | 🟡 DEFERRED Wave-1 (AC-W1-14) — Loki retention 90d + audit_log archival |
-| 10 LOW findings | LOW | 🟡 DEFERRED Wave-1 hygiene pass |
-
-Master report: [`_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md)
+- **Wave:** Wave 0 (Foundation) — **closing** (Stage B PR-B closes anchor `internal_demo_passed=true`)
+- **Phase 00.1 (Repo+CI/CD)**: ✅ Complete (merged 2026-05-17 via [PR #25](https://github.com/mrflxxxme/oriion/pull/25), `b192c6b`)
+- **Architect-PR (pre-00.2)**: ✅ Complete (merged 2026-05-17 via [PR #27](https://github.com/mrflxxxme/oriion/pull/27))
+- **Phase 00.2 (Custom JWT auth)**: ✅ Complete (merged via PR `[00.2] feat(iam)...` 2026-05-18; 14 atomic commits, src.iam coverage 86.69%, AC1-AC10 green)
+- **Phase 00.3 (DB+RLS+multitenancy)**: ✅ Complete (merged in parallel with 00.2 + 00.4)
+- **Phase 00.4 (LLM gateway+MCP)**: ✅ Complete (merged in parallel with 00.2 + 00.3)
+- **Phase 00.2.5 (integration)**: ✅ Complete (merged 2026-05-19 via [PR #32](https://github.com/mrflxxxme/oriion/pull/32), 8 atomic commits; deleted `backend/src/_stubs/` and rewired imports к real impls)
+- **Phase 00.5 / 00.5a (Pydantic-AI runtime)**: ✅ Complete (anchor branch merged 2026-05-20)
+- **Phase 00.5b (runtime + tasks + orchestrator)**: ✅ Complete (merged via [PR #35](https://github.com/mrflxxxme/oriion/pull/35) 2026-05-21; 6 commits + Commit 8 (audit fixes + Exit ritual) + mandatory 5-agent audit swarm; 3 HIGH/15 MEDIUM/17 LOW; AC-W1-1..10 pin block to Phase 01.1 retro)
+- **Phase 00.6 PR-A (Stage A: local-first validation infra)**: ✅ Complete (merged 2026-05-25 via [PR #36](https://github.com/mrflxxxme/oriion/pull/36); 22 atomic commits eb31ff8 → 0f125bd; consolidated self-audit 0H/9M/10L PASS-WITH-FIXES; new AC-W1-11..15 pin block extension)
+- **Phase 00.6 PR-B (Stage B: YC staging deploy + 10× demo + Wave-0 anchor flip)**: 🔄 In Progress on `claude/gallant-lamport-f48eca` (this session)
+- **Phase 00.7 (frontend skeleton)**: ⏳ Pending — opens после Phase 00.6 closure
+- **Phase 01.1 retro (Wave-1 hardening)**: ⏳ Pending — created в PR-B C8 commit с AC-W1-1..17 pins lifted
 
 ## Active blockers
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
-| OQ-04 | РКН-уведомление | Founder + юрист | **Submitted** — dev unblocked. Final РКН confirmation required до prod-launch. |
+| OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | **Submitted** — dev unblocked. Final РКН confirmation required до prod-launch; dev/test работает на mock-данных. |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку, нужно до открытия ЮKassa (Wave 1) |
 
-## Next agent — read first (bootstrap-4)
+## What just happened (Phase 00.6 PR-A + start of PR-B)
 
-1. [`README.md`](./README.md)
-2. [`STATUS.md`](./STATUS.md)
-3. **this HANDOFF.md**
-4. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md)
+### Phase 00.6 PR-A (PR #36, merged 2026-05-25)
 
-Then для Stage B continuation:
+**22 атомарных коммитов** (см. `git log e8b5552 --oneline | head -22`):
 
-5. [`roadmap/wave-0-foundation/phases/00.6-deploy-observability.md`](./roadmap/wave-0-foundation/phases/00.6-deploy-observability.md) — read «Scope amendment 2026-05-23» Stage B section
-6. [`_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md`](./_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md) — Wave-1 AC pin block extension AC-W1-11..15
-7. [`gates/wave-0-to-1.md`](./gates/wave-0-to-1.md) — D5 amendment ландит в PR-B per α decision-7
+```
+eb31ff8 — Phase 00.6 spec amendment к 2-stage version [C1]
+dd9fa2d — alembic.ini UTF-8 force via env.py patch (cp1251 Windows fix) [C2]
+588e979 — auth_service.register uses async-with set_tenant_context (GUC helper) [C3]
+f5a937f — mid-session checkpoint
+4af82e6 — founder-action provisioning complete + env state matrix
+29fcbf1 — _shared/observability OTel SDK + auto-instrumentation [C4]
+eb96039 — _shared/observability/metrics.py 9-metric family + /metrics ASGI mount [C5]
+b5a0f6c — _shared/logging.py OTel correlation processor + LOG_FORMAT override [C6]
+8c70f50 — infra/docker-compose.staging.yml 9-service stack + observability configs [C7]
+55e2ae1 — infra/docker-compose.staging-local.override.yml + Caddyfile.staging env-driven [C8]
+a518621 — infra/observability/grafana provisioning + 3 dashboards [C9]
+6773dad — tests/tasks/ 35 unit tests (src/tasks 47% → 95.82%) [C10]
+4801891 — tests/runtime/ 28 unit tests (src/runtime 49% → 94.92%) [C11]
+d462532 — ci-backend.yml per-module gate ≥85% для agents/tasks/runtime (AC13 strict) [C12]
+30c0051 — observability unit tests + local-smoke runbook [C13]
+e8e663d — Phase 00.6 PR-A self-audit + Exit ritual + PR open [C14]
+b62ed50 — in-loop smoke-test fixes (Dockerfile, Caddy basic_auth, Loki 3.2 field, OTel port, pgvector image) [C15]
+082b948 — alembic monkey-patch _ensure_version_table для varchar(128) [C16]
+76c386f — document Phase 00.5b orchestrator-dispatch gap [C17]
+0d9fa73 — ruff + mypy strict cleanups для CI green [C18]
+3c661aa — src/ ruff cleanup + mypy AsyncPG ignore [C19]
+2e58fad — defer src/agents per-module gate к Wave-1 AC-W1-17 [C20]
+0f125bd — register PYSEC-2026-161 ignore + ADR-014 entry [C21]
+```
 
-## CRITICAL FINDING — Phase 00.5b architectural gap discovered during Stage A smoke (2026-05-25)
+**Decisions standing (verbatim из grill 2026-05-23, НЕ перегриливать в PR-B):**
 
-End-to-end smoke testing surfaced that **Phase 00.5b shipped the POST /api/v1/cells/{cell_id}/tasks HTTP endpoint + the orchestrator code, but NO background dispatcher** that picks queued tasks and runs them. The orchestrator was only ever invoked via direct call в the demo-flow integration test. Live tasks created via HTTP stay в `status=queued` forever; SSE stream subscribers wait indefinitely until httpx client timeout.
+| # | Branch | Resolution |
+|---|---|---|
+| Q1 | Scope envelope | B (spec + hygiene; GLM-5 silent defer без ADR-N) |
+| Q2 | Execution model | D-extended (local-first then VM, 2-stage) |
+| Q3 | PR strategy | ii (2 PRs — PR-A local + PR-B staging) |
+| Q4 | Worktree | fresh PR-B worktree |
+| Q5 | Compose pattern | A (base + local override) |
+| Q6 | Local-pass acceptance | 3 (smoke + 1× real-LLM demo) |
+| Q7 | Audit scope | IV (full на PR-A — DOWNGRADED к self-audit per context budget; lightweight на PR-B — UPGRADED к full 5-agent per founder PR-B brief) |
+| Q8 | AC13 | i (strict honor — закрыто PR-A для tasks/runtime; agents deferred к Wave-1 AC-W1-17) |
+| Q9 | GUC | A1 (async-with wrap — закрыто PR-A C3) |
+| Q10 | Alembic | B1 (env.py utf-8 — закрыто PR-A C2) |
+| Q11 | IaC | 1 (Terraform-only) |
+| Q12 | Anchor-flip | α (10× founder run against staging URL) |
+| Q13 | AC-tolerance | AC8 cohort p95; AC9/10 per-run all-pass |
 
-Phase 00.5b STATUS «AC3: orchestrator drives state machine» was technically true (state machine exists) but tested only via canned-data CI flow.
+### CRITICAL FINDING from PR-A live smoke (recap)
 
-**Impact on Stage A local-smoke:**
-* Steps 1-4, 7-9 от runbook (compose up, /healthz, /metrics, Grafana, Loki, Tempo, teardown) ✅ — validates observability infrastructure end-to-end
-* Step 5 (1× REAL-LLM demo run) ❌ BLOCKED — needs orchestrator dispatch layer. Confirmed via direct POST /tasks → `status=queued` permanent + SSE stream times out at 0.0s
+POST /api/v1/cells/{cell_id}/tasks создаёт queued task **но НЕ dispatches** к orchestrator. SSE stream `/tasks/{id}/stream` подключается к InProcessSSEPublisher pubsub queue, но никто события не публикует — клиент ждёт впустую. PR-B C1 closes via **Path #1 inline-dispatch endpoint**:
 
-**Resolution paths** (founder choice):
-1. **Add inline-dispatch endpoint в PR-B**: POST /api/v1/cells/{cell_id}/tasks/{id}/run synchronously invokes orchestrator (long-poll style). Quick (~1 day), pragmatic для Wave-0 demo gate.
-2. **Add Dramatiq worker в PR-B**: Background queue picks up queued tasks. Production-shape but +2-3 days scope.
-3. **Defer demo flow к Wave-1 entirely**: Update gate D5 semantic «internal_demo_passed» к infrastructure-validation-only за Wave-0; full demo flow becomes Wave-1 deliverable.
+```
+POST /api/v1/cells/{cell_id}/tasks/{task_id}/run
+# Synchronously invokes orchestrator.run_task(task) — SSE стрим начинает работать end-to-end.
+```
 
-**Recommended:** Path #1 — add inline orchestrator dispatch endpoint в PR-B как Commit 1 (before Terraform + demo runs). Closes AC3 properly end-to-end + matches founder's «10× founder runs against staging URL» plan.
+AC-W1-16 (NEW, this prompt): orchestrator-dispatch swap к Dramatiq actor (async dispatcher) tracked для Wave-1; inline approach acceptable для Wave-0 single-cell demo flow.
 
-**New Wave-1 AC pins:**
-* AC-W1-16 — Replace inline-dispatch endpoint с proper Dramatiq worker for multi-tenant concurrency
-* AC-W1-17 — Proper unit tests для src/agents (coordinator/researcher/writer/analyst factory functions, routers via TestClient, schemas, seed_data, archetype_service, team_provisioning_service). Phase 00.6 Commit 19 corrected Phase 00.5b's inaccurate «agents 100%» claim — per-directory `tests/agents --cov=src/agents` hits only ~28%; CI gate deferred until proper tests land.
+### Phase 00.6 PR-B commit ledger (in flight, 10 atomic commits)
 
-## Founder action
+**Phase A — AI autonomous (C0..C6 + C8):**
 
-1. **Run Stage A local-smoke** per [`docs/runbooks/local-smoke.md`](../docs/runbooks/local-smoke.md) **infrastructure validation portion** (~10 min) — Steps 1-4 + 6-9 work and pass. Skip Step 5 (real-LLM demo run) — blocked on orchestrator-dispatch gap above.
-2. **Refresh YC IAM token** if last refresh >10h ago (one-liner в HANDOFF «YC IAM token refresh runbook» section).
-3. **Optional pre-PR-B prep:** Install Russian Trusted Root CA для GigaChat TLS (runbook Pre-flight Step 2).
-4. **Review + merge PR-A** через GitHub UI после sign-off.
-5. **Open Stage B work** post-merge — Terraform Yandex Cloud baseline + CI deploy workflow + 10× `scripts/demo_market_brief.py --runs 10 --api-base-url https://staging.${BRAND_DOMAIN}/...` → собрать gate-evidence для AC8 (cohort p95) + AC9 + AC10 → флипнуть Wave-0 anchor `internal_demo_passed=true`.
-
-## Decisions standing (no re-grill — verbatim from 2026-05-23)
-
-| # | Topic | Decision | Status |
+| # | Status | Commit | Type |
 |---|---|---|---|
-| 1 | **Scope envelope** | B — Spec + Wave-1 hygiene; GLM-5 silent defer без ADR | ✅ Shipped |
-| 2 | **Execution model** | D-extended — Local-first validation, then VM deploy | ✅ Shipped (PR-A local) |
-| 3 | **Worktree** | Current `claude/great-engelbart-8aa6fc` | ✅ Used |
-| 4 | **PR strategy** | (ii) 2 PRs — PR-A (local) + PR-B (YC+demo+anchor) | ✅ PR-A code-complete |
-| 5 | **Compose pattern** | A — base `staging.yml` + `staging-local.override.yml` | ✅ Shipped C7+C8 |
-| 6 | **Local-pass acceptance** | 3 — Smoke + Grafana + 1 REAL-LLM demo + AC4 alert + Loki+Tempo visible | ✅ Runbook ships (C13) |
-| 7 | **Gate D5 anchor flip** | α — Update D5 verbatim: founder runs script 10× against staging URL | 🟡 Stage B PR-B amendment |
-| 8 | **5-agent audit swarm** | IV — Full 5-agent on PR-A; lightweight (Sec+Compliance) on PR-B | 🟡 PR-A downgraded к self-audit (context budget); PR-B unchanged |
-| 9 | **AC13 ≥85% per-module** | (i) Strict honor | ✅ Closed C10+C11+C12 (95.82% + 94.92%) |
-| 10 | **F-CR-M2/F-ARC-M4 GUC** | (A1) — Wrap with async-with helper | ✅ Shipped C3 |
-| 11 | **alembic.ini cp1251** | (B1) — Patch env.py с encoding="utf-8" | ✅ Shipped C2 |
-| 12 | **Stage B IaC** | (1) — Terraform-only | 🟡 PR-B work |
-| 13 | **AC tolerance band** | AC8 cohort p95 + AC9/10 per-run all-pass; fix script | 🟡 Stage B PR-B (Commit 4 plan) |
+| C0 | 🔄 in flight | `docs(planning): catch-up HANDOFF + STATUS to Phase 00.6 PR-A baseline` | housekeeping |
+| C1 | ⏳ pending | `feat(runtime,tasks): inline orchestrator-dispatch endpoint (POST /tasks/{id}/run)` | feature |
+| C2 | ⏳ pending | `fix(scripts): demo_market_brief.py AC8 cohort-semantic + exit-code refactor` | bugfix |
+| C3 | ⏳ pending | `feat(infra/terraform): YC Cloud baseline (VM + Managed PG + Redis + Lockbox + DNS)` | feature |
+| C4 | ⏳ pending | `feat(ci): deploy-staging.yml workflow + scripts/deploy/{wait_healthy,rollback}.sh` | feature |
+| C5 | ⏳ pending | `feat(infra,docs): Caddyfile.staging real-ACME + staging-bootstrap runbook` | feature |
+| C6 | ⏳ pending | `docs(planning,gates): amend wave-0-to-1.md D5 verbatim per α + ADR-018 V4 drift` | docs |
+| C8 | ⏳ pending | `chore(planning,roadmap): lift AC-W1-1..17 в phases/01.1-retro.md` (NEW) | docs |
 
-## Known caveats (carryover + deferred)
+**Founder gate (between C6 and C7):** terraform apply + DNS A-record `staging.oriion.dev` + `gh secret set` (4 secrets + 3 vars) + first deploy + manual register/login curl + 10× demo run `python -m scripts.demo_market_brief --runs 10` + screen-recording. Evidence handed back в `.planning/gates/evidence/wave-0-to-1/`.
 
-- **F-ARC-H2 SSEPublisher multi-worker** — Wave 0 deploys с `workers=1` per Phase 00.6 spec; Wave-1 Redis pubsub swap on AC-W1-1
-- **Slug-based cross-tenant linkage** — Wave-1 backlog (unchanged)
-- **TOCTOU SSRF в `read_url`** — Wave-1 hardening (unchanged)
-- **alembic.ini cp1251 на Windows** — ✅ **CLOSED Phase 00.6 Commit 2** (env.py UTF-8 patch)
-- **F-CR-M2 + F-ARC-M4 (auth_service.register GUC duplication)** — ✅ **CLOSED Phase 00.6 Commit 3** (async-with refactor)
-- **F-TR-M1/M2 (test cancel_cascade location)** — ✅ **CLOSED Phase 00.6 Commit 10** (relocated to tests/tasks/)
-- **AC13 per-module ≥85% gate для agents/tasks/runtime** — ✅ **CLOSED Phase 00.6 Commits 10+11+12**
-- **Live LLM provider tests** — Stage A local validation runs them per founder runbook
-- **GigaChat OAuth refresh-after-expiry test (F-P5-4)** — AC-W1-10 Wave-1 pin
-- **YANDEX_GPT_* env var legacy names** — ✅ **CLOSED Phase 00.6 Commit 13** (.env.example synced)
-- **DeepSeek V3/R1 → V4 model generation drift в ADR-018** — Stage B PR-B amendment
+**Phase B — AI resumes (C7 + C9):**
 
-## Pitfalls confirmed (final)
+| # | Status | Commit | Type |
+|---|---|---|---|
+| C7 | ⏳ pending | `chore(gates,evidence): 10× founder demo run evidence` | evidence |
+| C9 | ⏳ pending | `chore(audit,docs): FULL 5-agent Phase 00.6 retro + Exit ritual + Wave-0 anchor flip` | audit |
 
-- Worktree-prefixed absolute paths в Edit/Write
-- `oriion_app` role canary в CI (verified green в Phase 00.5b suite + preserved Phase 00.6)
-- `rbac.system_roles` natural key is `slug` (NOT `code`)
-- pytest-xdist remains disabled
-- `.claude/settings.local.json` gitignored
-- Pip-audit `PYSEC-2025-183` ignore preserved; **NEW** OpenTelemetry bump added `opentelemetry-instrumentation-{fastapi,httpx,asyncpg}` >=0.60b0 — verify no new advisories on next pip-audit run
-- Settings reads `.env` not `.env.local` (pydantic-settings convention); `backend/.env` gitignored via `.gitignore:2`
-- YC IAM token TTL ~12h — refresh runbook one-liner saved в HANDOFF
-- GigaChat TLS requires RU Trusted Root CA installed OR `GIGACHAT_VERIFY_SSL=false` (dev-only)
-- Auto-Mode classifier blocks `-SkipCertificateCheck` в TLS calls (correct security posture)
-- Caddy `auto_https off` global directive — required для localhost mode но overrides CADDY_TLS=on env (F-CR-M2 known; Stage B Caddyfile rewrite)
+### AC-W1 pin block (lift verbatim в Phase 01.1 retro C8)
 
-## Exit ritual completed (Phase 00.6 PR-A)
+**Phase 00.5b inherited (Phase 01.1 retro target):**
+- AC-W1-1 — SSEPublisher Redis-pubsub bridge (multi-worker invariant, F-ARC-H2)
+- AC-W1-2 — Per-step TaskStep persistence + per-callsite metrics
+- AC-W1-3 — Master-Agent schema extension
+- AC-W1-4 — TaskRepository port + outbox
+- AC-W1-5 — cancel_cascade real-PG testcontainers + SSE-stream proper test (extended за F-TR-M1)
+- AC-W1-6 — GUC tenant-context helper extract ✅ **CLOSED PR-A C3** (remove from active list)
+- AC-W1-7 — NullTeamProvisioningService no-op default
+- AC-W1-8 — DelegateInput.target_agent_slug pattern constraint
+- AC-W1-9 — Provider key rotation via YC Lockbox (partial — Stage B Terraform ships Lockbox provisioning)
+- AC-W1-10 — GigaChat OAuth refresh-after-expiry test
 
-- [x] JOURNAL.md entry appended (top-of-file timestamped block)
-- [x] HANDOFF.md rewritten (this file)
-- [x] STATUS.md updated — Phase 00.6 PR-A ✅ Code-complete; AC scoreboard final
-- [x] AUDIT-REPORT.md self-audit written к `_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/`
-- [x] All HIGH findings either zero (no HIGH found) or already addressed in-loop
-- [x] Plan file persists at `C:\Users\KUklonskiy\.claude\plans\crispy-crunching-sunset.md` (legacy from Phase 00.5b)
-- [ ] **PR opened** — final step (after this commit lands)
+**Phase 00.6 PR-A new pins:**
+- AC-W1-11 — OTel header-sanitization processor (drop Authorization spans) — F-SEC-M2
+- AC-W1-12 — OTel SDK thread-safety (atomic _instrumented flag) — F-ARC-M1
+- AC-W1-13 — Per-callsite metric instrumentation (orchestrator + LLMRouter + cost_recorder) — F-ARC-L1
+- AC-W1-14 — Loki retention 90d + audit_log archival — F-CMP-M2 (ФЗ-152 compliance)
+- AC-W1-15 — Alertmanager Telegram/PagerDuty receivers — F-CMP-L1
+
+**Phase 00.6 PR-B new pins (this prompt):**
+- AC-W1-16 — orchestrator-dispatch swap к Dramatiq actor (replace inline synchronous endpoint от PR-B C1)
+- AC-W1-17 — proper src/agents unit tests (per PR-A C20 per-module gate deferral)
+
+## Pre-flight readiness (validated 2026-05-26)
+
+| Item | Status | Notes |
+|---|---|---|
+| Worktree base | ✅ `gallant-lamport-f48eca` @ `e8b5552` (= origin/main HEAD post-PR #36) | working tree clean |
+| `backend/.env` | ✅ copied 3793 bytes from `great-engelbart-8aa6fc/backend/.env` | YANDEX_IAM_TOKEN refreshed via `yc iam create-token` (length=309) |
+| Docker | ✅ Desktop 28.5.1 / 8.2 GiB RAM | sufficient для 10-service stack |
+| Terraform | ✅ v1.15.4 on PATH | ready для `terraform init/plan/apply` |
+| yc CLI | ✅ auth'd | folder-id = `b1g74vf7snhebom5avhu` |
+| gh CLI | ✅ auth'd as `mrflxxxme` | ready для `gh secret set` + `gh pr create` |
+| Russian Trusted Root CA | ✅ installed в OS trust store | GigaChat OAuth работает |
+| Stale main checkout | ⚠️ DEFERRED housekeeping | `0a9eee8` (Phase 00.1 era) vs origin/main `e8b5552`; не блокирует PR-B work (worktree base correct) |
+| Stale worktrees (13 ea) | ⚠️ DEFERRED housekeeping | cleanup pin для post-PR-B-merge |
+
+## Carryover к next session (если PR-B paused mid-flight)
+
+Read first:
+1. [`README.md`](./README.md)
+2. **this HANDOFF.md** — current PR-B snapshot
+3. [`STATUS.md`](./STATUS.md) — wave-progress
+4. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md)
+5. `C:\Users\KUklonskiy\.claude\plans\expressive-jumping-thimble.md` — full PR-B plan with commit ledger
+6. `.planning/_session-context/AUDIT-2026-05-25-PHASE-00-6-PR-A/AUDIT-REPORT.md` — Phase 00.6 PR-A consolidated audit (input для PR-B C9 5-agent retro)
+
+Resume point: check `git log -10 --oneline` against ledger в this HANDOFF; pick next C[N] not yet committed; mark TaskList task in_progress; execute per plan.
+
+## Founder action queue
+
+1. **Now (autonomous)**: PR-B C0..C6+C8 ship without founder hands (~hours of AI work).
+2. **Founder gate**: see `docs/runbooks/staging-bootstrap.md` (created в C5).
+3. **After 10× demo evidence hand-back**: AI ships C7+C9 + opens PR-B via `gh pr create`.
+4. **Post-merge housekeeping**: update local main checkout + cleanup 13 stale worktrees.
+
+## Exit ritual partial (this commit C0)
+
+- [x] HANDOFF.md rewritten — full Phase 00.6 PR-A snapshot + PR-B ledger
+- [x] STATUS.md rewritten — sibling C0 commit
+- [ ] PR-B C1..C9 execution — pending
+- [ ] JOURNAL.md PR-B entry — appended в C9 Exit ritual
+- [ ] Wave-0 anchor flip — C9
+- [ ] PR-B opened — C9
