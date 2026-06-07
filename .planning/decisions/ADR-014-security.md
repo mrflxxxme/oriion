@@ -1,18 +1,24 @@
 # ADR-014: Security — RBAC + DLP + изоляция memory от tool-output + операционная гигиена
 
-- **Status:** Accepted (amendments 2026-05-19 + 2026-05-20, see «Wave 0 security decisions»)
+- **Status:** Accepted (amendments 2026-05-19 + 2026-05-20; 2026-06-07 Phase 00.6 PR-B CVE-drift refresh, see registry below)
 
-## Pip-audit ignored advisories registry (audit-trail)
+## Pip-audit + Trivy ignored advisories registry (audit-trail)
 
 > Each ignored advisory MUST be re-reviewed at the next dependency bump
 > of the affected package. CI hooks: `.github/workflows/ci-backend.yml`
-> step `pip-audit (CVE scan)`.
+> step `pip-audit (CVE scan)` (uses `--ignore-vuln <ID>`) AND
+> `.github/workflows/ci-security.yml` step `filesystem — trivy` (uses
+> `trivyignores: .trivyignore` at repo root). pip-audit keys on PYSEC/GHSA
+> ids; trivy keys on CVE ids — the same vuln may appear under both with
+> different ids.
 
 | Advisory | Package | Status | Justification | Re-review trigger |
 |---|---|---|---|---|
 | `PYSEC-2025-183` / `CVE-2025-45768` | `pyjwt` (all versions) | DISPUTED by upstream (jpadilla) | Claim is "weak encryption when key length is short". Our policy: HS256 + mandatory 32+ char secret per `Settings.jwt_secret_access_v1` field default literally encoding "min-32-chars". No fix version published; advisory has no upper-bound (all versions marked affected). | Re-review at every `pyjwt` bump or when fix version published |
 | `CVE-2025-69872` | `diskcache` 5.6.3 (transitive via `fastmcp` → `pydantic-ai`) | No fix version published as of 2026-05-21 | Not on a runtime critical path for our stack — used internally by `fastmcp` for its own request-caching layer, not for user data or BYOK key material. The other 5 transitive CVEs (CVE-2026-25580 / GHSA-rcfx-77hg-w2wv / CVE-2025-69196 / CVE-2025-64340 / CVE-2026-27124) were closed by bumping pydantic-ai → 1.56+ and fastmcp → 3.2+ in Phase 00.5b post-PR-CI fix. | Re-review when `diskcache` publishes a fix or when `fastmcp` drops the dep |
-| `PYSEC-2026-161` | `starlette` 0.52.1 (transitive via `fastapi`) | Fix lives in starlette 1.0.1 but `fastapi 0.120-0.130` caps `starlette<1.0.0`. Resolver rejects direct bump («unsatisfiable»). | Advisory: «Starlette reconstructs URL based on HTTP Host header without validation; allows authentication bypass when auth depends on reconstructed URL's path». Our auth (Phase 00.2 custom JWT) does NOT depend on URL reconstruction from Host header — routing is path-matched explicitly + JWT signature-verified, не URL-derived. Attack surface не applicable к our IAM design. | Re-review when fastapi releases a version supporting `starlette>=1.0.1` (currently fastapi 0.120-0.128 cap at <1.0.0) |
+| `PYSEC-2026-161` (pip-audit) / `CVE-2026-48710` (trivy, `.trivyignore`) | `starlette` 0.52.1 (transitive via `fastapi` 0.129.2) | Fix lives in starlette 1.0.1 but `fastapi>=0.120,<0.130` caps `starlette<1.0.0`. Resolver rejects direct bump («unsatisfiable»). | Same starlette family (URL reconstructed from Host header without validation; auth-bypass IF auth depends on the reconstructed URL path). Our auth (Phase 00.2 custom JWT) does NOT derive identity from a reconstructed URL — routing is explicit path-match + JWT signature-verified. Not applicable to our IAM design. CVSS = MEDIUM. The trivy fs gate keys on the CVE id, hence the `.trivyignore` entry. | Re-review when fastapi releases a version allowing `starlette>=1.0.1`; bump both + drop both ignores. Wave-1 dependency-bump pin. |
+| `PYSEC-2026-196` (pip-audit) | `pip` 26.1.1 (build-time tool, fix 26.1.2) | `pip` is a BUILD-TIME tool, not shipped in the prod runtime image (the prod Dockerfile installs hash-locked deps via `uv`, never `pip install` from untrusted indexes). 26.1.2 is not yet the version uv bundles. | CVE drift (2026-06). Re-review when the uv-bundled `pip` reaches 26.1.2. |
+| `CVE-2026-47265` + `CVE-2026-34993` | `aiohttp` (transitive via `xai-sdk`) | **CLOSED — fixed by bump** `aiohttp 3.13.5 → 3.14.0` (Phase 00.6 PR-B, `uv lock --upgrade-package aiohttp`). No ignore needed; retained here as audit-trail. | n/a (resolved) |
 
 ## Wave 0 security decisions (2026-05-19, amended 2026-05-20)
 

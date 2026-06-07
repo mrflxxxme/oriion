@@ -1,0 +1,32 @@
+# Phase 00.6 PR-B — copy to terraform.tfvars (gitignored) and fill real values.
+# `terraform plan` runs with empty secret defaults; `terraform apply` for a
+# working stack needs the LLM keys + JWT + BYOK master filled.
+
+# ── Auth + placement (REQUIRED) ────────────────────────────────────────────
+yc_cloud_id  = "b1gXXXXXXXXXXXXXXXXX"
+yc_folder_id = "b1g74vf7snhebom5avhu" # staging folder
+yc_zone      = "ru-central1-a"
+# yc_sa_key_file      = "~/.yc/sa-key.json"
+# ssh_public_key_file = "~/.ssh/oriion-deploy.pub"
+
+# ── Brand / DNS ────────────────────────────────────────────────────────────
+brand_domain = "oriion.dev"
+# manage_dns = false   # set true ONLY if oriion.dev is delegated to YC DNS
+
+# ── Lockbox secret values (SENSITIVE) ──────────────────────────────────────
+lockbox_deepseek_api_key       = "sk-..."
+lockbox_yandex_gpt_api_key     = "..."        # or rely on IAM-token flow
+lockbox_yandex_gpt_catalog_id  = "b1g..."
+lockbox_gigachat_auth_key      = "..."        # base64 client_id:secret
+lockbox_jwt_secret             = "min-32-char-random-secret-rotate-me"
+lockbox_byok_master_key_b64    = "base64-of-32-random-bytes"
+lockbox_grafana_admin_user     = "admin"
+lockbox_grafana_admin_password = "rotate-me-strong"
+
+# ── Sizing overrides (optional) ────────────────────────────────────────────
+# vm_cores              = 4
+# vm_memory_gb          = 8
+# vm_disk_gb            = 50
+# pg_resource_preset    = "s2.medium"
+# pg_disk_gb            = 100
+# redis_resource_preset = "hm3-c2-m8"

@@ -56,6 +56,9 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '1'
           ignore-unfixed: true
+          # Documented ignore registry (ADR-014). Currently: CVE-2026-48710
+          # (starlette — fix only in 1.0.x, unreachable under fastapi <0.130).
+          trivyignores: .trivyignore
           format: sarif
           output: trivy-results.sarif
 
