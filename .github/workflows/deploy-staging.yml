@@ -33,6 +33,11 @@ permissions:
 jobs:
   build-and-deploy:
     name: build + push + deploy + smoke
+    # Readiness gate: auto-deploy on push runs ONLY once the founder has
+    # provisioned staging (terraform + secrets) and flips repo variable
+    # STAGING_DEPLOY_ENABLED=true. Until then the job is skipped (green/neutral,
+    # not a red main). Manual `workflow_dispatch` always runs (first deploy).
+    if: ${{ vars.STAGING_DEPLOY_ENABLED == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10 # AC: commit -> production <= 10 min
     environment: staging
