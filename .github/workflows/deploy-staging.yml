@@ -1,0 +1,98 @@
+name: deploy-staging
+
+# Phase 00.6 PR-B — build backend image -> push to YC Container Registry ->
+# SSH to the staging VM -> docker compose pull/up -> wait healthy -> smoke ->
+# Grafana deploy annotation. AC: commit -> production <= 10 min; rollback <= 2 min.
+#
+# Triggers: push to main (auto) + manual workflow_dispatch (first deploy /
+# re-deploy a chosen SHA). Frontend image build lands in Phase 00.7 — the
+# compose `frontend` service is profile-gated, so Wave-0 deploys backend only.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'infra/**'
+      - 'scripts/deploy/**'
+      - '.github/workflows/deploy-staging.yml'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (defaults to the commit SHA)'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false # never interrupt an in-flight deploy
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: build + push + deploy + smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # AC: commit -> production <= 10 min
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "$TAG" ]; then TAG="${{ github.sha }}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Deploying image tag: $TAG"
+
+      - name: Auth to Yandex Container Registry
+        run: |
+          echo '${{ secrets.YC_SA_JSON }}' | docker login \
+            --username json_key --password-stdin cr.yandex
+
+      - name: Build + push backend image
+        run: |
+          IMG="cr.yandex/${{ vars.YC_CR_FOLDER }}/oriion-backend:${{ steps.tag.outputs.tag }}"
+          docker build --target prod -t "$IMG" backend/
+          docker push "$IMG"
+
+      - name: SSH deploy to staging VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_VM_HOST }}
+          username: deploy
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          command_timeout: 8m
+          envs: IMAGE_TAG
+          script: |
+            set -euo pipefail
+            cd /opt/oriion
+            export IMAGE_TAG="${{ steps.tag.outputs.tag }}"
+            # /opt/oriion/.env is materialized once during bootstrap from
+            # Lockbox (see docs/runbooks/staging-bootstrap.md); AC-W1-9 swaps
+            # this for the backend reading Lockbox via SDK at startup.
+            echo "$IMAGE_TAG" > .deployed_tag
+            docker compose -f infra/docker-compose.staging.yml --env-file .env pull
+            docker compose -f infra/docker-compose.staging.yml --env-file .env up -d
+            bash scripts/deploy/wait_healthy.sh 120
+
+      - name: Smoke tests
+        run: |
+          set -euo pipefail
+          BASE="https://${{ vars.STAGING_DOMAIN }}"
+          for endpoint in /healthz /metrics; do
+            echo "smoke: $BASE$endpoint"
+            curl -fsSL --retry 5 --retry-delay 5 --retry-connrefused "$BASE$endpoint" > /dev/null
+          done
+          echo "smoke tests passed"
+
+      - name: Grafana deploy annotation
+        if: success()
+        continue-on-error: true # annotation failure must not fail the deploy
+        run: |
+          curl -fsSL -X POST "${{ vars.GRAFANA_URL }}/api/annotations" \
+            -H "Authorization: Bearer ${{ secrets.GRAFANA_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"deploy ${{ steps.tag.outputs.tag }}\",\"tags\":[\"deploy\",\"staging\"]}"
