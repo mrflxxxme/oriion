@@ -179,6 +179,22 @@ PR #30 architecture audit:
      own `contracts/runtime/` if it grows beyond the orchestrator
      (currently ~250 LoC across 5 files)
 
+### Exception #3 — `runtime → mcp.tools.web_search` (2026-06-07)
+
+- **Importing files:**
+  - `backend/src/runtime/dispatch.py`: `from src.mcp.tools.web_search import WebSearchTool`
+  - `backend/src/runtime/dispatch.py`: `from src.mcp.exceptions import MCPError`
+- **Justification:** Phase 00.6 PR-B (founder decision 2026-06-07) feeds the
+  Researcher leaf REAL market data via a scripted `web_search` pre-fetch (the
+  LLM tool-call path is AC14/AC-W1-16). `web_search` is a first-party **built-in
+  tool utility** (not an MCP server), function-level import — analogous to the
+  sanctioned-by-default service/factory edges (`iam → agents`,
+  `agents → llm_gateway`). No model/schema import; no DB coupling.
+- **Wave-1 follow-up:** when the real LLM-driven Coordinator + tool-call path
+  lands (AC-W1-16), the Researcher Agent calls `web_search` as a Pydantic-AI
+  tool through the gateway, and this direct `runtime → mcp.tools` edge is
+  replaced by the tool-registry seam.
+
 ### Service-call edges (sanctioned by default — NOT model imports)
 
 The following cross-context dependencies are **service-class imports**,

@@ -42,6 +42,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from src._shared.config import get_settings
 from src.agents.analyst import AnalystDeps, build_analyst_agent
 from src.agents.coordinator import (
     ArtifactRef,
@@ -51,6 +52,8 @@ from src.agents.researcher import ResearcherDeps, build_researcher_agent
 from src.agents.tools.delegate import DelegateInput, DelegateResult
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
+from src.mcp.exceptions import MCPError
+from src.mcp.tools.web_search import WebSearchTool
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
 from src.tasks.models import Task
@@ -73,6 +76,13 @@ CREDIT_PER_INPUT_TOKEN = Decimal("0.000027")
 CREDIT_PER_OUTPUT_TOKEN = Decimal("0.000110")
 
 DEFAULT_PIPELINE: tuple[str, ...] = ("researcher", "analyst", "writer")
+
+# Live web_search (Brave) feeds the Researcher REAL market data instead of
+# LLM memory (founder decision 2026-06-07). Wave-0 wires it as a scripted
+# pre-fetch (the LLMGatewayModel tool-call path is AC14/AC-W1-16), so we call
+# web_search deterministically before the Researcher LLM and inject the
+# snippets into its sub-prompt. read_url + Yandex-XML backend are Wave-1 pins.
+WEB_SEARCH_MAX_RESULTS = 6
 
 # Per-specialist builder + deps-class map. Injectable so unit tests can
 # substitute fakes that don't construct a real Pydantic-AI Agent.
@@ -133,6 +143,34 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     return int(input_tokens), int(output_tokens)
 
 
+async def fetch_research_context(
+    web_search_tool: WebSearchTool,
+    query: str,
+    *,
+    max_results: int = WEB_SEARCH_MAX_RESULTS,
+) -> str:
+    """Run a live web_search and format the top hits as a markdown block.
+
+    Degrades gracefully: any web_search failure (no backend key configured,
+    rate-limit, upstream/network error) returns "" so the Researcher falls
+    back to LLM-only synthesis instead of failing the whole task run.
+    """
+    if not query.strip():
+        return ""
+    try:
+        results = await web_search_tool.search(
+            query, agent_id="researcher", max_results=max_results
+        )
+    except MCPError:  # WebSearchError + ToolRateLimitExceeded both subclass MCPError
+        return ""
+    if not results:
+        return ""
+    lines = ["## Актуальные результаты веб-поиска (используй как источники, цитируй URL):"]
+    for i, r in enumerate(results, start=1):
+        lines.append(f"{i}. {r.title} — {r.url}\n   {r.snippet}")
+    return "\n".join(lines)
+
+
 def build_leaf_runner(
     *,
     llm_router: LLMRouter,
@@ -142,14 +180,18 @@ def build_leaf_runner(
     user_id: UUID,
     workspace_id: UUID | None = None,
     leaf_specs: dict[str, _LeafSpec] | None = None,
+    web_search_tool: WebSearchTool | None = None,
+    user_prompt: str = "",
 ) -> Callable[[DelegateInput, OrchestratorContext], Awaitable[DelegateResult]]:
     """Build the production leaf-dispatch callable.
 
     For each delegation the runner:
-        1. Builds the target specialist Agent (real ``LLMGatewayModel``).
-        2. Runs it against ``inp.sub_prompt`` (one real LLM call).
-        3. Persists a child ``Task`` row (status='succeeded').
-        4. Returns a ``DelegateResult`` with estimated cost + token usage.
+        1. (Researcher only) pre-fetches live web_search context and prepends
+           it to the sub-prompt — REAL market data, not LLM memory.
+        2. Builds the target specialist Agent (real ``LLMGatewayModel``).
+        3. Runs it against the (possibly research-augmented) sub_prompt.
+        4. Persists a child ``Task`` row (status='succeeded').
+        5. Returns a ``DelegateResult`` with estimated cost + token usage.
     """
     specs = leaf_specs or _DEFAULT_LEAF_SPECS
 
@@ -159,13 +201,21 @@ def build_leaf_runner(
             raise KeyError(
                 f"no leaf spec for slug={inp.target_agent_slug!r}; " f"known={sorted(specs)}"
             )
+
+        sub_prompt = inp.sub_prompt
+        # Researcher gets live web_search context prepended (founder 2026-06-07).
+        if inp.target_agent_slug == "researcher" and web_search_tool is not None:
+            context = await fetch_research_context(web_search_tool, user_prompt or inp.sub_prompt)
+            if context:
+                sub_prompt = f"{context}\n\n{inp.sub_prompt}"
+
         model = LLMGatewayModel(
             role_key=inp.target_agent_slug,
             llm_router=llm_router,
             workspace_id=workspace_id,
         )
         agent = spec.build(model=model)
-        run_result = await agent.run(inp.sub_prompt, deps=spec.deps_factory())
+        run_result = await agent.run(sub_prompt, deps=spec.deps_factory())
 
         output_text = _extract_output_text(run_result)
         input_tokens, output_tokens = _extract_usage(run_result)
@@ -291,6 +341,21 @@ _SUB_PROMPT_FRAMING: dict[str, str] = {
 }
 
 
+def _default_web_search_tool() -> WebSearchTool:
+    """Construct a no-rate-limiter WebSearchTool from Settings (Brave key).
+
+    Single call per task run → no Redis limiter needed. If no Brave/Yandex key
+    is configured, the tool raises at search-time and the Researcher leaf
+    degrades to LLM-only (see fetch_research_context).
+    """
+    settings = get_settings()
+    return WebSearchTool(
+        rate_limiter=None,
+        brave_api_key=settings.brave_search_api_key.get_secret_value() or None,
+        yandex_api_key=settings.yandex_search_api_key.get_secret_value() or None,
+    )
+
+
 async def dispatch_task(
     *,
     task: Task,
@@ -299,16 +364,19 @@ async def dispatch_task(
     sse_publisher: SSEPublisher | None = None,
     available_agent_slugs: list[str] | None = None,
     coordinator: ScriptedCoordinator | None = None,
+    web_search_tool: WebSearchTool | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
     Returns the structured CoordinatorOutput dict (the orchestrator also
     emits the SSE ledger to ``sse_publisher`` so ``/stream`` subscribers see
-    the full event log via drain-replay).
+    the full event log via drain-replay). The Researcher leaf is augmented
+    with live web_search context (Brave) when a key is configured.
     """
     publisher = sse_publisher or get_sse_publisher()
     slugs = available_agent_slugs or list(DEFAULT_PIPELINE)
     coord = coordinator or ScriptedCoordinator()
+    search_tool = web_search_tool or _default_web_search_tool()
 
     user_prompt = ""
     if isinstance(task.input_jsonb, dict):
@@ -320,6 +388,8 @@ async def dispatch_task(
         parent_task_id=task.id,
         cell_id=task.cell_id,
         user_id=task.initiated_by_user_id,
+        web_search_tool=search_tool,
+        user_prompt=user_prompt,
     )
 
     return await execute_agent_task(
@@ -339,8 +409,10 @@ __all__ = [
     "CREDIT_PER_INPUT_TOKEN",
     "CREDIT_PER_OUTPUT_TOKEN",
     "DEFAULT_PIPELINE",
+    "WEB_SEARCH_MAX_RESULTS",
     "ScriptedCoordinator",
     "build_leaf_runner",
     "dispatch_task",
     "estimate_credits",
+    "fetch_research_context",
 ]

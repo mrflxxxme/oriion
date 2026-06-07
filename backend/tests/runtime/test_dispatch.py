@@ -20,6 +20,8 @@ from uuid import UUID, uuid4
 import pytest
 from src.agents.coordinator import CoordinatorOutput
 from src.agents.tools.delegate import DelegateInput, DelegateResult
+from src.mcp.exceptions import WebSearchError
+from src.mcp.tools.web_search import WebSearchResult
 from src.runtime.dispatch import (
     CREDIT_PER_INPUT_TOKEN,
     CREDIT_PER_OUTPUT_TOKEN,
@@ -30,6 +32,7 @@ from src.runtime.dispatch import (
     build_leaf_runner,
     dispatch_task,
     estimate_credits,
+    fetch_research_context,
 )
 from src.tasks.models import Task
 
@@ -221,6 +224,96 @@ async def test_build_leaf_runner_creates_child_task_and_costs() -> None:
     assert child.total_output_tokens == 2000
     assert isinstance(child.id, UUID)
     assert result.sub_task_id == child.id
+
+
+# ── web_search wiring (Researcher live context) ───────────────────────────
+
+
+class _FakeSearchTool:
+    def __init__(
+        self, results: list[WebSearchResult] | None = None, raise_exc: Exception | None = None
+    ) -> None:
+        self._results = results or []
+        self._raise = raise_exc
+        self.queries: list[str] = []
+
+    async def search(
+        self, query: str, agent_id: str = "system", max_results: int = 10
+    ) -> list[WebSearchResult]:
+        self.queries.append(query)
+        if self._raise is not None:
+            raise self._raise
+        return self._results[:max_results]
+
+
+@pytest.mark.asyncio
+async def test_fetch_research_context_formats_results() -> None:
+    tool = _FakeSearchTool(
+        results=[
+            WebSearchResult(title="Конкурент А", url="https://a.ru", snippet="AI команды"),
+            WebSearchResult(title="Конкурент Б", url="https://b.ru", snippet="боты"),
+        ]
+    )
+    ctx = await fetch_research_context(tool, "рынок AI команд РФ")  # type: ignore[arg-type]
+    assert "https://a.ru" in ctx and "https://b.ru" in ctx
+    assert "Конкурент А" in ctx
+    assert tool.queries == ["рынок AI команд РФ"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_research_context_degrades_on_error() -> None:
+    tool = _FakeSearchTool(raise_exc=WebSearchError("no_search_backend_configured"))
+    assert await fetch_research_context(tool, "q") == ""  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_fetch_research_context_empty_query_and_no_results() -> None:
+    assert await fetch_research_context(_FakeSearchTool(), "") == ""  # type: ignore[arg-type]
+    assert await fetch_research_context(_FakeSearchTool(results=[]), "q") == ""  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_build_leaf_runner_prepends_research_context_for_researcher() -> None:
+    session = _FakeSession()
+    fake_agent = _FakeLeafAgent("матрица", in_tok=100, out_tok=200)
+    specs = {"researcher": _LeafSpec(build=lambda *, model: fake_agent, deps_factory=_FakeDeps2)}
+    tool = _FakeSearchTool(results=[WebSearchResult(title="X", url="https://x.ru", snippet="s")])
+
+    runner = build_leaf_runner(
+        llm_router=object(),  # type: ignore[arg-type]
+        session=session,  # type: ignore[arg-type]
+        parent_task_id=uuid4(),
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        leaf_specs=specs,
+        web_search_tool=tool,  # type: ignore[arg-type]
+        user_prompt="рынок AI команд РФ",
+    )
+    await runner(DelegateInput(target_agent_slug="researcher", sub_prompt="собери матрицу"), None)  # type: ignore[arg-type]
+
+    # The Researcher's actual prompt was augmented with the live search block.
+    assert tool.queries == ["рынок AI команд РФ"]
+    assert "https://x.ru" in fake_agent.run_prompts[0]
+    assert "собери матрицу" in fake_agent.run_prompts[0]
+
+
+@pytest.mark.asyncio
+async def test_build_leaf_runner_no_search_tool_uses_plain_subprompt() -> None:
+    session = _FakeSession()
+    fake_agent = _FakeLeafAgent("матрица", in_tok=100, out_tok=200)
+    specs = {"researcher": _LeafSpec(build=lambda *, model: fake_agent, deps_factory=_FakeDeps2)}
+    runner = build_leaf_runner(
+        llm_router=object(),  # type: ignore[arg-type]
+        session=session,  # type: ignore[arg-type]
+        parent_task_id=uuid4(),
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        leaf_specs=specs,
+        web_search_tool=None,  # no live search → plain sub-prompt
+        user_prompt="рынок",
+    )
+    await runner(DelegateInput(target_agent_slug="researcher", sub_prompt="собери матрицу"), None)  # type: ignore[arg-type]
+    assert fake_agent.run_prompts[0] == "собери матрицу"
 
 
 @pytest.mark.asyncio

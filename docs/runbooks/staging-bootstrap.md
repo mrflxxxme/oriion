@@ -69,6 +69,9 @@ YC_CR_REGISTRY=cr.yandex/<YC_CR_FOLDER>
 CADDY_SITE_ADDR=staging.oriion.dev
 CADDY_ACME_EMAIL=deploy@oriion.dev
 # CADDY_GLOBAL_OPTS intentionally unset → auto_https ON (ACME)
+# Live web_search for the Researcher (REAL market data, not LLM memory):
+WEB_SEARCH_MOCK_MODE=false
+BRAVE_SEARCH_API_KEY=<your-brave-search-api-key>
 EOF
 chmod 600 .env
 ```

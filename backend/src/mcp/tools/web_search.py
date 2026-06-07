@@ -74,13 +74,18 @@ class WebSearchTool:
 
     def __init__(
         self,
-        rate_limiter: ToolRateLimiter,
+        rate_limiter: ToolRateLimiter | None = None,
         *,
         limit_per_min: int = _DEFAULT_LIMIT_PER_MIN,
         timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
         brave_api_key: str | None = None,
         yandex_api_key: str | None = None,
     ) -> None:
+        # rate_limiter is optional: the Wave-0 scripted-dispatch path
+        # (runtime.dispatch) calls search() once per task run — far under the
+        # 30/min cap — so it injects None and skips the Redis round-trip. The
+        # MCP-tool surface + the Wave-1 LLM tool-call path always pass a real
+        # ToolRateLimiter (defends against agent loops).
         self._rate_limiter = rate_limiter
         self._limit_per_min = limit_per_min
         self._timeout_seconds = timeout_seconds
@@ -105,18 +110,19 @@ class WebSearchTool:
         if max_results <= 0:
             raise WebSearchError("max_results must be > 0")
 
-        # Rate limit gate ----------------------------------------------------
-        verdict = await self._rate_limiter.check_detailed(
-            agent_id=agent_id,
-            tool_name=_TOOL_NAME,
-            limit=self._limit_per_min,
-            window_seconds=_DEFAULT_WINDOW_SECONDS,
-        )
-        if not verdict.allowed:
-            raise ToolRateLimitExceeded(
-                retry_after=verdict.retry_after,
-                detail=f"web_search limit {self._limit_per_min}/min exceeded",
+        # Rate limit gate (skipped when no limiter injected — see __init__) --
+        if self._rate_limiter is not None:
+            verdict = await self._rate_limiter.check_detailed(
+                agent_id=agent_id,
+                tool_name=_TOOL_NAME,
+                limit=self._limit_per_min,
+                window_seconds=_DEFAULT_WINDOW_SECONDS,
             )
+            if not verdict.allowed:
+                raise ToolRateLimitExceeded(
+                    retry_after=verdict.retry_after,
+                    detail=f"web_search limit {self._limit_per_min}/min exceeded",
+                )
 
         # Mock-mode short-circuit -------------------------------------------
         if _mock_mode_enabled():
