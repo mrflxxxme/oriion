@@ -1,114 +1,124 @@
-# Caddyfile.staging — Phase 00.6 Stage A + Stage B.
+# Caddyfile.staging — Phase 00.6 Stage A (local) + Stage B (real ACME).
 #
-# Single Caddyfile serving both real YC staging (CADDY_TLS=on + STAGING_
-# DOMAIN=staging.${BRAND_DOMAIN}) и local founder validation (CADDY_TLS=
-# off + STAGING_DOMAIN=localhost).
+# Single Caddyfile serving BOTH real YC staging (Let's Encrypt ACME) and local
+# founder validation (plain HTTP), switched purely by two env-vars:
 #
-# Behaviour:
-#   * CADDY_TLS=on  → Caddy auto-issues Let's Encrypt cert через ACME for
-#                      the configured STAGING_DOMAIN. Real DNS required.
-#   * CADDY_TLS=off → Caddy serves plain HTTP only; useful для local
-#                      validation where founder hits http://localhost:8080.
+#   CADDY_SITE_ADDR   — site address.
+#                       * Stage B prod : staging.${BRAND_DOMAIN} (FQDN, no port)
+#                                        → Caddy auto-HTTPS via ACME on :443.
+#                       * Stage A local: :80 (port-only) → HTTP listener only.
+#                       Default `:80`.
+#   CADDY_GLOBAL_OPTS — extra global directives.
+#                       * Stage B prod : UNSET/empty → auto_https stays ON
+#                                        (default) → ACME issues the cert.
+#                       * Stage A local: "auto_https off" → no ACME, plain HTTP.
+#
+# F-CR-M2 fix (PR-A audit): the previous Caddyfile hardcoded `auto_https off`
+# globally, so even a real FQDN site address could never obtain an ACME cert —
+# an operator footgun. ACME is now controlled by CADDY_GLOBAL_OPTS, defaulting
+# to ON for production. The local override compose sets it to "auto_https off".
 #
 # Routes:
+#   /healthz /health          → backend:8000
 #   /api/*                    → backend:8000 (FastAPI)
 #   /api/cells/.+/tasks/.+/stream → backend:8000 (SSE — flush_interval -1)
 #   /metrics                  → backend:8000 (Prometheus exposition)
-#   /grafana/*                → grafana:3000 (gated by Caddy basic-auth)
-#   /                         → frontend (Phase 00.7) ИЛИ placeholder
-
+#   /grafana/*                → grafana:3000 (Grafana's own auth; Caddy
+#                                basic_auth defence-in-depth = AC-W1 pin)
+#   /                         → frontend (Phase 00.7) OR placeholder
 {
-    # Global options. auto_https off allows STAGING_DOMAIN=localhost к work
-    # без ACME. When CADDY_TLS=on, founder removes this line OR sets
-    # STAGING_DOMAIN к a real FQDN so Caddy switches к auto-HTTPS path.
-    auto_https off
+	# Extra global directives. Empty (production default) → auto_https ON →
+	# ACME for the FQDN site address. Local override sets "auto_https off".
+	{$CADDY_GLOBAL_OPTS}
 
-    # Admin API bound к 0.0.0.0:2019 so Prometheus can scrape /metrics
-    # (caddy job in prometheus.yml).
-    admin {$CADDY_ADMIN_LISTEN:0.0.0.0:2019}
+	# ACME contact email (used only when auto_https is on + a cert is issued).
+	email {$CADDY_ACME_EMAIL:deploy@oriion.dev}
+
+	# Admin API bound к 0.0.0.0:2019 so Prometheus can scrape :2019 metrics
+	# (caddy job in prometheus.yml).
+	admin {$CADDY_ADMIN_LISTEN:0.0.0.0:2019}
 }
 
 {$CADDY_SITE_ADDR::80} {
-    # Site address — Stage A local uses `:80` (HTTP-only listener; CADDY_TLS=off
-    # override-yml leaves CADDY_SITE_ADDR unset → defaults to `:80`). Stage B
-    # YC deploy sets CADDY_SITE_ADDR=staging.${BRAND_DOMAIN} which switches
-    # Caddy к auto-HTTPS path с ACME-issued Let's Encrypt cert.
+	# Site address — Stage A local uses `:80` (HTTP-only listener). Stage B
+	# YC deploy sets CADDY_SITE_ADDR=staging.${BRAND_DOMAIN} (FQDN) so Caddy
+	# switches to the auto-HTTPS path with an ACME-issued Let's Encrypt cert.
 
-    # Backend liveness — explicit route so /healthz works за Caddy proxy
-    # (docker-compose healthcheck + Stage A founder smoke step 2).
-    @healthz {
-        path /healthz /health
-    }
-    handle @healthz {
-        reverse_proxy backend:8000
-    }
+	# Backend liveness — explicit route so /healthz works за Caddy proxy
+	# (docker-compose healthcheck + Stage A founder smoke step 2).
+	@healthz {
+		path /healthz /health
+	}
+	handle @healthz {
+		reverse_proxy backend:8000
+	}
 
-    # Backend API
-    @api {
-        path /api/*
-    }
-    handle @api {
-        reverse_proxy backend:8000
-    }
+	# Backend API
+	@api {
+		path /api/*
+	}
+	handle @api {
+		reverse_proxy backend:8000
+	}
 
-    # SSE long-poll endpoint — disable Caddy buffering так что events
-    # реachate the client immediately (per Phase 00.6 spec).
-    @sse_stream {
-        path_regexp ^/api/cells/[^/]+/tasks/[^/]+/stream/?$
-    }
-    handle @sse_stream {
-        reverse_proxy backend:8000 {
-            flush_interval -1
-        }
-    }
+	# SSE long-poll endpoint — disable Caddy buffering так что events
+	# реachate the client immediately (per Phase 00.6 spec).
+	@sse_stream {
+		path_regexp ^/api/cells/[^/]+/tasks/[^/]+/stream/?$
+	}
+	handle @sse_stream {
+		reverse_proxy backend:8000 {
+			flush_interval -1
+		}
+	}
 
-    # Prometheus /metrics — backend ASGI mount
-    @metrics {
-        path /metrics /metrics/*
-    }
-    handle @metrics {
-        reverse_proxy backend:8000
-    }
+	# Prometheus /metrics — backend ASGI mount
+	@metrics {
+		path /metrics /metrics/*
+	}
+	handle @metrics {
+		reverse_proxy backend:8000
+	}
 
-    # Grafana proxy. Wave-0 Stage A: relies на Grafana's built-in
-    # GF_SECURITY_ADMIN_USER/PASSWORD (set via docker-compose env) — Caddy
-    # basic_auth gate disabled здесь потому что empty GRAFANA_BASIC_AUTH_
-    # BCRYPT default crashes config parse. Stage B (PR-B) production deploy
-    # restores basic_auth Caddy layer after Lockbox-injected bcrypt env-var
-    # ships, providing defence-in-depth past Grafana's own auth.
-    @grafana {
-        path /grafana/*
-    }
-    handle_path /grafana/* {
-        reverse_proxy grafana:3000
-    }
+	# Grafana proxy. Wave-0 Stage A: relies на Grafana's built-in
+	# GF_SECURITY_ADMIN_USER/PASSWORD (set via docker-compose env) — Caddy
+	# basic_auth gate disabled здесь потому что empty GRAFANA_BASIC_AUTH_
+	# BCRYPT default crashes config parse. Stage B (PR-B) production deploy
+	# restores basic_auth Caddy layer after Lockbox-injected bcrypt env-var
+	# ships, providing defence-in-depth past Grafana's own auth.
+	@grafana {
+		path /grafana/*
+	}
+	handle_path /grafana/* {
+		reverse_proxy grafana:3000
+	}
 
-    # Frontend SPA fallback. Phase 00.7 frontend ship populates /srv/
-    # frontend volume; until then Caddy returns 404 на root которое
-    # Wave-0 API-only demo flow OK с (founder hits /api/* directly через
-    # scripts/demo_market_brief.py).
-    handle {
-        @has_frontend file /srv/frontend/index.html
-        handle @has_frontend {
-            root * /srv/frontend
-            try_files {path} /index.html
-            file_server
-        }
-        # No frontend present yet — return 503 с pointer.
-        respond <<HTML
+	# Frontend SPA fallback. Phase 00.7 frontend ship populates /srv/
+	# frontend volume; until then Caddy returns 404 на root которое
+	# Wave-0 API-only demo flow OK с (founder hits /api/* directly через
+	# scripts/demo_market_brief.py).
+	handle {
+		@has_frontend file /srv/frontend/index.html
+		handle @has_frontend {
+			root * /srv/frontend
+			try_files {path} /index.html
+			file_server
+		}
+		# No frontend present yet — return 503 с pointer.
+		respond <<HTML
             <!doctype html>
             <html><head><title>TEAMLY_RU Staging</title></head>
             <body><h1>Phase 00.6 Stage A — API up; frontend lands в Phase 00.7</h1>
             <p>Try <a href="/healthz">/healthz</a> · <a href="/metrics">/metrics</a> · <a href="/api/v1/llm/providers">/api/v1/llm/providers</a></p>
             </body></html>
         HTML 503
-    }
+	}
 
-    # Access logs к stdout (JSON; promtail / Loki picks up from container).
-    log {
-        output stdout
-        format json
-    }
+	# Access logs к stdout (JSON; promtail / Loki picks up from container).
+	log {
+		output stdout
+		format json
+	}
 }
 
 # /healthz routes folded into the main {$STAGING_DOMAIN} site block above

@@ -81,8 +81,9 @@ services:
 
   caddy:
     environment:
-      STAGING_DOMAIN: ${STAGING_DOMAIN:-localhost}
-      CADDY_TLS: "off"
+      # Local HTTP-only: port-only site address + auto_https off (no ACME).
+      CADDY_SITE_ADDR: ":80"
+      CADDY_GLOBAL_OPTS: "auto_https off"
       # Bind admin endpoint так что Prometheus может scrape :2019 metrics.
       CADDY_ADMIN_LISTEN: 0.0.0.0:2019
     ports:
