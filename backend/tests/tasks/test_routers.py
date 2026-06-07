@@ -247,9 +247,7 @@ def test_run_task_non_queued_returns_409(app: FastAPI, fake_service: _FakeTaskSe
     mock_dispatch.assert_not_awaited()
 
 
-def test_run_task_unknown_id_returns_404(
-    app: FastAPI, fake_service: _FakeTaskService
-) -> None:
+def test_run_task_unknown_id_returns_404(app: FastAPI, fake_service: _FakeTaskService) -> None:
     """F-TR-2 fix: an unknown task_id → get_task raises TaskNotFound → 404."""
 
     async def _raise_not_found(_task_id: Any) -> Task:

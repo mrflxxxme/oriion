@@ -1,0 +1,13 @@
+# Trivy ignored advisories (audit-trail) — see .planning/decisions/ADR-014-security.md
+# Each entry MUST carry a justification + a re-review trigger. CI hook:
+# .github/workflows/ci-security.yml step "filesystem — trivy" (trivyignores: .trivyignore).
+#
+# CVE-2026-48710 — starlette (installed 0.52.1; fixed only in 1.0.1).
+#   Transitive via fastapi 0.129.2 (pyproject pins fastapi>=0.120,<0.130, which
+#   resolves starlette 0.x). The fix landed in starlette 1.0.x — UNREACHABLE
+#   under the current fastapi major. CVSS = MEDIUM (GitHub security_severity);
+#   trivy labels it HIGH. CVE drift (published after PR #36 merged 2026-05-25).
+#   Re-review trigger: when fastapi ships a release allowing starlette >=1.0.1
+#   (tracked as Wave-1 pin AC-W1 dependency-bump). Bump fastapi + starlette then,
+#   and remove this line.
+CVE-2026-48710
