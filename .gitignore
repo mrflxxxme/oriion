@@ -63,6 +63,21 @@ docker-compose.override.yml
 *.tmp
 *.bak
 
+# Terraform — state + local vars carry secrets/infra detail, never commit.
+# The .terraform.lock.hcl provider lock IS committed (reproducible provider
+# versions); only the downloaded plugin cache + state + tfvars are ignored.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
 # Claude Code / oh-my-claudecode internal state — never committed
 .omc/
 .claude-flow/
