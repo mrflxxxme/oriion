@@ -11,14 +11,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from src._shared.middleware.tenant_context import get_tenant_db_session
 from src.iam.middleware import AuthenticatedUser, get_current_user
+from src.tasks.exceptions import TasksError
 from src.tasks.models import Task
 from src.tasks.routers.stream import router as stream_router
 from src.tasks.routers.tasks import get_task_service
@@ -78,6 +80,16 @@ class _FakeTaskService:
         return [uuid4(), uuid4()]  # 2 fake descendants
 
 
+class _FakeDbSession:
+    """Minimal session shim — run_task endpoint only calls .commit()."""
+
+    def __init__(self) -> None:
+        self.commits = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+
 @pytest.fixture
 def fake_user() -> _FakeUser:
     return _FakeUser(id=uuid4())
@@ -89,10 +101,28 @@ def fake_service() -> _FakeTaskService:
 
 
 @pytest.fixture
-def app(fake_user: _FakeUser, fake_service: _FakeTaskService) -> FastAPI:
+def fake_db() -> _FakeDbSession:
+    return _FakeDbSession()
+
+
+@pytest.fixture
+def app(
+    fake_user: _FakeUser,
+    fake_service: _FakeTaskService,
+    fake_db: _FakeDbSession,
+) -> FastAPI:
     a = FastAPI()
     a.include_router(tasks_router, prefix="/api/v1")
     a.include_router(stream_router, prefix="/api/v1")
+
+    # The run_task endpoint reads request.app.state.llm_router (via
+    # llm_gateway.deps.get_llm_router). dispatch_task is patched in the
+    # run tests, so a sentinel object is enough to satisfy the lookup.
+    a.state.llm_router = object()
+
+    @a.exception_handler(TasksError)
+    async def _tasks_error_handler(_request: Request, exc: TasksError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"code": exc.code})
 
     async def _override_user() -> AuthenticatedUser:
         # AuthenticatedUser is a frozen dataclass — provide both `claims`
@@ -101,9 +131,10 @@ def app(fake_user: _FakeUser, fake_service: _FakeTaskService) -> FastAPI:
         return AuthenticatedUser(claims=MagicMock(), user=fake_user)  # type: ignore[arg-type]
 
     async def _override_db() -> AsyncIterator[Any]:
-        # Unused — get_task_service is also overridden so this never
-        # actually runs. Kept for completeness.
-        yield None
+        # run_task depends directly on get_tenant_db_session for the
+        # dispatch session + commit. FastAPI caches the dependency within
+        # a request so get_task_service shares this same session object.
+        yield fake_db
 
     a.dependency_overrides[get_current_user] = _override_user
     a.dependency_overrides[get_tenant_db_session] = _override_db
@@ -158,3 +189,59 @@ def test_stream_endpoint_mounted_in_app(app: FastAPI) -> None:
     """
     routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
     assert "/api/v1/cells/{cell_id}/tasks/{task_id}/stream" in routes
+
+
+# ── POST /run — inline orchestrator-dispatch (Phase 00.6 PR-B C1) ──────────
+
+
+def test_run_endpoint_mounted_in_app(app: FastAPI) -> None:
+    """Route-registration check for the new dispatch endpoint."""
+    routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
+    assert "/api/v1/cells/{cell_id}/tasks/{task_id}/run" in routes
+
+
+def test_run_task_dispatches_queued_task_returns_202(
+    app: FastAPI, fake_service: _FakeTaskService, fake_db: _FakeDbSession
+) -> None:
+    """A queued task → dispatch_task invoked → 202 + result echoed.
+
+    dispatch_task is patched so no real LLM/orchestrator runs; we assert the
+    endpoint wiring (queued-gate pass, dispatch call, commit, response shape).
+    """
+    queued = _build_fake_task(uuid4(), uuid4(), uuid4())
+    queued.status = "queued"
+    fake_service.next_task = queued
+
+    with patch(
+        "src.tasks.routers.tasks.dispatch_task",
+        new=AsyncMock(return_value={"summary": "ok", "total_cost_credits": "1.0"}),
+    ) as mock_dispatch:
+        client = TestClient(app)
+        cell_id, task_id = uuid4(), uuid4()
+        r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
+
+    assert r.status_code == 202
+    body = r.json()
+    assert body["task_id"] == str(task_id)
+    assert body["result"] == {"summary": "ok", "total_cost_credits": "1.0"}
+    mock_dispatch.assert_awaited_once()
+    assert fake_db.commits == 1
+
+
+def test_run_task_non_queued_returns_409(app: FastAPI, fake_service: _FakeTaskService) -> None:
+    """A task already running/succeeded must NOT be re-dispatched → 409."""
+    running = _build_fake_task(uuid4(), uuid4(), uuid4())
+    running.status = "running"
+    fake_service.next_task = running
+
+    with patch(
+        "src.tasks.routers.tasks.dispatch_task",
+        new=AsyncMock(),
+    ) as mock_dispatch:
+        client = TestClient(app)
+        cell_id, task_id = uuid4(), uuid4()
+        r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
+
+    assert r.status_code == 409
+    assert r.json()["code"] == "tasks.not_dispatchable"
+    mock_dispatch.assert_not_awaited()

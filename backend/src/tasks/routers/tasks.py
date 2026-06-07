@@ -1,14 +1,18 @@
-"""POST/GET /api/v1/cells/{cell_id}/tasks — task CRUD."""
+"""POST/GET /api/v1/cells/{cell_id}/tasks — task CRUD + inline dispatch."""
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src._shared.middleware.tenant_context import get_tenant_db_session
 from src.iam.middleware import AuthenticatedUser, get_current_user
+from src.llm_gateway.deps import get_llm_router
+from src.runtime.dispatch import dispatch_task
+from src.runtime.sse_publisher import get_sse_publisher
+from src.tasks.exceptions import TaskNotDispatchable
 from src.tasks.schemas import TaskCreateRequest, TaskOut
 from src.tasks.services.task_service import TaskService
 
@@ -53,6 +57,49 @@ async def get_task(
     _ = cell_id
     task = await service.get_task(task_id)
     return TaskOut.model_validate(task)
+
+
+@router.post("/{task_id}/run", status_code=status.HTTP_202_ACCEPTED)
+async def run_task(
+    cell_id: UUID,
+    task_id: UUID,
+    request: Request,
+    auth: AuthenticatedUser = Depends(get_current_user),  # noqa: ARG001
+    service: TaskService = Depends(get_task_service),
+    db: AsyncSession = Depends(get_tenant_db_session),
+) -> dict[str, object]:
+    """Inline orchestrator-dispatch (Phase 00.6 PR-B — closes the PR-A
+    CRITICAL FINDING: POST /tasks created a queued row but never dispatched).
+
+    Synchronously runs the Wave-0 deterministic researcher→analyst→writer
+    pipeline against the queued task — each specialist is a real LLM call
+    through LLMRouter. The orchestrator emits the full SSE ledger to the
+    in-process publisher, so a concurrent (or subsequent, via drain-replay)
+    GET /stream subscriber sees task.started -> 3x delegation -> task.completed.
+
+    Blocks until orchestration finishes (workers=1 invariant per F-ARC-H2).
+    AC-W1-16 swaps this for a Dramatiq actor (return 202 immediately) + the
+    real LLM-driven Coordinator once the model adapter forwards tool-calls.
+    """
+    _ = cell_id  # routing scope — RLS enforces tenant at the DB layer
+    task = await service.get_task(task_id)  # raises TaskNotFound → 404
+    if task.status != "queued":
+        raise TaskNotDispatchable(f"task {task_id} status={task.status!r}, expected 'queued'")
+
+    llm_router = get_llm_router(request)
+    publisher = get_sse_publisher()
+    result = await dispatch_task(
+        task=task,
+        session=db,
+        llm_router=llm_router,
+        sse_publisher=publisher,
+    )
+    await db.commit()
+    return {
+        "task_id": str(task_id),
+        "status": task.status,
+        "result": result,
+    }
 
 
 @router.post("/{task_id}/cancel", status_code=status.HTTP_202_ACCEPTED)

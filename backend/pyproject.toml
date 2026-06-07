@@ -129,6 +129,10 @@ ignore = [
 "tests/tasks/*.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/runtime/*.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/_shared/observability/*.py" = ["RUF001", "RUF002", "RUF003"]
+# Phase 00.6 PR-B: ScriptedCoordinator sub-prompt framing is RU LLM-facing
+# content (prompts dispatched to specialist agents), not code-style noise —
+# same rationale as the canned_pydantic_ai fixture above.
+"src/runtime/dispatch.py" = ["RUF001"]
 
 [tool.ruff.format]
 quote-style = "double"

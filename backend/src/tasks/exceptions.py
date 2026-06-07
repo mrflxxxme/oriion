@@ -43,3 +43,17 @@ class DelegationDepthExceeded(TasksError):
     code = "tasks.delegation_depth_exceeded"
     status_code = 422
     title = "Task delegation depth exceeded"
+
+
+class TaskNotDispatchable(TasksError):
+    """POST /tasks/{id}/run on a task that is not in 'queued' state.
+
+    Wave-0 inline dispatch only accepts queued tasks — re-running an
+    already-running/succeeded/failed/cancelled task would double-charge
+    budget + duplicate SSE ledgers. AC-W1-16 (Dramatiq swap) revisits
+    idempotent re-dispatch semantics.
+    """
+
+    code = "tasks.not_dispatchable"
+    status_code = 409
+    title = "Task not dispatchable"
