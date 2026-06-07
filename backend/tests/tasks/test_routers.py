@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from src._shared.middleware.tenant_context import get_tenant_db_session
 from src.iam.middleware import AuthenticatedUser, get_current_user
-from src.tasks.exceptions import TasksError
+from src.tasks.exceptions import TaskNotFound, TasksError
 from src.tasks.models import Task
 from src.tasks.routers.stream import router as stream_router
 from src.tasks.routers.tasks import get_task_service
@@ -245,3 +245,48 @@ def test_run_task_non_queued_returns_409(app: FastAPI, fake_service: _FakeTaskSe
     assert r.status_code == 409
     assert r.json()["code"] == "tasks.not_dispatchable"
     mock_dispatch.assert_not_awaited()
+
+
+def test_run_task_unknown_id_returns_404(
+    app: FastAPI, fake_service: _FakeTaskService
+) -> None:
+    """F-TR-2 fix: an unknown task_id → get_task raises TaskNotFound → 404."""
+
+    async def _raise_not_found(_task_id: Any) -> Task:
+        raise TaskNotFound("nope")
+
+    fake_service.get_task = _raise_not_found  # type: ignore[method-assign]
+    with patch("src.tasks.routers.tasks.dispatch_task", new=AsyncMock()) as mock_dispatch:
+        client = TestClient(app)
+        cell_id, task_id = uuid4(), uuid4()
+        r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
+
+    assert r.status_code == 404
+    assert r.json()["code"] == "tasks.not_found"
+    mock_dispatch.assert_not_awaited()
+
+
+def test_run_task_dispatch_failure_commits_then_propagates(
+    app: FastAPI, fake_service: _FakeTaskService, fake_db: _FakeDbSession
+) -> None:
+    """F-CR-2 fix: when dispatch_task raises, the endpoint commits the
+    orchestrator's failed-state write BEFORE re-raising (so the 'failed' row
+    survives get_db's rollback-on-exception) and the error still propagates."""
+    queued = _build_fake_task(uuid4(), uuid4(), uuid4())
+    queued.status = "queued"
+    fake_service.next_task = queued
+
+    boom = RuntimeError("provider melted mid-dispatch")
+    with patch(
+        "src.tasks.routers.tasks.dispatch_task",
+        new=AsyncMock(side_effect=boom),
+    ) as mock_dispatch:
+        client = TestClient(app, raise_server_exceptions=False)
+        cell_id, task_id = uuid4(), uuid4()
+        r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
+
+    # The exception propagated (no RFC-7807 handler for bare RuntimeError → 500).
+    assert r.status_code == 500
+    mock_dispatch.assert_awaited_once()
+    # Crucially: the failed-state write was committed before the re-raise.
+    assert fake_db.commits == 1

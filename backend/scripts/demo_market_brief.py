@@ -72,6 +72,7 @@ AC10_MAX_COST_USD_PER_RUN = 0.30
 TCREDIT_USD = 0.01  # ADR-018: 1 T-credit ≈ 0.01 USD
 AC9_BRIEF_MIN_WORDS = 1500
 AC9_MATRIX_MIN_ROWS = 5
+AC9_MATRIX_MIN_COLS = 4
 AC9_CONTENT_PLAN_POSTS = 10
 
 # Artifact-type keys emitted by the Wave-0 ScriptedCoordinator
@@ -97,6 +98,7 @@ class RunResult:
     ac10_passed: bool = False
     brief_words: int = 0
     matrix_rows: int = 0
+    matrix_cols: int = 0
     content_plan_posts: int = 0
 
     @property
@@ -116,9 +118,29 @@ def _count_matrix_rows(matrix_text: str) -> int:
     return max(len(body_rows) - 1, 0)  # subtract header row
 
 
+def _matrix_max_cols(matrix_text: str) -> int:
+    """Max |-delimited cell count across data rows (AC9 requires >=4 columns)."""
+    best = 0
+    for line in matrix_text.splitlines():
+        s = line.strip()
+        if s.startswith("|") and "---" not in s:
+            cells = s.strip("|").split("|")
+            best = max(best, len(cells))
+    return best
+
+
 def _count_content_plan_posts(text: str) -> int:
-    """Count numbered bold posts (``1. **…``) — the writer's content-plan idiom."""
-    return len(re.findall(r"^\s*\d+\.\s+\*\*", text, flags=re.MULTILINE))
+    """Count content-plan posts across the writer's content-plan idioms.
+
+    F-CR-1 / F-TR-1 audit fix: the production writer role-prompt
+    (contracts/role-prompts/writer.md §6 few-shot) emits each post as an H3
+    header `### Пост N — <channel> — <day>`. An earlier draft used a
+    numbered-bold list `N. **...**`. Match BOTH so AC9 scores REAL staging
+    output, not just the synthetic test fixture. The dispatch writer
+    sub-prompt (runtime/dispatch.py) also pins the H3 idiom belt-and-suspenders.
+    """
+    pattern = r"(?:^###\s+Пост\s+\d+)|(?:^\s*\d+\.\s+\*\*)"
+    return len(re.findall(pattern, text, flags=re.MULTILINE))
 
 
 def _evaluate_ac9(result: RunResult) -> None:
@@ -128,12 +150,14 @@ def _evaluate_ac9(result: RunResult) -> None:
 
     result.brief_words = len(brief_text.split())
     result.matrix_rows = _count_matrix_rows(matrix_text)
+    result.matrix_cols = _matrix_max_cols(matrix_text)
     # The content plan lives inside the writer's "brief" artifact.
     result.content_plan_posts = _count_content_plan_posts(brief_text)
 
     result.ac9_passed = (
         result.brief_words >= AC9_BRIEF_MIN_WORDS
         and result.matrix_rows >= AC9_MATRIX_MIN_ROWS
+        and result.matrix_cols >= AC9_MATRIX_MIN_COLS
         and result.content_plan_posts == AC9_CONTENT_PLAN_POSTS
     )
 
@@ -296,7 +320,8 @@ async def _async_main(args: argparse.Namespace) -> int:
             f"[run {i}] elapsed={result.duration_seconds:.1f}s "
             f"cost={result.total_cost_credits} credits "
             f"ac9={result.ac9_passed} (brief={result.brief_words}w "
-            f"matrix={result.matrix_rows}r plan={result.content_plan_posts}p) "
+            f"matrix={result.matrix_rows}r×{result.matrix_cols}c "
+            f"plan={result.content_plan_posts}p) "
             f"ac10={result.ac10_passed}"
         )
         for err in result.errors:

@@ -216,6 +216,13 @@ class ScriptedCoordinator:
         self._pipeline = pipeline
 
     async def run(self, user_prompt: str, *, deps: Any) -> _ScriptedRunResult:
+        # NOTE (F-CR-4): this Wave-0 stand-in calls deps.runner(...) directly,
+        # so it intentionally BYPASSES the delegate_task tool guards (depth check
+        # + target_agent_slug ∈ available_agent_slugs). Safe here because the
+        # pipeline is a fixed, in-team 3-step sequence; an unknown slug still
+        # fails fast via build_leaf_runner's KeyError. The real LLM-driven
+        # Coordinator (AC-W1-16) routes through delegate_task and re-enables the
+        # typed guards.
         artifacts: list[ArtifactRef] = []
         prior_context = ""
         for slug in self._pipeline:
@@ -276,7 +283,10 @@ _SUB_PROMPT_FRAMING: dict[str, str] = {
     ),
     "writer": (
         "Ты Writer. Подготовь market brief (≥1500 слов на русском) и "
-        "контент-план ровно на 10 постов на основе исследования и анализа."
+        "контент-план ровно на 10 постов на основе исследования и анализа. "
+        "Каждый из 10 постов ОФОРМИ заголовком третьего уровня в формате "
+        "'### Пост N — <канал> — <день>' (N от 1 до 10) — это обязательный "
+        "формат для машинного парсинга (AC9)."
     ),
 }
 

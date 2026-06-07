@@ -1,6 +1,6 @@
 ﻿# ADR-024: Bounded-context contracts — 10 контекстов в `contracts/` + CloudEvents 1.0 + naming corrections
 
-- **Status:** Accepted (amendments 2026-05-19: «Naming bridge: organization → workspace» + «Sanctioned cross-context exceptions»; re-confirmed 2026-05-21 by Phase 00.5b audit — no new sanctioned imports added by Commits 2-7 router wiring + agents/tasks/runtime contexts)
+- **Status:** Accepted (amendments 2026-05-19: «Naming bridge: organization → workspace» + «Sanctioned cross-context exceptions»; re-confirmed 2026-05-21 by Phase 00.5b audit; amended 2026-05-26 by Phase 00.6 PR-B audit (F-ARC-1) — Exception #2 records a new file `runtime/dispatch.py` on the existing `runtime → tasks` edge; no new edge introduced)
 
 ## Naming bridge: organization → workspace (2026-05-19)
 
@@ -151,6 +151,13 @@ PR #30 architecture audit:
   - `backend/src/runtime/orchestrator.py`: `from src.tasks.models import Task`
   - `backend/src/runtime/orchestrator.py`: `from src.tasks import events as tasks_events`
   - `backend/src/runtime/orchestrator.py`: `from src.tasks.exceptions import BudgetExceeded` (via budget_guard)
+  - `backend/src/runtime/dispatch.py`: `from src.tasks.models import Task` (Phase 00.6 PR-B — inline-dispatch leaf-runner creates child `Task` rows; same blessed edge as orchestrator.py, no new justification needed — recorded per the §3 file:line rule, F-ARC-1)
+- **Reverse edge (sanctioned-by-default, recorded for transparency):**
+  `tasks/routers/tasks.py` → `runtime.dispatch` + `runtime.sse_publisher`
+  (function/factory imports, not model imports) — the `/tasks/{id}/run`
+  endpoint invokes the execution layer. Mirrors the pre-existing
+  `tasks/routers/stream.py` → `runtime.sse_publisher` import; no new exception
+  required (service/function-call edges are sanctioned-by-default per §3).
 - **Justification:** the `runtime` bounded context is by design the
   **execution layer** for `tasks`. Per Phase 00.5 phase-spec the runtime
   drives the Task state machine (queued → running → succeeded/failed/

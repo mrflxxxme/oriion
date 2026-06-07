@@ -88,12 +88,23 @@ async def run_task(
 
     llm_router = get_llm_router(request)
     publisher = get_sse_publisher()
-    result = await dispatch_task(
-        task=task,
-        session=db,
-        llm_router=llm_router,
-        sse_publisher=publisher,
-    )
+    try:
+        result = await dispatch_task(
+            task=task,
+            session=db,
+            llm_router=llm_router,
+            sse_publisher=publisher,
+        )
+    except Exception:
+        # F-CR-2 fix: the orchestrator writes task.status='failed' +
+        # completed_at + cost on the session before re-raising. Without this
+        # commit, get_db's rollback-on-exception would DISCARD that write —
+        # leaving the row 'queued' while the SSE ledger says 'failed'
+        # (DB/stream divergence + lost failure audit trail). Persist the
+        # failed-state write, then re-raise so the RFC-7807 handler still runs.
+        # AC-W1-16 (Dramatiq actor) gives each dispatch its own TX boundary.
+        await db.commit()
+        raise
     await db.commit()
     return {
         "task_id": str(task_id),

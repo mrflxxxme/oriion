@@ -16,6 +16,7 @@ from scripts.demo_market_brief import (
     _decide_exit_code,
     _evaluate_ac9,
     _ingest_run_output,
+    _matrix_max_cols,
 )
 
 
@@ -39,8 +40,21 @@ def _matrix_block(rows: int) -> str:
     return f"{header}\n{sep}\n{body}"
 
 
+def _two_col_matrix() -> str:
+    header = "| Игрок | Сегмент |"
+    sep = "| --- | --- |"
+    body = "\n".join(f"| p{i} | s |" for i in range(6))
+    return f"{header}\n{sep}\n{body}"
+
+
 def _content_plan_block() -> str:
-    return "\n" + "\n".join(f"{i}. **Пост {i}** описание" for i in range(1, 11))
+    # Production writer idiom (contracts/role-prompts/writer.md §6 few-shot):
+    # each post is an H3 header "### Пост N — <channel> — <day>". This is the
+    # REAL shape the AC9 parser must score (F-CR-1/F-TR-1 audit fix) — not the
+    # synthetic numbered-bold form the earlier fixture used.
+    return "\n" + "\n".join(
+        f"### Пост {i} — Telegram — день {i}\nтекст поста {i}" for i in range(1, 11)
+    )
 
 
 # ── parsing helpers ───────────────────────────────────────────────────────
@@ -51,9 +65,34 @@ def test_count_matrix_rows_excludes_header_and_separator() -> None:
     assert _count_matrix_rows("") == 0
 
 
-def test_count_content_plan_posts() -> None:
+def test_count_content_plan_posts_h3_idiom() -> None:
+    # The production writer idiom ("### Пост N") must score 10.
     assert _count_content_plan_posts(_content_plan_block()) == 10
     assert _count_content_plan_posts("no posts here") == 0
+
+
+def test_count_content_plan_posts_numbered_bold_fallback() -> None:
+    # Backward-compat: the earlier numbered-bold idiom is still counted.
+    numbered = "\n".join(f"{i}. **Пост {i}**" for i in range(1, 11))
+    assert _count_content_plan_posts(numbered) == 10
+
+
+def test_matrix_max_cols() -> None:
+    assert _matrix_max_cols(_matrix_block(6)) == 4
+    assert _matrix_max_cols(_two_col_matrix()) == 2
+    assert _matrix_max_cols("") == 0
+
+
+def test_evaluate_ac9_rejects_too_few_matrix_columns() -> None:
+    r = RunResult(run_index=1, started_at="t")
+    r.artifacts = {
+        "brief": ("слово " * 1600) + _content_plan_block(),
+        "matrix": _two_col_matrix(),  # 6 rows but only 2 columns
+    }
+    _evaluate_ac9(r)
+    assert r.matrix_rows >= 5
+    assert r.matrix_cols == 2
+    assert r.ac9_passed is False  # fails on the column dimension
 
 
 def test_ingest_run_output_maps_artifacts_and_cost() -> None:
