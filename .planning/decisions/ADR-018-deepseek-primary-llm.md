@@ -1,6 +1,36 @@
 # ADR-018: DeepSeek как primary LLM-стек
 
-- **Status:** Accepted (amendment 2026-05-19, see «Wave 0 RU-currency model»)
+- **Status:** Accepted (amendment 2026-05-19, see «Wave 0 RU-currency model»; amendment 2026-05-26, see «DeepSeek V4 generation drift»)
+
+## DeepSeek V4 generation drift (amendment 2026-05-26, Phase 00.6 PR-B)
+
+> Closes F-CMP-M1 (Phase 00.6 PR-A audit): the DeepSeek API now ships the **V4**
+> generation (`deepseek-v4-flash` + `deepseek-v4-pro`) in place of the V3/R1
+> pair this ADR originally documented. Provisioning smoke (Phase 00.6 commit
+> `4af82e6`) confirmed the live API returns 2 models — v4-flash + v4-pro.
+
+**Impact: none on code; governance-only.** The model name is a request
+parameter, NOT an enum — `LLMRouter.route(...)` + `LLMGatewayModel` pass the
+configured model string straight through to the provider HTTP call. The
+failover chain `(deepseek → yandexgpt → gigachat)` is unchanged.
+
+**Generation mapping (V3/R1 → V4):**
+
+| Old (this ADR) | New (V4 generation) | Used for |
+|---|---|---|
+| `deepseek-v3` / `deepseek-chat` | `deepseek-v4-flash` | general (Writer, Researcher, SMM, Manager, Sales) + Wave-0 leaf specialists |
+| `deepseek-r1` / `deepseek-reasoner` | `deepseek-v4-pro` | reasoning-heavy (Analyst, Coordinator complex decomposition, Lawyer, Accountant) |
+
+`router_service.py::ROLE_TO_MODEL` keeps the logical aliases
+(`deepseek-reasoner` / `deepseek-chat`); the deploy-time model-name override
+(Settings / Lockbox) maps them to the V4 catalog names. The pricing table in
+`pricing_service` is refreshed to V4 rates as part of Wave-1 cost-instrumentation
+(AC-W1-13) — Wave-0 cost estimates use the documented V3/R1-era $/1M figures
+below (close enough for the AC10 30¢ cap; exact billing reconciliation is a
+Wave-1 concern).
+
+The remainder of this ADR (routing table, RU access, ФЗ-152, open-weights)
+stands verbatim with the model-name substitution above.
 
 ## Wave 0 RU-currency model (2026-05-19)
 
