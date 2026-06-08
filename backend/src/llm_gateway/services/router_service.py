@@ -203,15 +203,16 @@ class LLMRouter:
 def _provider_default_model(provider_slug: str) -> str:
     """Hardcoded default per provider (mirrors the 0001 migration seed).
 
-    yandexgpt defaults to ``yandexgpt-pro`` (founder decision 2026-06-07 — the
-    product targets brief quality, so the failover model is pro, not lite).
-    PREREQUISITE: yandexgpt-pro must be enabled in the YC folder/catalog,
-    otherwise the API returns 404 (see the runbook note in
-    docs/runbooks/staging-bootstrap.md). lite remains reachable via model_hint.
+    yandexgpt defaults to ``yandexgpt/rc`` = **YandexGPT 5.1 Pro** (modelVersion
+    yagpt-5.1-2025-08) — the best Yandex model available in the founder's catalog
+    (probed live 2026-06-07; the stable ``yandexgpt`` alias is 5.0 Pro). The
+    YandexGPTProvider builds the modelUri verbatim when the name carries a
+    version segment ("/"), so this resolves to gpt://<folder>/yandexgpt/rc.
+    Falls back to the stable 5.0 Pro by setting model_hint="yandexgpt".
     """
     return {
         "deepseek": "deepseek-chat",
-        "yandexgpt": "yandexgpt-pro",
+        "yandexgpt": "yandexgpt/rc",
         "gigachat": "GigaChat-Pro",
         "openai": "gpt-4o",
         "anthropic": "claude-sonnet-4-6",
