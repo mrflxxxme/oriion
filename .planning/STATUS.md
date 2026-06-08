@@ -7,7 +7,7 @@
 | Wave | Status | Anchor target |
 |---|---|---|
 | Pre-Wave-0 | ✅ Complete | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
-| Wave 0 (Foundation) | 🔄 **Closing** (Phase 00.6 PR-B in flight; anchor flip pending Stage B 10× demo) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
+| Wave 0 (Foundation) | 🔄 **Closing** (all build phases ✅; architecture **live-validated locally**; only the founder staging 10× anchor run remains) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
 | Wave 1 (Core MVP) | ⏳ Pending — Phase 01.1 retro file created в PR-B C8 (AC-W1-1..17) | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + Telegram Business API |
 | Wave 2 (Pixel + каталог) | ⏳ Pending | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent first-instances |
 | Wave 3 (Глубина) | ⏳ Pending | +ИП-Бух + СМБ-Sales vertical + Vertical Rituals + PARA Workspace |
@@ -16,9 +16,13 @@
 
 ## Текущая активная фаза
 
-**Phase 00.6 PR-B (Stage B — YC staging deploy + 10× demo + Wave-0 anchor flip)** — 🔄 **In Progress** on branch `claude/gallant-lamport-f48eca`. 10-commit ledger; founder-gate between C6 and C7 (terraform apply + 10× demo run). См. [`HANDOFF.md`](./HANDOFF.md) для детали.
+**Phase 00.7 (Frontend skeleton)** — ⏳ **NEXT** (opens now; runs ∥ Wave-0 close per roadmap). UI поверх доказанного API.
 
-**Phase 00.6 PR-A (Stage A — local-first validation infra)** — ✅ **Complete** (merged 2026-05-25 via [PR #36](https://github.com/mrflxxxme/oriion/pull/36); 22 atomic commits eb31ff8 → 0f125bd; consolidated self-audit 0H/9M/10L PASS-WITH-FIXES).
+**Phase 00.6 PR-B (Stage B + orchestrator-dispatch + live validation)** — ✅ **Complete** ([PR #38](https://github.com/mrflxxxme/oriion/pull/38) C0–C12 + [PR #39](https://github.com/mrflxxxme/oriion/pull/39) C13–C19, merged 2026-06-08). Full 5-agent retro PASS. **Архитектура доказана end-to-end на живом стеке с реальными LLM** (DeepSeek + live Brave + YandexGPT 5.1 Pro failover; AC8+AC10 PASS, AC9 matrix+plan PASS, brief-length = Wave-1 tuning). 7 deployment-багов найдено и починено живым прогоном (C13–C19). См. [`HANDOFF.md`](./HANDOFF.md).
+
+**Оставшийся Wave-0 пункт:** founder staging 10× anchor run (gate D5 — `internal_demo_passed`) — Wave-0→Wave-1 gate, НЕ блокирует Phase 00.7. Runbook: `docs/runbooks/staging-bootstrap.md`.
+
+**Phase 00.6 PR-A (Stage A local infra)** — ✅ **Complete** ([PR #36](https://github.com/mrflxxxme/oriion/pull/36); 22 commits; AC-W1-11..15).
 
 ## Phase history (Wave-0)
 
@@ -34,8 +38,8 @@
 | 00.5 / 00.5a — Pydantic-AI runtime | ✅ Complete | merged 2026-05-20 | |
 | 00.5b — runtime + tasks + orchestrator | ✅ Complete | [#35](https://github.com/mrflxxxme/oriion/pull/35) 2026-05-21 | 5-agent audit 3H/15M/17L; AC-W1-1..10 pin block |
 | **00.6 PR-A** — Stage A local infra | ✅ Complete | [#36](https://github.com/mrflxxxme/oriion/pull/36) 2026-05-25 | 22 commits; self-audit 0H/9M/10L; AC-W1-11..15 pin block extension |
-| **00.6 PR-B** — Stage B YC deploy + anchor flip | 🔄 In Progress | TBD | this session, 10-commit ledger |
-| 00.7 — Frontend skeleton | ⏳ Pending | TBD | opens после Phase 00.6 PR-B closure |
+| **00.6 PR-B** — Stage B + orchestrator-dispatch + live validation | ✅ Complete | [#38](https://github.com/mrflxxxme/oriion/pull/38) + [#39](https://github.com/mrflxxxme/oriion/pull/39) 2026-06-08 | C0–C19; 5-agent retro PASS; architecture live-proven; AC-W1-16..23 |
+| 00.7 — Frontend skeleton | ⏳ **NEXT** | TBD | opens now (∥ Wave-0 close); UI on proven API |
 
 ## Active blockers
 
