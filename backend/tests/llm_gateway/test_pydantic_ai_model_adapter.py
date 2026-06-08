@@ -47,9 +47,15 @@ def fake_provider():
 
 @pytest.fixture
 def fake_router(fake_provider):
-    """Mock LLMRouter that returns the fake_provider for any role."""
+    """Mock LLMRouter whose acomplete() returns a canned (response, model, slug)."""
     router = AsyncMock()
-    router.route = AsyncMock(return_value=(fake_provider, "deepseek-chat"))
+    canned = LLMResponse(
+        content="Hello, this is a canned chat response.",
+        finish_reason="stop",
+        usage=LLMUsage(tokens_input=12, tokens_output=8, cached_input_tokens=0),
+        raw_provider_metadata={"provider": "deepseek"},
+    )
+    router.acomplete = AsyncMock(return_value=(canned, "deepseek-chat", "deepseek"))
     return router
 
 
@@ -90,21 +96,16 @@ async def test_llm_gateway_model_translates_request_to_router_call(
         model_request_parameters=model_request_params,
     )
 
-    # Router was called with the role_key + zero-workspace-id (Wave 0 default).
-    fake_router.route.assert_awaited_once()
-    call_kwargs = fake_router.route.await_args.kwargs
+    # Router.acomplete was called with the role_key + OpenAI-shaped messages.
+    fake_router.acomplete.assert_awaited_once()
+    call_kwargs = fake_router.acomplete.await_args.kwargs
     assert call_kwargs["role_key"] == "coordinator"
-
-    # Provider chat received OpenAI-shaped messages — system + user.
-    fake_provider.chat.assert_awaited_once()
-    llm_req = fake_provider.chat.await_args.args[0]
-    assert llm_req.model == "deepseek-chat"
-    assert llm_req.messages == [
+    assert call_kwargs["messages"] == [
         {"role": "system", "content": "You are a coordinator."},
         {"role": "user", "content": "Make me a market brief."},
     ]
     # Metadata is propagated for downstream billing/audit attribution.
-    assert llm_req.metadata["role_key"] == "coordinator"
+    assert call_kwargs["metadata"]["role_key"] == "coordinator"
 
     # ModelResponse shape: TextPart with provider content, usage normalized.
     assert isinstance(response, ModelResponse)
@@ -133,7 +134,7 @@ async def test_llm_gateway_model_passes_workspace_id_to_router(fake_router, mode
         model_request_parameters=model_request_params,
     )
 
-    call_kwargs = fake_router.route.await_args.kwargs
+    call_kwargs = fake_router.acomplete.await_args.kwargs
     assert call_kwargs["workspace_id"] == workspace_id
 
 
@@ -151,7 +152,7 @@ async def test_llm_gateway_model_forwards_model_hint(fake_router, model_request_
         model_request_parameters=model_request_params,
     )
 
-    call_kwargs = fake_router.route.await_args.kwargs
+    call_kwargs = fake_router.acomplete.await_args.kwargs
     assert call_kwargs["model_hint"] == "byok-openai/gpt-4o"
 
 
