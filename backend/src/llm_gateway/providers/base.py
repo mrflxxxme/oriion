@@ -25,7 +25,12 @@ class LLMRequest(BaseModel):
 
     messages: list[dict[str, Any]] = Field(min_length=1)
     model: str
-    max_tokens: int = 2048
+    # 8192 (was 2048): a market brief (≥1500 words) + a 10-post content plan is
+    # ~3-4k words ≈ 6-8k output tokens; the 2048 cap truncated the writer mid-
+    # document (brief ~790 words, content plan cut off → AC9 fail). 8192 is
+    # within DeepSeek + YandexGPT-Pro + GigaChat output limits. Cost stays under
+    # the AC10 / budget_guard caps. Per-role tuning is a Wave-1 pin (AC-W1-23).
+    max_tokens: int = 8192
     temperature: float = 0.7
     stream: bool = False
     tools: list[dict[str, Any]] | None = None
