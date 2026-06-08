@@ -77,6 +77,16 @@ def test_count_content_plan_posts_numbered_bold_fallback() -> None:
     assert _count_content_plan_posts(numbered) == 10
 
 
+def test_count_content_plan_posts_wrapped_heading_quirk() -> None:
+    # Real-LLM quirk: the model wraps its own heading level around the
+    # instructed `### Пост N` → `#### ### Пост N` (observed from DeepSeek).
+    wrapped = "\n".join(f"#### ### Пост {i} — Telegram — день {i}" for i in range(1, 11))
+    assert _count_content_plan_posts(wrapped) == 10
+    # And a plain H2 variant.
+    h2 = "\n".join(f"## Пост {i}" for i in range(1, 11))
+    assert _count_content_plan_posts(h2) == 10
+
+
 def test_matrix_max_cols() -> None:
     assert _matrix_max_cols(_matrix_block(6)) == 4
     assert _matrix_max_cols(_two_col_matrix()) == 2

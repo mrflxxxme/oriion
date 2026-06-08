@@ -139,7 +139,12 @@ def _count_content_plan_posts(text: str) -> int:
     output, not just the synthetic test fixture. The dispatch writer
     sub-prompt (runtime/dispatch.py) also pins the H3 idiom belt-and-suspenders.
     """
-    pattern = r"(?:^###\s+Пост\s+\d+)|(?:^\s*\d+\.\s+\*\*)"
+    # Match a post heading at ANY markdown level, tolerating the real-LLM
+    # quirk where the model wraps its own heading around the instructed format
+    # (e.g. `#### ### Пост 1 — Telegram — Пн`). `^#{1,6}[#\s]*Пост\s+\d+`
+    # covers `### Пост 1`, `## Пост 1`, `#### ### Пост 1`; the second branch
+    # keeps the numbered-bold fallback.
+    pattern = r"(?:^#{1,6}[#\s]*Пост\s+\d+)|(?:^\s*\d+\.\s+\*\*)"
     return len(re.findall(pattern, text, flags=re.MULTILINE))
 
 
