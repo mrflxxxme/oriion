@@ -48,6 +48,12 @@ COPY src ./src
 COPY migrations ./migrations
 COPY scripts ./scripts
 COPY alembic.ini ./
+# Role-prompt markdown is a runtime asset the agent factories load. Canonical
+# source is .planning/contracts/role-prompts/ (outside this build context), so
+# a packaged copy lives in backend/role_prompts/ and ROLE_PROMPTS_DIR points
+# the loader at it (compose env). Single-sourcing is a Wave-1 pin (AC-W1-20).
+COPY role_prompts ./role_prompts
+ENV ROLE_PROMPTS_DIR=/app/role_prompts
 
 RUN uv sync --frozen --no-dev --compile-bytecode
 

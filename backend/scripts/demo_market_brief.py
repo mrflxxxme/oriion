@@ -320,7 +320,7 @@ async def _async_main(args: argparse.Namespace) -> int:
             f"[run {i}] elapsed={result.duration_seconds:.1f}s "
             f"cost={result.total_cost_credits} credits "
             f"ac9={result.ac9_passed} (brief={result.brief_words}w "
-            f"matrix={result.matrix_rows}r×{result.matrix_cols}c "
+            f"matrix={result.matrix_rows}rx{result.matrix_cols}c "
             f"plan={result.content_plan_posts}p) "
             f"ac10={result.ac10_passed}"
         )
@@ -375,7 +375,18 @@ def _build_argparser() -> argparse.ArgumentParser:
     return parser
 
 
+def _force_utf8_console() -> None:
+    """Windows consoles default to cp1251 — force UTF-8 so RU content + symbols
+    in progress/error lines don't crash the run with UnicodeEncodeError (the
+    JSON evidence is already utf-8). errors='replace' keeps it crash-proof."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main() -> int:
+    _force_utf8_console()
     args = _build_argparser().parse_args()
     return asyncio.run(_async_main(args))
 
