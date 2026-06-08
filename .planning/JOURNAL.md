@@ -390,3 +390,13 @@ Append-only журнал AI-агентских сессий. Одна запис
 - Next: founder reviews + merges this audit PR в†’ decides RLS approach (3 options surfaced in HANDOFF.md "Founder action") в†’ opens Phase 00.5 session.
 - Refs: branch `claude/pre-phase-05-audit`; audit at `.planning/_session-context/AUDIT-2026-05-19-PRE-PHASE-05/`; archived PR audits at `.planning/_session-context/archive/`.
 
+## 2026-06-08 · phase-00.6-pr-b-complete + live-validation · @claude-opus
+
+- **Phase 00.6 PR-B COMPLETE** — closed the PR-A CRITICAL FINDING (POST /tasks queued-but-never-dispatched) + shipped full Stage-B + **live-validated the whole architecture with real LLMs**. 20 commits (C0–C19) across [PR #38](https://github.com/mrflxxxme/oriion/pull/38) (C0–C12) + [PR #39](https://github.com/mrflxxxme/oriion/pull/39) (C13–C19), both merged.
+- **Shipped:** inline orchestrator-dispatch `POST /tasks/{id}/run` + `runtime/dispatch.py` (ScriptedCoordinator pipeline); Terraform YC baseline; `deploy-staging.yml`; Caddy real-ACME; live Brave web_search wired into Researcher; gate D5 + ADR-018 amendments; `01.1-retro.md`.
+- **Full 5-agent retrospective audit** (Code/Security/Test/Architecture/Compliance) — 4 HIGH all fixed in-loop; verdict **PASS**. Report: `_session-context/AUDIT-2026-05-26-PHASE-00-6-FINAL/`.
+- **Live validation (the highlight):** ran the real «Market & content brief» scenario against the live Docker stack with real keys. Found + fixed **7 deployment bugs invisible to unit tests** (C13–C19): role-prompts not packaged into the image (would break staging); UTF-8 console crash; no intra-request provider failover (DeepSeek-402 hard-failed); leaf-agent structured-output gap; invalid yandex model name; `max_tokens=2048` truncation; AC9 parser too strict. After fixes the full pipeline runs end-to-end: register → cell+team → /tasks → /run → researcher(Brave)+analyst+writer (DeepSeek; YandexGPT 5.1 Pro failover) → 8 SSE events → 3 artifacts → cost. **AC8+AC10 PASS; AC9 matrix 5×4 + content-plan 10 PASS; brief-length the one Wave-1 tuning gap.** Output quality consultant-grade.
+- **New Wave-1 pins:** AC-W1-20 (single-source role-prompts), AC-W1-21 (RU CA in container + yandex-pro enablement), AC-W1-22 (writer length/format), AC-W1-23 (per-role max_tokens + latency-vs-length via streaming). All in `roadmap/wave-1-core-mvp/phases/01.1-retro.md`.
+- **Next:** Phase 00.7 (frontend skeleton) opens — runs ∥ Wave-0 close. Remaining Wave-0 item = founder staging 10× anchor run (gate D5), not a 00.7 blocker.
+- Refs: branches `claude/gallant-lamport-f48eca` (PR-B) + `claude/lucid-maxwell-c7e2a1` (this Exit ritual); runbook `docs/runbooks/staging-bootstrap.md`.
+
