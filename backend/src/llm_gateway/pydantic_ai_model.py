@@ -38,8 +38,6 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RequestUsage
 
-from src.llm_gateway.providers.base import LLMRequest
-
 # Pydantic-AI's ModelResponse.finish_reason is typed as a strict Literal.
 _FinishReason = Literal["stop", "length", "content_filter", "tool_call", "error"]
 
@@ -106,20 +104,17 @@ class LLMGatewayModel(Model):
         (inherited default raises until Wave 1 SSE-on-runtime lands)."""
         openai_messages = _messages_to_openai_shape(messages)
 
-        provider, target_model = await self._router.route(
+        # acomplete walks the failover chain (DeepSeek → YandexGPT → GigaChat),
+        # so a single provider error (e.g. 402 Payment Required) fails over to
+        # the next provider instead of failing the whole task.
+        resp, target_model, provider_slug = await self._router.acomplete(
             workspace_id=self._workspace_id,
             role_key=self._role_key,
             model_hint=self._model_hint,
-        )
-        self._last_model_name = target_model
-
-        req = LLMRequest(
             messages=openai_messages,
-            model=target_model,
-            stream=False,
             metadata={"role_key": self._role_key, "workspace_id": str(self._workspace_id)},
         )
-        resp = await provider.chat(req)
+        self._last_model_name = target_model
 
         return ModelResponse(
             parts=[TextPart(content=resp.content)],
@@ -132,7 +127,7 @@ class LLMGatewayModel(Model):
             model_name=f"{_SYSTEM_TAG}/{target_model}",
             timestamp=datetime.now(UTC),
             finish_reason=_normalize_finish_reason(resp.finish_reason),
-            provider_name=provider.name,
+            provider_name=provider_slug,
         )
 
     # F-ARC-M1 audit fix: request_stream() is intentionally NOT overridden in

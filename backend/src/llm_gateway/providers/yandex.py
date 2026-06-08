@@ -52,7 +52,12 @@ class YandexGPTProvider:
         )
 
     def _model_uri(self, model: str) -> str:
-        # Yandex modelUri convention: gpt://<folder_id>/<model_name>/latest
+        # Yandex modelUri convention: gpt://<folder_id>/<model_name>/<version>.
+        # If `model` already carries a version segment (contains "/", e.g.
+        # "yandexgpt/rc" = YandexGPT 5.1 Pro), use it verbatim; otherwise
+        # default to the stable "latest" alias (e.g. "yandexgpt" → 5 Pro).
+        if "/" in model:
+            return f"gpt://{self._catalog_id}/{model}"
         return f"gpt://{self._catalog_id}/{model}/latest"
 
     def _completion_body(self, req: LLMRequest, *, stream: bool) -> dict[str, Any]:

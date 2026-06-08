@@ -15,6 +15,7 @@ lift — Phase 01.1 retro per AC14.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,16 +122,23 @@ def parse_role_prompt_text(raw: str, *, role_filename: str) -> RolePrompt:
 def load_role_prompt(role_slug: str, *, prompts_dir: Path | None = None) -> RolePrompt:
     """Load `contracts/role-prompts/<role_slug>.md` and parse it.
 
-    The default ``prompts_dir`` walks up from this file to find
-    ``.planning/contracts/role-prompts``. Override for tests.
+    Resolution order:
+      1. explicit ``prompts_dir`` arg (tests);
+      2. ``ROLE_PROMPTS_DIR`` env var — REQUIRED in the container, where the
+         repo-root walk doesn't reach ``.planning`` (the prompts are packaged
+         into the image at ``/app/role_prompts`` and pointed at via this var);
+      3. host/dev fallback — walk up to ``.planning/contracts/role-prompts``.
     """
     if prompts_dir is None:
-        # Walk: backend/src/agents/services/role_prompt_loader.py →
-        # backend/src/agents/services → backend/src/agents → backend/src →
-        # backend → repo-root → .planning/contracts/role-prompts
-        here = Path(__file__).resolve()
-        repo_root = here.parents[4]
-        prompts_dir = repo_root / ".planning" / "contracts" / "role-prompts"
+        env_dir = os.environ.get("ROLE_PROMPTS_DIR", "").strip()
+        if env_dir:
+            prompts_dir = Path(env_dir)
+        else:
+            # Host/dev walk: backend/src/agents/services/role_prompt_loader.py →
+            # … → backend → repo-root → .planning/contracts/role-prompts
+            here = Path(__file__).resolve()
+            repo_root = here.parents[4]
+            prompts_dir = repo_root / ".planning" / "contracts" / "role-prompts"
 
     path = prompts_dir / f"{role_slug}.md"
     if not path.exists():

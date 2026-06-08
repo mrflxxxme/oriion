@@ -14,10 +14,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import httpx
+import structlog
+
 from src.llm_gateway.circuit_breaker import CircuitState, ProviderCircuit
 from src.llm_gateway.exceptions import LLMProviderUnavailable
-from src.llm_gateway.providers.base import LLMProvider
+from src.llm_gateway.providers.base import LLMProvider, LLMRequest, LLMResponse
 from src.llm_gateway.providers.byok_proxy import parse_byok_model
+
+logger = structlog.get_logger(__name__)
 
 # ── ROLE_TO_MODEL — per ADR-018 ───────────────────────────────────────────
 ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
@@ -118,6 +123,73 @@ class LLMRouter:
             f"No fallback available (excluded={exclude!r}, chain={chain!r})."
         )
 
+    async def acomplete(
+        self,
+        *,
+        workspace_id: UUID,
+        role_key: str,
+        model_hint: str | None,
+        messages: list[dict[str, str]],
+        metadata: dict[str, str] | None = None,
+    ) -> tuple[LLMResponse, str, str]:
+        """Run a completion, failing over across the chain on retryable errors.
+
+        Walks DeepSeek → YandexGPT → GigaChat (reordered to the role's primary):
+        on any provider HTTP/network error (e.g. 402 Payment Required, 429, 5xx,
+        connection error) it records the circuit failure and tries the NEXT
+        provider — instead of the previous behaviour where a single provider
+        error bubbled up and failed the whole task. Returns ``(response, model)``.
+
+        BYOK requests (``byok-*`` hint) stay single-provider (per-workspace key,
+        no cross-provider fallback).
+        """
+        if model_hint and model_hint.startswith("byok-"):
+            provider, model = await self.route(
+                workspace_id=workspace_id, role_key=role_key, model_hint=model_hint
+            )
+            resp = await provider.chat(
+                LLMRequest(messages=messages, model=model, stream=False, metadata=metadata or {})
+            )
+            return resp, model, provider.name
+
+        default_provider, default_model = ROLE_TO_MODEL.get(role_key, ROLE_TO_MODEL["default"])
+        chain = self._chain_starting_at(default_provider)
+        last_exc: Exception | None = None
+        tried: list[str] = []
+        for slug in chain:
+            candidate = self._providers.get(slug)
+            circuit = self._circuits.get(slug)
+            if candidate is None or circuit is None or not circuit.should_attempt:
+                continue
+            if slug == default_provider:
+                model = model_hint or default_model
+            else:
+                model = _provider_default_model(slug)
+            try:
+                resp = await candidate.chat(
+                    LLMRequest(
+                        messages=messages, model=model, stream=False, metadata=metadata or {}
+                    )
+                )
+                circuit.record_success()
+                return resp, model, slug
+            except (httpx.HTTPError, LLMProviderUnavailable) as exc:
+                circuit.record_failure()
+                last_exc = exc
+                tried.append(slug)
+                logger.warning(
+                    "llm_gateway.router.failover",
+                    failed_provider=slug,
+                    error=str(exc),
+                    next_candidates=[s for s in chain if s not in tried],
+                )
+                continue
+        if last_exc is not None:
+            raise last_exc
+        raise LLMProviderUnavailable(
+            f"All providers in chain {chain!r} unavailable (none had a CLOSED circuit)."
+        )
+
     # -- internals ------------------------------------------------------------
     @staticmethod
     def _chain_starting_at(primary: str) -> tuple[str, ...]:
@@ -129,10 +201,18 @@ class LLMRouter:
 
 
 def _provider_default_model(provider_slug: str) -> str:
-    """Hardcoded default per provider (mirrors the 0001 migration seed)."""
+    """Hardcoded default per provider (mirrors the 0001 migration seed).
+
+    yandexgpt defaults to ``yandexgpt/rc`` = **YandexGPT 5.1 Pro** (modelVersion
+    yagpt-5.1-2025-08) — the best Yandex model available in the founder's catalog
+    (probed live 2026-06-07; the stable ``yandexgpt`` alias is 5.0 Pro). The
+    YandexGPTProvider builds the modelUri verbatim when the name carries a
+    version segment ("/"), so this resolves to gpt://<folder>/yandexgpt/rc.
+    Falls back to the stable 5.0 Pro by setting model_hint="yandexgpt".
+    """
     return {
         "deepseek": "deepseek-chat",
-        "yandexgpt": "yandexgpt-pro",
+        "yandexgpt": "yandexgpt/rc",
         "gigachat": "GigaChat-Pro",
         "openai": "gpt-4o",
         "anthropic": "claude-sonnet-4-6",
