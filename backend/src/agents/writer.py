@@ -29,12 +29,13 @@ def build_writer_agent(
     *,
     model: LLMGatewayModel,
     role_prompt: RolePrompt | None = None,
-) -> Agent[WriterDeps, WriterOutput]:
+) -> Agent[WriterDeps, str]:
+    # Wave-0 plain-text output (see researcher.py note — AC14/AC-W1-16).
     prompt = (role_prompt or get_role_prompt()).composed_system_prompt()
     return Agent(
         model=model,
         deps_type=WriterDeps,
-        output_type=WriterOutput,
+        output_type=str,
         system_prompt=prompt,
         tools=[],
     )

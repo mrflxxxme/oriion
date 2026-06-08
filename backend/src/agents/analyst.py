@@ -37,12 +37,13 @@ def build_analyst_agent(
     *,
     model: LLMGatewayModel,
     role_prompt: RolePrompt | None = None,
-) -> Agent[AnalystDeps, AnalystOutput]:
+) -> Agent[AnalystDeps, str]:
+    # Wave-0 plain-text output (see researcher.py note — AC14/AC-W1-16).
     prompt = (role_prompt or get_role_prompt()).composed_system_prompt()
     return Agent(
         model=model,
         deps_type=AnalystDeps,
-        output_type=AnalystOutput,
+        output_type=str,
         system_prompt=prompt,
         tools=[],
     )

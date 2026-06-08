@@ -36,12 +36,18 @@ def build_researcher_agent(
     *,
     model: LLMGatewayModel,
     role_prompt: RolePrompt | None = None,
-) -> Agent[ResearcherDeps, ResearcherOutput]:
+) -> Agent[ResearcherDeps, str]:
+    # Wave-0: plain-text output. The structured ResearcherOutput requires the
+    # LLMGatewayModel structured-output / tool-call bridge (AC14/AC-W1-16) which
+    # isn't wired yet — declaring it makes Pydantic-AI try to coerce free text
+    # into the schema and fail (UnexpectedModelBehavior). The leaf produces
+    # markdown; the demo/runtime consume it as text. ResearcherOutput is kept
+    # for the Wave-1 structured path.
     prompt = (role_prompt or get_role_prompt()).composed_system_prompt()
     return Agent(
         model=model,
         deps_type=ResearcherDeps,
-        output_type=ResearcherOutput,
+        output_type=str,
         system_prompt=prompt,
         tools=[],  # web_search + read_url wire-up Wave 1
     )
