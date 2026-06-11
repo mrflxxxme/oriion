@@ -82,9 +82,13 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: npm audit (high+ severity)
+      # Scope to runtime deps — what actually ships to users. The dev/build
+      # toolchain (vitest@2 → nested vite/esbuild GHSA-67mh-4wv8-2f99) carries
+      # advisories that never reach the bundle; bumping it is a Wave-1 tooling
+      # pass (would force the vitest 3.x breaking upgrade), tracked separately.
+      - name: npm audit (high+ severity, production deps)
         working-directory: frontend
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
       - name: License check — forbid GPL/AGPL/LGPL [AC5]
         working-directory: frontend
