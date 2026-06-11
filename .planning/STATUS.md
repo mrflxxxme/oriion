@@ -16,7 +16,7 @@
 
 ## Текущая активная фаза
 
-**Phase 00.7 (Frontend skeleton)** — ⏳ **NEXT** (opens now; runs ∥ Wave-0 close per roadmap). UI поверх доказанного API.
+**Phase 00.7 (Frontend skeleton)** — ✅ **Complete** (2026-06-11; commit ledger C0–C16). Functional Wave-0 demo UI **live-validated end-to-end** against the real docker stack (register → login → cells → submit «Маркет-бриф» → SSE 3-agent progress → 3 markdown artifacts; `wave-0-demo.spec.ts` @live PASS 2.4min). 18 components, Nordic Warm tokens, axe 0 serious/critical on all 5 routes, cold-start 773ms, coverage 91.8%. 3-agent frontend audit PASS. **AC7 (UI-demo) unblocked.** Spec amendments (no flat `GET /cells`; SSE Bearer-fetch; types from live `/docs`; code-based router) flagged for architect. Deferred polish → [`revisions/00.7-audit-deferred.md`](./revisions/00.7-audit-deferred.md).
 
 **Phase 00.6 PR-B (Stage B + orchestrator-dispatch + live validation)** — ✅ **Complete** ([PR #38](https://github.com/mrflxxxme/oriion/pull/38) C0–C12 + [PR #39](https://github.com/mrflxxxme/oriion/pull/39) C13–C19, merged 2026-06-08). Full 5-agent retro PASS. **Архитектура доказана end-to-end на живом стеке с реальными LLM** (DeepSeek + live Brave + YandexGPT 5.1 Pro failover; AC8+AC10 PASS, AC9 matrix+plan PASS, brief-length = Wave-1 tuning). 7 deployment-багов найдено и починено живым прогоном (C13–C19). См. [`HANDOFF.md`](./HANDOFF.md).
 
@@ -39,7 +39,7 @@
 | 00.5b — runtime + tasks + orchestrator | ✅ Complete | [#35](https://github.com/mrflxxxme/oriion/pull/35) 2026-05-21 | 5-agent audit 3H/15M/17L; AC-W1-1..10 pin block |
 | **00.6 PR-A** — Stage A local infra | ✅ Complete | [#36](https://github.com/mrflxxxme/oriion/pull/36) 2026-05-25 | 22 commits; self-audit 0H/9M/10L; AC-W1-11..15 pin block extension |
 | **00.6 PR-B** — Stage B + orchestrator-dispatch + live validation | ✅ Complete | [#38](https://github.com/mrflxxxme/oriion/pull/38) + [#39](https://github.com/mrflxxxme/oriion/pull/39) 2026-06-08 | C0–C19; 5-agent retro PASS; architecture live-proven; AC-W1-16..23 |
-| 00.7 — Frontend skeleton | ⏳ **NEXT** | TBD | opens now (∥ Wave-0 close); UI on proven API |
+| 00.7 — Frontend skeleton | ✅ Complete | TBD | 2026-06-11; C0–C16; @live demo PASS; 3-agent FE audit PASS; AC7 unblocked; AC1-AC12 (AC4 by-design) |
 
 ## Active blockers
 

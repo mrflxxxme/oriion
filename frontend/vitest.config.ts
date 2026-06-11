@@ -9,6 +9,8 @@ export default mergeConfig(
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
       include: ["src/**/*.{test,spec}.{ts,tsx}"],
+      // Playwright owns the e2e specs — keep them out of the vitest runner.
+      exclude: ["src/test/e2e/**", "node_modules/**", "dist/**"],
       coverage: {
         provider: "v8",
         reporter: ["text", "html", "lcov"],
@@ -18,6 +20,8 @@ export default mergeConfig(
           "src/test/**",
           "src/main.tsx",
           "src/vite-env.d.ts",
+          "src/routeTree.gen.ts",
+          "src/**/*.d.ts",
         ],
         thresholds: {
           lines: 70,

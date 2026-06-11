@@ -1,0 +1,57 @@
+/*
+ * Oriion design tokens — Nordic Warm (Wave 0)
+ * Materialized from .planning/ui/design-tokens.md §2–§9.
+ *
+ * This file holds the RAW palette + motion + z-index scales that are consumed
+ * either by themes.css (semantic role mappings) or directly in component CSS.
+ *
+ * The Tailwind-namespaced derived scales (radius, shadow, type, feedback
+ * palette utilities) live in index.css `@theme` with literal values — keeping
+ * them here too would collide with Tailwind's own `--radius-*` / `--shadow-*`
+ * namespace names and create circular var references.
+ *
+ * DECISION-4 (ADR-028 §5.1) — temporary palette until OQ-09 (Wave 2 brand refresh).
+ */
+
+:root {
+  /* §2.1 Base — neutral slate scale (consumed by themes.css semantic roles) */
+  --color-base-50: #f8fafc;
+  --color-base-100: #f1f5f9;
+  --color-base-200: #e2e8f0;
+  --color-base-300: #cbd5e1;
+  --color-base-400: #94a3b8;
+  --color-base-500: #64748b;
+  --color-base-600: #475569;
+  --color-base-700: #334155;
+  --color-base-800: #1e293b;
+  --color-base-900: #0f172a;
+  --color-base-950: #020617;
+
+  /* §2.2 Brand / Primary — amber accent (single brand colour) */
+  --color-primary-100: #fef3c7;
+  --color-primary-400: #fbbf24;
+  --color-primary-500: #f59e0b;
+  --color-primary-600: #d97706;
+  --color-primary-700: #b45309;
+
+  /* §7.1 Motion durations (direct use in component transitions) */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-deliberate: 600ms;
+
+  /* §7.2 Easings */
+  --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* §9 Z-index scale (mapped into Tailwind z-* utilities in index.css) */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-popover: 50;
+  --z-toast: 60;
+  --z-tooltip: 70;
+}

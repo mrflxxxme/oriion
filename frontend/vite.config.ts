@@ -14,6 +14,13 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     strictPort: true,
+    // Backend (FastAPI) has no CORS middleware — dev traffic goes through this proxy.
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: "es2022",
