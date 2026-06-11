@@ -16,10 +16,10 @@ export const badgeVariants = cva(
       variant: {
         default: "bg-surface text-secondary border border-default",
         primary: "bg-brand-100 text-brand-700",
-        success: "bg-success-100 text-success-600",
-        warning: "bg-warning-100 text-warning-500",
-        danger: "bg-danger-100 text-danger-600",
-        info: "bg-info-100 text-info-500",
+        success: "bg-success-100 text-success-700",
+        warning: "bg-warning-100 text-warning-700",
+        danger: "bg-danger-100 text-danger-700",
+        info: "bg-info-100 text-info-700",
       },
       size: {
         sm: "px-2 py-0.5 text-xs",

@@ -29,8 +29,10 @@
   --bg-surface: var(--color-base-100);
   --bg-overlay: rgba(15, 23, 42, 0.4);
   --text-primary: var(--color-base-900);
-  --text-secondary: var(--color-base-500);
-  --text-tertiary: var(--color-base-400);
+  /* base-600/500 (not 500/400) so secondary clears AA on bg-surface and
+   * tertiary clears AA on bg-page in light mode (a11y audit A2/A3). */
+  --text-secondary: var(--color-base-600);
+  --text-tertiary: var(--color-base-500);
   --border-default: var(--color-base-200);
   --border-emphasis: var(--color-base-300);
   --cta-primary: var(--color-primary-600);

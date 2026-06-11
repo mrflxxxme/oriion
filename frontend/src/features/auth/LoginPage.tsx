@@ -98,13 +98,10 @@ export function LoginPage() {
                 {t("auth.field.remember")}
               </label>
             </span>
-            <a
-              href="#"
-              aria-disabled="true"
-              className="text-sm text-cta underline-offset-4 hover:underline"
-            >
+            {/* Wave-1 placeholder — non-interactive until the reset route exists. */}
+            <span className="text-sm text-tertiary" title="Доступно в Wave 1">
               {t("auth.login.forgot")}
-            </a>
+            </span>
           </div>
 
           <Button type="submit" className="w-full" loading={login.isPending}>

@@ -13,7 +13,7 @@ describe("Badge", () => {
     render(<Badge variant="success">Готово</Badge>);
     const el = screen.getByText("Готово");
     expect(el.className).toContain("bg-success-100");
-    expect(el.className).toContain("text-success-600");
+    expect(el.className).toContain("text-success-700");
   });
 
   it("applies size class", () => {

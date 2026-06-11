@@ -12,7 +12,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Badge,
@@ -37,7 +37,7 @@ const TERMINAL = new Set(["succeeded", "completed", "failed", "cancelled"]);
 
 const STATUS_BADGE: Record<string, { variant: BadgeProps["variant"]; label: string }> = {
   queued: { variant: "default", label: "В очереди" },
-  running: { variant: "info", label: "Выполняется" },
+  running: { variant: "warning", label: "Выполняется" },
   succeeded: { variant: "success", label: "Завершено" },
   completed: { variant: "success", label: "Завершено" },
   failed: { variant: "danger", label: "Ошибка" },
@@ -60,13 +60,27 @@ const COST_COLUMNS = [
   costColumnHelper.accessor("tokens", { header: "Токены", cell: (i) => i.getValue() }),
 ] as ColumnDef<CostRow>[];
 
+// Demote artifact-internal headings (h1→h3…) so they never compete with the
+// page <h1> / section <h2> (a11y heading order), and harden any LLM-emitted
+// links. react-markdown v10 already escapes raw HTML + sanitizes URL schemes.
+const MARKDOWN_COMPONENTS: Components = {
+  a: ({ node: _node, ...props }) => (
+    <a {...props} target="_blank" rel="noopener noreferrer nofollow" />
+  ),
+  h1: ({ node: _node, ...props }) => <h3 {...props} />,
+  h2: ({ node: _node, ...props }) => <h4 {...props} />,
+  h3: ({ node: _node, ...props }) => <h5 {...props} />,
+};
+
 function ArtifactSection({ artifact }: { artifact: Artifact }) {
   const label = ARTIFACT_LABEL[artifact.type] ?? artifact.type;
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-lg font-semibold text-primary">{label}</h2>
-      <div className="prose-tokens max-w-none text-sm text-secondary [&_h1]:text-primary [&_h2]:text-primary [&_h3]:text-primary [&_strong]:text-primary [&_table]:w-full [&_td]:border [&_td]:border-default [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-default [&_th]:px-2 [&_th]:py-1">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.path_or_inline}</ReactMarkdown>
+      <div className="max-w-none text-sm text-secondary [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-primary [&_h4]:mt-3 [&_h4]:font-semibold [&_h4]:text-primary [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-primary [&_table]:w-full [&_td]:border [&_td]:border-default [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-default [&_th]:px-2 [&_th]:py-1 [&_a]:text-cta [&_a]:underline">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+          {artifact.path_or_inline}
+        </ReactMarkdown>
       </div>
     </section>
   );

@@ -2,7 +2,7 @@
  * AppShell — top-level application chrome (component-inventory.md #1).
  * Skip-link → header (with theme toggle) → sidebar nav → main → footer.
  */
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Menu, Moon, Sun } from "lucide-react";
 import { useThemeStore } from "@/stores/theme";
@@ -37,6 +37,15 @@ export const AppShell = forwardRef<HTMLDivElement, AppShellProps>(function AppSh
   const toggleTheme = useThemeStore((s) => s.toggle);
   const mainPadding = density === "compact" ? "p-4" : "p-6";
 
+  // Mobile nav state: controlled via onSidebarToggle if provided, else internal.
+  const [mobileOpenInternal, setMobileOpenInternal] = useState(false);
+  const isControlled = onSidebarToggle !== undefined;
+  const mobileOpen = isControlled ? !sidebarCollapsed : mobileOpenInternal;
+  const toggleMobile = () => {
+    if (isControlled) onSidebarToggle();
+    else setMobileOpenInternal((open) => !open);
+  };
+
   return (
     <div ref={ref} className={cn("flex min-h-screen flex-col bg-page text-primary", className)}>
       {/* First focusable element — skip directly to the main content region. */}
@@ -53,9 +62,10 @@ export const AppShell = forwardRef<HTMLDivElement, AppShellProps>(function AppSh
             <Button
               variant="ghost"
               size="icon"
-              aria-label={sidebarCollapsed ? "Развернуть меню" : "Свернуть меню"}
-              aria-expanded={!sidebarCollapsed}
-              {...(onSidebarToggle ? { onClick: onSidebarToggle } : {})}
+              aria-label={mobileOpen ? "Свернуть меню" : "Развернуть меню"}
+              aria-expanded={mobileOpen}
+              aria-controls="app-mobile-nav"
+              onClick={toggleMobile}
               className="md:hidden"
             >
               <Menu className="size-5" aria-hidden="true" />
@@ -77,14 +87,23 @@ export const AppShell = forwardRef<HTMLDivElement, AppShellProps>(function AppSh
         </Button>
       </header>
 
+      {/* Mobile nav — disclosed by the hamburger below md. Rendered only when
+          open so the (display:none) desktop nav isn't a duplicate landmark. */}
+      {sidebar && mobileOpen ? (
+        <nav
+          id="app-mobile-nav"
+          aria-label="Основная навигация"
+          className="border-b border-default bg-surface md:hidden"
+        >
+          {sidebar}
+        </nav>
+      ) : null}
+
       <div className="flex flex-1">
         {sidebar ? (
           <nav
             aria-label="Основная навигация"
-            className={cn(
-              "hidden shrink-0 border-r border-default bg-surface md:flex md:flex-col",
-              sidebarCollapsed ? "md:w-16" : "md:w-64",
-            )}
+            className="hidden shrink-0 border-r border-default bg-surface md:flex md:flex-col md:w-64"
           >
             {sidebar}
           </nav>

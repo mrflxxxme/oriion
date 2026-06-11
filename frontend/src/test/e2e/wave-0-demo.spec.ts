@@ -11,6 +11,14 @@ import AxeBuilder from "@axe-core/playwright";
 
 const PASSWORD = "Wave0Demo!Pass12";
 
+async function expectNoAxeViolations(page: import("@playwright/test").Page) {
+  const results = await new AxeBuilder({ page }).analyze();
+  const serious = results.violations.filter((v) =>
+    ["serious", "critical"].includes(v.impact ?? ""),
+  );
+  expect(serious, JSON.stringify(serious.map((v) => v.id))).toHaveLength(0);
+}
+
 test.describe("@live Wave-0 demo", () => {
   test.setTimeout(260_000);
 
@@ -29,11 +37,13 @@ test.describe("@live Wave-0 demo", () => {
     await expect(page).toHaveURL(/\/cells/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: /ячейки/i, level: 1 })).toBeVisible();
 
-    // 3. Open the cell, then go to the new-task form.
+    // 3. Open the cell, then go to the new-task form (axe both routes — AC7).
     await page.locator("table tbody tr").first().getByRole("link").first().click();
     await expect(page).toHaveURL(/\/cells\/[^/]+$/);
+    await expectNoAxeViolations(page); // cell detail route
     await page.getByRole("link", { name: /новая задача/i }).click();
     await expect(page).toHaveURL(/\/tasks\/new$/);
+    await expectNoAxeViolations(page); // task submit route
 
     // 4. Use the «Маркет-бриф» preset, then submit.
     await page.getByRole("button", { name: /маркет-бриф/i }).click();

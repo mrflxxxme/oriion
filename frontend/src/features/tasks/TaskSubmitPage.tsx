@@ -57,7 +57,7 @@ export function TaskSubmitPage() {
         ]}
       />
 
-      <h1 className="text-2xl font-semibold text-primary">{t("tasks.submit.title")}</h1>
+      <h1 className="text-3xl font-bold text-primary">{t("tasks.submit.title")}</h1>
 
       <Card variant="outlined" padding="lg">
         <form onSubmit={(e) => void form.handleSubmit(onValid)(e)} noValidate>
@@ -116,7 +116,7 @@ export function TaskSubmitPage() {
               <p className="text-sm text-secondary">{t("tasks.submit.pipelineHint")}</p>
               <div className="flex flex-wrap gap-2">
                 {ROLE_KEYS.map((key) => (
-                  <Badge key={key} variant="info" size="md">
+                  <Badge key={key} variant="default" size="md">
                     {t(key)}
                   </Badge>
                 ))}

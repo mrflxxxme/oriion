@@ -20,7 +20,7 @@ interface TaskProgressStreamProps {
 const STATUS_BADGE: Record<AgentCard["status"], { variant: BadgeProps["variant"]; label: string }> =
   {
     pending: { variant: "default", label: "Ожидание" },
-    running: { variant: "info", label: "Выполняется" },
+    running: { variant: "warning", label: "Выполняется" },
     done: { variant: "success", label: "Готово" },
   };
 
