@@ -9,7 +9,7 @@
 
 | Phase | Направление | Owner | Релевантные ADR |
 |---|---|---|---|
-| 02.1 | Pixel Department (Native Canvas 2D + AI-generated archetypes + 5 hand-drawn vertical-героев) | Senior Frontend + Designer | [ADR-004](../../decisions/ADR-004-pixel-department.md), [ADR-021](../../decisions/ADR-021-ai-generated-pixel-pipeline.md) |
+| 02.1 | Pixel Department — **опциональный skin/office-режим** (Native Canvas 2D + AI-generated archetypes + 3 hand-drawn героев W2, ещё 2 — W3); базовый UI/брендинг строго professional nordic | Senior Frontend + Designer | [ADR-004](../../decisions/ADR-004-pixel-department.md), [ADR-021](../../decisions/ADR-021-ai-generated-pixel-pipeline.md), [ADR-031](../../decisions/ADR-031-design-direction-restyling.md) |
 | 02.2 | Расширение каталога vertical-templates до 5 шт. (+ ИП-Бухгалтерия, СМБ-Sales) | Tech Lead + Middle Backend | [ADR-017](../../decisions/ADR-017-vertical-templates.md), [ADR-010](../../decisions/ADR-010-role-versioning.md) |
 | 02.3 | Pyodide-runner для Analyst (WASM в браузере) | Senior Frontend | [ADR-006](../../decisions/ADR-006-gvisor-then-firecracker.md), [ADR-020](../../decisions/ADR-020-pyodide-code-execution.md) |
 | 02.4 | MCP-серверы для vertical-коннекторов (Bitrix24, amoCRM, WB, Ozon) + community-MCP | Middle Backend | [ADR-013](../../decisions/ADR-013-mcp-protocol.md) |

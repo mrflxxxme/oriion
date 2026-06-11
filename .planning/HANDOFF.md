@@ -4,17 +4,16 @@
 
 ## Last updated
 
-- Date: 2026-06-11 (Phase 00.7 Frontend skeleton **COMPLETE** + live-validation Exit ritual.)
-- Session: `romantic-hamilton-4b43c5`
-- Agent: @claude-opus
+- Date: 2026-06-11 (Founder grill-аудит после 00.1–00.7: правки .planning + 3 быстрых фикса чистоты вывода)
+- Session: `reverent-euclid-3bbf83`
+- Agent: @claude-fable
 
 ## Project status
 
-- **Wave:** Wave 0 (Foundation) — **closing**. All build phases complete (incl. the frontend now) + architecture live-validated. The only remaining Wave-0 item is the **founder staging 10× anchor run** (gate D5) — a Wave-0→Wave-1 gate.
-- **Phase 00.1–00.5b**: ✅ Complete (see git history / prior HANDOFFs).
-- **Phase 00.6 PR-A + PR-B**: ✅ Complete ([#36](https://github.com/mrflxxxme/oriion/pull/36), [#38](https://github.com/mrflxxxme/oriion/pull/38), [#39](https://github.com/mrflxxxme/oriion/pull/39)) — backend architecture proven end-to-end with real LLMs.
-- **Phase 00.7 (frontend skeleton)**: ✅ **Complete** (this session; C0–C16). UI built on the proven API + **live-validated end-to-end**.
-- **Phase 01.1 retro (Wave-1 hardening)**: ⏳ Pending — `roadmap/wave-1-core-mvp/phases/01.1-retro.md` holds AC-W1-1..23 (+ now the 00.7 deferred polish, see below).
+- **Wave:** Wave 0 (Foundation) — **closing**. Build-фазы 00.1–00.7 ✅; архитектура live-validated. Остались: **Phase 00.8 (design restyling, NEW)** + founder staging 10× anchor run (gate D5 — независимый Track A, 00.8 его не гейтит).
+- **Phase 00.1–00.7**: ✅ Complete (см. STATUS.md / git history).
+- **Phase 00.8 (design restyling)**: ⏳ Pending — создана этой сессией per [ADR-031](./decisions/ADR-031-design-direction-restyling.md). Spec: `roadmap/wave-0-foundation/phases/00.8-design-restyling.md`.
+- **Phase 01.1 retro**: ⏳ Pending — AC-W1-1..23 + **NEW AC-W1-24/25** (Coordinator generalization на произвольные промпты + role-prompt example diversification).
 
 ## Active blockers
 
@@ -23,74 +22,52 @@
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Wave 1) |
 
-## What just happened — Phase 00.7 (C0–C16)
+## What just happened — grill-session 2026-06-11
 
-Built the **functional Wave-0 demo UI** (Vite 6 + React 19 + TanStack Router/Query + Tailwind v4 + Radix/shadcn pattern) on top of the proven 00.6 API, and **proved the whole click-path end-to-end against the live docker stack with real LLMs**.
+Founder провёл промежуточный аудит по 4 темам (дизайн / универсальность агентов / чистота вывода / консистентность доков). 6 решений зафиксированы через grill (см. JOURNAL.md запись). Итог сессии — доки + 3 дешёвых кода-фикса; имплементация крупного — фазами.
 
-### Commit ledger
+### Код (quick fixes, чистота вывода)
 
-| # | Commit |
-|---|---|
-| C0 | pre-flight: pin live API truth + Vite proxy + SSE/run fixtures |
-| C1 | deps + tooling (query/zustand/rhf/zod/radix/markdown + playwright/axe/jest-axe) |
-| C2 | design tokens + dark/light theme (Nordic Warm) |
-| C3+C4 | 18 UI primitives (component-inventory) + barrel |
-| C5+C6 | API client (apiFetch + zod) + auth store + single-flight 401 refresh |
-| C7 | code-based router + providers + boot-time silent session restore |
-| C8 | auth feature (Login/Register, FZ-152 consent, auto-login) |
-| C9 | cells feature (list + detail, workspace fan-out) |
-| C10 | task submit (generic form + «Маркет-бриф» preset, create→navigate→fire /run un-awaited) |
-| C11 | SSE fetch-reader + pure progress reducer (9 event types) |
-| C12 | task result page (Tabs: progress cards + log / markdown artifacts / cost) |
-| C13 | Playwright E2E (@live demo + backend-free smoke) |
-| C14 | CI gates (token §A/§B grep + AC5 barrel audit + playwright job) |
-| C15 | 3-agent frontend audit fixes (a11y contrast, single-accent, mobile nav, markdown) |
-| C16 | Exit ritual |
+1. **`backend/src/runtime/dispatch.py`** — `strip_wrapping_fence` (срез обёрточного ```-фенса, включая ```markdown-маркер) + `normalize_artifact_markdown` (фенс + frontmatter + хвостовой structured-summary). Применение двухуровневое: leaf-вывод — только фенс (чтобы `prior_context` для analyst/writer сохранял мету); `ArtifactRef.path_or_inline` — полная нормализация. +7 unit-тестов; `tests/runtime` 50/50.
+2. **Role-prompts 0.1.0 → 0.1.1** (8 файлов: `backend/role_prompts/` + `.planning/contracts/role-prompts/`, синхронны per AC-W1-20): §3 — тело артефакта = чистый публикуемый документ; мета (допущения/уверенность/gaps/обращения к Координатору) только во frontmatter + structured summary (машинные блоки, платформа срезает перед показом, но передаёт по конвейеру); запрет ```-обёртки всего ответа; writer `[assumption]` → frontmatter-only.
+3. **`frontend/src/features/tasks/TaskResultPage.tsx`** — «Результат» показывает финальные документы (матрица + бриф); межшаговая «Аналитика (рабочий документ)» и неизвестные типы — в свёрнутом `<details>` «Промежуточные материалы». Без 19-го ui-компонента (CI barrel-гейт = 18). Frontend 156/156, lint + `tsc`+build green. E2E-ассерты не задеты (проверено).
 
-### Live validation (2026-06-11) — UI demo PROVEN
+### Доки
 
-`wave-0-demo.spec.ts` (@live) drove the real flow in Chromium against the docker stack: **register → auto-login → cells → cell → submit «Маркет-бриф» → SSE 3-agent progress (Исследователь→Аналитик→Райтер) → 3 markdown artifacts (matrix/analysis/brief) → axe 0 serious/critical on all 5 routes. PASS, ~2.3-2.4min.**
+- **Phase 00.8** + строки в wave-0 PHASES/README + roadmap/README; счётчик гейта «7 phases» → «9».
+- **ADR-031** (Proposed; flip → Accepted при exit 00.8 с выбранным акцентом) + decisions/README.
+- **Pixel reframing**: ADR-004 revision-note + wave-2 README/PHASES — pixel-герои = опциональный скин (opt-in), базовый бренд = professional nordic; «5 героев» в 02.1 синхронизировано с README (3 в W2 + 2 в W3).
+- **OQ-09** — направление зафиксировано, открытым остаётся имя/домен/финальный бренд (W2). **design-tokens.md** — forward-note v0.2 (значения не менялись).
+- **01.1-retro** — AC-W1-24 (произвольные промпты: удалить `_SUB_PROMPT_FRAMING`/`DEFAULT_PIPELINE`/`_ARTIFACT_KIND`; тип артефакта от Координатора; маркет-бриф остаётся только демо-пресетом) + AC-W1-25 (≥2 не-бриф примера на роль в §6 + clean-artifact conformance на golden-прогонах) + Note о лендинге quick-фиксов.
 
-Two real bugs were caught by the live run that mocked unit tests missed:
-1. **Auth token-store ordering** — `/users/me` was called before the access token was written to the store → 401 → failed refresh → silent register failure. Fixed: persist tokens before the authed call. (Lesson: keep a live, non-mocked E2E — mocks can't catch token plumbing.)
-2. **Button a11y contrast** — destructive/cta buttons used theme-flipping `text-page` (3.8:1 dark-on-rose). Fixed with mode-invariant `text-on-cta`/`text-on-danger` tokens. The 3-agent audit also caught the same class on feedback Badges (fixed in C15).
+### Не сделано сознательно (по решениям грилла)
 
-### Acceptance — 11/12 PASS, AC4 by-design
+- Рестайлинг НЕ имплементирован — это Phase 00.8 (вход через `gsd:ui-phase`).
+- Агенты НЕ генерализованы — ничего до 01.1 (AC-W1-16/24/25).
+- Лендинг по teamly.to не делаем; полный ребрендинг — W2 (OQ-09).
 
-AC1 (773ms), AC2 (5 routes), AC3 (@live demo), AC5 (18 components), AC6 (token grep), AC7 (axe×5 routes), AC8 (dark/light), AC9 (tsc strict), AC10 (91.8% cov), AC11 (9 SSE types), AC12 (FZ-152) — all ✅. AC4 (SSE <200ms) satisfied by design (synchronous reducer; per-token is Wave-1). **AC7 (UI-demo) unblocked.**
+## Verification state
 
-### Spec amendments (live-driven — flag for architect)
-
-1. No flat `GET /cells` — list = `GET /workspaces` → `GET /workspaces/{id}/cells`.
-2. SSE auth = Bearer header → hand-rolled fetch+ReadableStream reader (EventSource can't).
-3. TS types from live `/docs`, not openapi-typescript off draft contracts (contracts drift).
-4. Code-based TanStack Router (not file-based codegen).
-5. Three-step task flow: `POST /tasks` → `POST /run` (blocking) → `GET /stream` (drain-replay); UI fires /run un-awaited.
-
-### Deferred → Wave-1 (`01.1-retro.md` + `revisions/00.7-audit-deferred.md`)
-
-i18n key-completeness (Wave-0 placeholder mode allowed), refresh-token zod parity, textarea counter aria-live debounce, minor a11y polish (sort-button name, pagination aria-disabled, single-tab Tabs), design nits (mono numerics, card elevation, sidebar hover, gap rhythm), per-page designer loop re-expansion.
-
-## Local dev / demo runbook (for the founder to click-test live)
-
-1. Start the stack: `docker compose -f infra/docker-compose.staging.yml -f infra/docker-compose.staging-local.override.yml --env-file backend/.env up -d --build` (backend on :8000).
-2. Refresh the Yandex IAM token when failover is needed: `yc iam create-token` → update `YANDEX_IAM_TOKEN` in `backend/.env` → `docker compose ... up -d backend`. (DeepSeek is primary + funded; Yandex is failover; GigaChat fails TLS locally — AC-W1-21.)
-3. Frontend: `cd frontend && npm install && npm run dev` → http://localhost:5173 (Vite proxies `/api` → :8000).
-4. Full automated proof: `npm run e2e:live` (real ~2.3min run) or `npm run e2e:ci` (fast backend-free smoke).
-
-## Keys / config state (local `backend/.env`, gitignored — NEVER in git)
-
-`DEEPSEEK_API_KEY` funded/primary. `YANDEX_IAM_TOKEN` ~12h TTL (refresh via `yc`). `BRAVE_SEARCH_API_KEY` live. `GIGACHAT_AUTH_KEY` present but TLS fails in-container (AC-W1-21). `REQUIRE_EMAIL_VERIFICATION=false` locally.
+- Backend: `uv run pytest tests/runtime` — 50/50 PASS (новые: fence/frontmatter/summary stripping, идемпотентность, выживание `### Пост N`, prior_context-keeps-meta).
+- Frontend: `npm test` 156/156 PASS (новый: disclosure collapsed-by-default + opens-on-click), `npm run lint` 0 warnings, `npm run build` OK.
+- **Рекомендуемый шаг перед anchor run:** один живой прогон `npm run e2e:live` — увидеть чистые артефакты глазами + проверить, что бриф не просел по длине после среза frontmatter (AC-W1-22 уже отслеживает ≥1500w; live ранее давал 1018w).
 
 ## Carryover — read order for the next session
 
-1. `README.md` → 2. **this HANDOFF.md** → 3. `STATUS.md` → 4. `agent-handbook/00-START-HERE.md` → 5. for Wave-1: `roadmap/wave-1-core-mvp/phases/01.1-retro.md` + `revisions/00.7-audit-deferred.md`.
+1. `README.md` → 2. **this HANDOFF.md** → 3. `STATUS.md` → 4. `agent-handbook/00-START-HERE.md` → 5. для 00.8: `roadmap/wave-0-foundation/phases/00.8-design-restyling.md` + ADR-031 + `ui/design-tokens.md`; для Wave-1: `roadmap/wave-1-core-mvp/phases/01.1-retro.md`.
+
+## Next actions
+
+1. **Merge PR этой сессии** (код-фиксы + .planning).
+2. **Execute Phase 00.8**: `gsd:ui-phase` (UI-SPEC) → plan → execute; accent bake-off с founder.
+3. **Founder staging 10× anchor run** (gate D5) — параллельно, независимо от 00.8; артефакты теперь чистые.
+4. Wave 1 старт: 01.1-retro первым (AC-W1-1..25).
 
 ## Exit ritual (this session)
 
-- [x] HANDOFF.md rewritten — Phase 00.7 complete + live validation
-- [x] STATUS.md updated — Phase 00.7 ✅, AC7 unblocked
-- [x] phase-spec 00.7 status → Complete + AC1–AC12 evidence + spec amendments
-- [x] JOURNAL.md appended — 00.7 closure entry
-- [x] `revisions/00.7-audit-deferred.md` — audit dispositions
-- [ ] Wave-0 anchor flip — pending founder staging 10× (Track A, independent)
+- [x] HANDOFF.md rewritten — grill-аудит + quick fixes + Phase 00.8
+- [x] STATUS.md updated — Phase 00.8 Pending, активная фаза, history-таблица
+- [x] JOURNAL.md prepended — запись 2026-06-11 reverent-euclid (6 решений + done-список)
+- [x] ADR-031 создан + decisions/README; ADR-004 revision-note
+- [x] Wave-0/1/2 roadmap-доки синхронизированы
+- [ ] Wave-0 anchor flip — pending founder staging 10× (Track A, независимый)

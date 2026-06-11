@@ -46,9 +46,14 @@ const STATUS_BADGE: Record<string, { variant: BadgeProps["variant"]; label: stri
 
 const ARTIFACT_LABEL: Record<string, string> = {
   matrix: "Матрица исследования",
-  analysis: "Аналитика",
+  analysis: "Аналитика (рабочий документ)",
   brief: "Бриф и контент-план",
 };
+
+// Final deliverables are shown prominently; intermediate working documents
+// (the analyst's inter-step output + any unknown future types) collapse into
+// a secondary disclosure so the Результат tab reads as a clean human answer.
+const FINAL_ARTIFACT_TYPES = new Set(["matrix", "brief"]);
 
 const costColumnHelper = createColumnHelper<CostRow>();
 const COST_COLUMNS = [
@@ -192,9 +197,25 @@ export function TaskResultPage() {
               aria-label={t("tasks.result.region")}
               className="flex flex-col gap-8"
             >
-              {artifacts.map((artifact) => (
-                <ArtifactSection key={artifact.id ?? artifact.type} artifact={artifact} />
-              ))}
+              {artifacts
+                .filter((artifact) => FINAL_ARTIFACT_TYPES.has(artifact.type))
+                .map((artifact) => (
+                  <ArtifactSection key={artifact.id ?? artifact.type} artifact={artifact} />
+                ))}
+              {artifacts.some((artifact) => !FINAL_ARTIFACT_TYPES.has(artifact.type)) ? (
+                <details className="rounded-md border border-default p-4">
+                  <summary className="cursor-pointer text-sm font-medium text-secondary hover:text-primary focus-visible:outline-none focus-visible:shadow-focus-ring">
+                    Промежуточные материалы
+                  </summary>
+                  <div className="mt-4 flex flex-col gap-8">
+                    {artifacts
+                      .filter((artifact) => !FINAL_ARTIFACT_TYPES.has(artifact.type))
+                      .map((artifact) => (
+                        <ArtifactSection key={artifact.id ?? artifact.type} artifact={artifact} />
+                      ))}
+                  </div>
+                </details>
+              ) : null}
             </div>
           )}
         </Tabs.Content>

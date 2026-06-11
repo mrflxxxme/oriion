@@ -2,9 +2,11 @@
 
 > **Revision 2026-05-15:** Wave 2 scope reduced — ИП-Бухгалтерия + СМБ-Sales vertical-templates moved W2 → W3. Wave 2 теперь ships: +WB-Селлер vertical (graduated W0→W2) + Pixel + Pyodide + Telegram Mini App + первые **3 Master-Agent instances** (Marketing + Telegram + WB) + Master-Agent hardening pass. Timebox 8 → 9 weeks. See [Session-decision](../../JOURNAL.md).
 
+> **Revision 2026-06-11 (per [ADR-031](../../decisions/ADR-031-design-direction-restyling.md)):** Pixel Department reframed — пиксельные герои и офис ship-ятся как **опциональный «скин» (opt-in, off by default)** поверх строго профессионального nordic base UI (Phase 00.8). Скоуп ассетов не меняется; меняется позиционирование: primary visual brand = professional nordic, pixel = memorable opt-in feature.
+
 ## Цель волны
 
-**Public beta релиз.** Pixel Department живёт (Native Canvas 2D), 4 templates в каталоге (1 horizontal + 3 vertical), Pyodide для Analyst-роли, MCP-каталог (vertical + community серверы), Telegram Mini App контейнер, полноценный onboarding с TTFV ≤3 мин.
+**Public beta релиз.** Pixel Department живёт (Native Canvas 2D) как опциональный skin/office-режим поверх профессионального nordic base UI (ADR-031), 4 templates в каталоге (1 horizontal + 3 vertical), Pyodide для Analyst-роли, MCP-каталог (vertical + community серверы), Telegram Mini App контейнер, полноценный onboarding с TTFV ≤3 мин.
 
 ## Метрика успеха
 
@@ -15,7 +17,7 @@
 - Master-Agent layer hardened на 3 vertical-instances; vertical-tier pricing rationale validated через A/B-test
 - Telegram Mini App live: ≥10 friends используют для approve/edit DM-replies
 - 50+ платящих клиентов
-- Pixel Department NPS: первые отзывы упоминают как secondary USP
+- Pixel Department NPS: первые отзывы упоминают как secondary USP (opt-in feature; kill-criteria per R-11 читается с поправкой на долю включивших скин)
 
 ## Критерий перехода к Wave 3
 
@@ -28,7 +30,7 @@
 ## Scope
 
 **Must:**
-- Pixel Department: Native HTML5 Canvas 2D + AI-generated baseline (24 archetypes) + 3 vertical-героев hand-drawn для W2 verticals (Marketing-agency «SMM-Анастасия», Telegram-крейтор «Крейтор-Денис», WB-Селлер «Селлер-Маркус») — ADR-004, ADR-021. Остальные 2 hand-drawn героя (Бухгалтер-Анна + Sales-Дмитрий) — Wave 3.
+- Pixel Department **(опциональный skin/office-режим, off by default per ADR-031)**: Native HTML5 Canvas 2D + AI-generated baseline (24 archetypes) + 3 vertical-героев hand-drawn для W2 verticals (Marketing-agency «SMM-Анастасия», Telegram-крейтор «Крейтор-Денис», WB-Селлер «Селлер-Маркус») — ADR-004, ADR-021, ADR-031. Остальные 2 hand-drawn героя (Бухгалтер-Анна + Sales-Дмитрий) — Wave 3.
 - Расширение каталога: **+WB-Селлер vertical-template** (graduated W0→W2) — добавляется поверх 3 templates из Wave 1
 - **Master-Agent hardening pass** на 3 vertical-instances + новый WB-Master с deep prompt в `contracts/role-prompts/masters/wb-seller-master.md`
 - Pyodide WASM для Analyst-роли (ADR-020) — code execution в браузере; Analyst capability-gap из Wave 0 закрыт
@@ -70,7 +72,7 @@
 - 4 templates в production (horizontal + 3 vertical) с golden datasets для verticals
 - 3 hand-drawn vertical-героев + 24 AI-generated archetypes (ещё 2 hand-drawn — Wave 3)
 - 3 vertical Master-Agents (hardened после Wave 1 first-draft) + WB-Master (Wave 2 new)
-- Pixel Department live
+- Pixel Department live (opt-in skin)
 - Telegram Mini App live с inline-approve UX
 - MCP-каталог (9+ серверов) в UI, включая wb-partners-mcp
 - Pyodide-runner для Analyst во всех team-presets (Analyst capability-gap из Wave 0 закрыт)

@@ -4,7 +4,7 @@ role_ui_name: Координатор
 preset: productivity-core
 preset_ui_name: Твои личные ассистенты
 status: Proposed
-version: 0.1.0
+version: 0.1.1
 language: ru
 contract_type: role-prompt
 wave_introduced: 0
@@ -88,6 +88,8 @@ model_default: deepseek-r1
 ```
 
 Плюс параллельно — **human-readable markdown-ответ** пользователю в чат: tl;dr + ссылки на артефакты + 3–5 ключевых insights + явное «что я предполагал» + «что осталось открытым».
+
+**Чистота пользовательского ответа (контракт уточнён 2026-06-11).** В human-readable ответ и в артефакты НЕ протекают служебные секции агентов: YAML-frontmatter, structured summary, `# Gaps and blockers`, обращения агентов друг к другу. Допущения и открытые вопросы попадают к пользователю только в твоей собственной формулировке (поля `assumptions` / `open_questions`). Артефакты передаёшь как чистые документы — без ```-обёртки вокруг всего содержимого.
 
 Если triage = `clarification-needed`, output упрощённый: `{intent_summary, clarifying_questions: [...], blocked_until_answer: true}`.
 

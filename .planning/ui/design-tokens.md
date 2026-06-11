@@ -1,7 +1,7 @@
 ﻿# Oriion Design Tokens — Nordic Warm
 
 - **Version:** 0.1.0 (Wave 0)
-- **Status:** temporary palette (final после OQ-09 Wave 2 brand refresh)
+- **Status:** temporary palette (final после OQ-09 Wave 2 brand refresh). **v0.2 restyling запланирован в [Phase 00.8](../roadmap/wave-0-foundation/phases/00.8-design-restyling.md)** per [ADR-031](../decisions/ADR-031-design-direction-restyling.md): приглушённая professional-nordic палитра в духе Claude Code, акцент TBD (терракота ≈#d97757 vs muted amber — bake-off внутри фазы). Меняются только значения; имена/структура токенов стабильны.
 - **Source of truth:** this file (per DECISION-4 — see [ADR-028](../decisions/ADR-028-policies-registry.md#decision-4))
 - **Materialization:** CSS variables в `frontend/src/styles/tokens.css` — Phase 00.7 deliverable. Здесь — spec only.
 
@@ -249,7 +249,8 @@ Mobile-first: styles default к < sm, then progressively enhance.
 
 ### 10.4 Future evolution (Wave 2)
 
-- Brand palette (amber → possibly Oriion-orange) может измениться post-OQ-09 resolution.
+- **Interim step (Phase 00.8, Wave 0 — per ADR-031):** v0.2.0 restyling к professional-nordic — глубже тёмный фон + приглушённый тёплый акцент (терракота vs muted amber, bake-off внутри фазы). Только значения токенов.
+- Brand palette (после 00.8 — possibly Oriion-orange) может измениться post-OQ-09 resolution.
 - **Structural tokens stay** — spacing, radius, type scale, shadow recipes — не меняются.
 - Semantic mappings (`--bg-primary`, `--text-primary`) могут перенаправляться на новые brand tokens без необходимости touch every component.
 
@@ -271,3 +272,4 @@ Mobile-first: styles default к < sm, then progressively enhance.
 | Version | Date | Change |
 |---|---|---|
 | 0.1.0 | 2026-05-13 | Initial Wave 0 foundation (Nordic Warm). Generated per DECISION-4. |
+| 0.1.0+note | 2026-06-11 | Forward-note: v0.2.0 restyling запланирован в Phase 00.8 (professional nordic, accent TBD) per ADR-031. Значения не менялись. |

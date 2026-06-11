@@ -33,6 +33,8 @@ from src.runtime.dispatch import (
     dispatch_task,
     estimate_credits,
     fetch_research_context,
+    normalize_artifact_markdown,
+    strip_wrapping_fence,
 )
 from src.tasks.models import Task
 
@@ -374,6 +376,109 @@ def test_extract_usage_request_response_aliases_and_none() -> None:
         pass
 
     assert _extract_usage(_NoUsage()) == (0, 0)
+
+
+# ── markdown normalization (founder session 2026-06-11) ──────────────────
+
+_WRAPPED_DOC = """```markdown
+---
+artifact_type: brief
+assumptions: [запуск в мае 2026]
+---
+
+# Бриф
+
+Текст брифа.
+
+### Пост 1 — Telegram — Пн
+
+```python
+print("inner code block survives")
+```
+
+**Structured summary:**
+
+```
+artifact_path: brief.md
+key_messages: ["раз", "два"]
+gaps: []
+```
+```
+"""
+
+
+def test_strip_wrapping_fence_unwraps_whole_doc_fence() -> None:
+    assert strip_wrapping_fence("```markdown\n# Бриф\n\nТекст.\n```") == "# Бриф\n\nТекст."
+    assert strip_wrapping_fence("```\n# Бриф\n```") == "# Бриф"
+
+
+def test_strip_wrapping_fence_keeps_inner_fences_untouched() -> None:
+    # A leading fence that closes early (interior fences) is NOT a wrapper.
+    text = "```markdown\n# Doc\n```\n\nостальной текст"
+    assert strip_wrapping_fence(text) == text
+    plain = "# Doc\n\n```python\nprint(1)\n```"
+    assert strip_wrapping_fence(plain) == plain
+
+
+def test_strip_wrapping_fence_idempotent() -> None:
+    once = strip_wrapping_fence("```markdown\n# Бриф\nТекст.\n```")
+    assert strip_wrapping_fence(once) == once
+
+
+def test_normalize_artifact_markdown_strips_frontmatter_and_summary() -> None:
+    out = normalize_artifact_markdown(_WRAPPED_DOC)
+    # Wrapper meta gone…
+    assert "artifact_type" not in out
+    assert "artifact_path" not in out
+    assert "Structured summary" not in out
+    # …human document intact, including the AC9 post heading + inner code.
+    assert out.startswith("# Бриф")
+    assert "### Пост 1 — Telegram — Пн" in out
+    assert 'print("inner code block survives")' in out
+
+
+def test_normalize_artifact_markdown_idempotent_and_plain_passthrough() -> None:
+    out = normalize_artifact_markdown(_WRAPPED_DOC)
+    assert normalize_artifact_markdown(out) == out
+    plain = "# Просто документ\n\nБез обёрток."
+    assert normalize_artifact_markdown(plain) == plain
+
+
+def test_normalize_artifact_markdown_keeps_non_summary_trailing_fence() -> None:
+    text = "# Doc\n\n```python\nprint(2)\n```"
+    assert normalize_artifact_markdown(text) == text
+
+
+@pytest.mark.asyncio
+async def test_scripted_coordinator_artifact_clean_but_context_keeps_meta() -> None:
+    """prior_context keeps the role-contract meta; the user-facing artifact doesn't."""
+    seen_prompts: list[str] = []
+    meta_doc = (
+        "---\nartifact_type: research-pack\n---\n\n# Research summary\n\nФакты.\n\n"
+        "```\nartifact_path: pack.md\nkey_messages: [x]\n```"
+    )
+
+    async def _runner(inp: DelegateInput, _deps: Any) -> DelegateResult:
+        seen_prompts.append(inp.sub_prompt)
+        return DelegateResult(
+            sub_task_id=uuid4(),
+            target_agent_slug=inp.target_agent_slug,
+            output=meta_doc,
+            cost_credits=Decimal(0),
+            tokens_used=0,
+        )
+
+    coord = ScriptedCoordinator()
+    result = await coord.run("запрос", deps=_FakeDeps(runner=_runner))
+
+    # Downstream agents still see the frontmatter + summary block…
+    assert "artifact_type: research-pack" in seen_prompts[1]
+    assert "artifact_path: pack.md" in seen_prompts[1]
+    # …while every materialized artifact is clean.
+    for artifact in result.output.artifacts:
+        assert "artifact_type" not in artifact.path_or_inline
+        assert "artifact_path" not in artifact.path_or_inline
+        assert "# Research summary" in artifact.path_or_inline
 
 
 # ── dispatch_task wiring ──────────────────────────────────────────────────

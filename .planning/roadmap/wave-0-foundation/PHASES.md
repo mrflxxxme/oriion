@@ -10,6 +10,7 @@
 | [00.5](./phases/00.5-pydantic-ai-productivity-team.md) | pydantic-ai-productivity-team | 5 дней | 00.2.5 | Senior Backend |
 | [00.6](./phases/00.6-deploy-observability.md) | deploy-observability | 3 дня | 00.1, 00.5 | DevOps |
 | [00.7](./phases/00.7-frontend-skeleton.md) | frontend-skeleton | 4 дня | 00.1, 00.2, 00.5 | Senior Frontend |
+| [00.8](./phases/00.8-design-restyling.md) | design-restyling | 2–3 дня | 00.7, ADR-031 | Designer + Senior Frontend |
 
 ## Граф зависимостей
 
@@ -21,9 +22,12 @@
                                        │
                                        ├─→ 00.6 (deploy + observability)  ∥ parallel
                                        └─→ 00.7 (frontend skeleton)
+                                             └─→ 00.8 (design restyling)
 ```
 
 > **Revision 2026-05-15:** Phase 00.5 anchor changed: WB-Селлер vertical team → horizontal `productivity-core` team (Coordinator + Researcher + Writer + Analyst). Demo-сценарий — «Market & content brief для нового продукта». WB-Селлер team-preset переезжает в Wave 2. See [ADR-017](../../decisions/ADR-017-vertical-templates.md) revision.
+
+> **Revision 2026-06-11:** Phase 00.8 (design restyling — professional nordic v0.2) вставлена после 00.7 per founder grill-session + [ADR-031](../../decisions/ADR-031-design-direction-restyling.md). +2–3 frontend-дня; НЕ гейтит `internal_demo_passed` (D5 = founder 10× anchor run, независимый Track A).
 
 ## Параллельность
 
@@ -43,7 +47,7 @@
 
 ## Acceptance gate to Wave 1
 
-- [ ] Все 7 phases в статусе Done
+- [ ] Все 9 phases (00.1–00.8, включая 00.2.5) в статусе Done
 - [ ] Internal demo (productivity-core horizontal team end-to-end через UI на сценарии «Market & content brief») прошёл
 - [ ] 3 артефакта demo-run-а соответствуют acceptance criteria (brief.md ≥1500w, competitive-matrix.md ≥5×4, content-plan.md 10 posts)
 - [ ] End-to-end demo latency ≤120 sec p95, cost ≤30¢

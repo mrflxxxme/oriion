@@ -2,6 +2,8 @@
 
 > **Revision 2026-05-15:** Wave 0 anchor changed из «WB-Селлер vertical team» на «horizontal `productivity-core` team». WB-Селлер team-preset переезжает в Wave 2. See [Session-decision](../../JOURNAL.md) + [ADR-017](../../decisions/ADR-017-vertical-templates.md) + [ADR-029](../../decisions/ADR-029-master-agent-vertical-templates.md).
 
+> **Revision 2026-06-11:** Phase 00.8 (design restyling — professional nordic v0.2) добавлена после 00.7 per [ADR-031](../../decisions/ADR-031-design-direction-restyling.md). Не гейтит `internal_demo_passed`.
+
 ## Цель волны
 
 **Internal demo:** horizontal team-preset `productivity-core` («Твои личные ассистенты») — Coordinator + Researcher + Writer + Analyst — end-to-end через DeepSeek + YandexGPT + GigaChat.
@@ -49,6 +51,7 @@ End-to-end pipeline: auth → DB (cell) → LLM-gateway (3 провайдера 
 - Docker Compose deploy + Caddy reverse proxy
 - OpenTelemetry → Grafana (минимум)
 - **Frontend skeleton (Phase 00.7 NEW per Session 4 / C-D2):** functional Wave-0 demo UI — auth + cell-list + task-submit + SSE result view, materializing все 18 components из `ui/component-inventory.md` через ui-ux-pro-max designer workflow
+- **Design restyling (Phase 00.8 NEW per Session 2026-06-11 / ADR-031):** tokens v0.2.0 (приглушённая professional-nordic палитра, акцент выбирается bake-off-ом) + полировка 6 экранов по teamly.to-паттернам — до старта Wave 1
 
 **Nice-to-have (можно отложить в Wave 1):**
 - Yandex ID / VK ID OAuth
@@ -68,7 +71,7 @@ End-to-end pipeline: auth → DB (cell) → LLM-gateway (3 провайдера 
 
 | Метрика | Цель |
 |---|---|
-| End-to-end demo (WB team) проходит | Pass/Fail |
+| End-to-end demo (`productivity-core` horizontal team) проходит | Pass/Fail |
 | Время на cold-start dev environment | ≤10 мин |
 | Время на регистрацию + первая задача (API) | ≤2 мин |
 | CI pipeline runtime | ≤8 мин |

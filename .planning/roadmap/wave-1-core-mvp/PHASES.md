@@ -9,7 +9,7 @@
 
 | Phase | Направление | Owner | Релевантные ADR |
 |---|---|---|---|
-| 01.1 | **Master-Agent layer + 2 vertical-templates** (Marketing-agency + Telegram-крейтор) + **Coordinator retrofit** under subordinate-mode + **horizontal role-prompts hardening pass** | Senior Backend + Tech Lead | [ADR-017](../../decisions/ADR-017-vertical-templates.md), [ADR-022](../../decisions/ADR-022-coordinator-wizard-llm-hybrid.md), [ADR-029](../../decisions/ADR-029-master-agent-vertical-templates.md) |
+| 01.1 | **Master-Agent layer + 2 vertical-templates** (Marketing-agency + Telegram-крейтор) + **Coordinator retrofit** under subordinate-mode + **horizontal role-prompts hardening pass** + **Coordinator generalization: произвольные промпты** (AC-W1-16/24/25 — удаление scripted-framing, артефакт-типы от Координатора) | Senior Backend + Tech Lead | [ADR-017](../../decisions/ADR-017-vertical-templates.md), [ADR-022](../../decisions/ADR-022-coordinator-wizard-llm-hybrid.md), [ADR-029](../../decisions/ADR-029-master-agent-vertical-templates.md) |
 | 01.2 | Memory: cell + role (двухуровневая, manual control) + persistent conversation history | Senior Backend | [ADR-011](../../decisions/ADR-011-memory-2-level.md) |
 | 01.3 | Артефакты: Yjs документы + S3 ассеты + citeable URLs | Senior Backend + Frontend | [ADR-012](../../decisions/ADR-012-artifacts.md) |
 | 01.4 | Биллинг: T-кредиты + ЮKassa + Trial 14 дней + Solo тариф + BYOK режим | Senior Backend | [ADR-008](../../decisions/ADR-008-credits-billing.md) |
