@@ -4,12 +4,12 @@
  * Compound API: Tabs + Tabs.List / Tabs.Trigger / Tabs.Content (Object.assign).
  */
 import { forwardRef } from "react";
-import type { ComponentPropsWithoutRef, ElementRef } from "react";
+import type { ComponentPropsWithoutRef, ComponentRef } from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "@/lib/utils";
 
 const TabsRoot = forwardRef<
-  ElementRef<typeof TabsPrimitive.Root>,
+  ComponentRef<typeof TabsPrimitive.Root>,
   ComponentPropsWithoutRef<typeof TabsPrimitive.Root>
 >(function TabsRoot({ className, ...props }, ref) {
   return (
@@ -18,7 +18,7 @@ const TabsRoot = forwardRef<
 });
 
 const TabsList = forwardRef<
-  ElementRef<typeof TabsPrimitive.List>,
+  ComponentRef<typeof TabsPrimitive.List>,
   ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(function TabsList({ className, ...props }, ref) {
   return (
@@ -31,7 +31,7 @@ const TabsList = forwardRef<
 });
 
 const TabsTrigger = forwardRef<
-  ElementRef<typeof TabsPrimitive.Trigger>,
+  ComponentRef<typeof TabsPrimitive.Trigger>,
   ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
 >(function TabsTrigger({ className, ...props }, ref) {
   return (
@@ -50,7 +50,7 @@ const TabsTrigger = forwardRef<
 });
 
 const TabsContent = forwardRef<
-  ElementRef<typeof TabsPrimitive.Content>,
+  ComponentRef<typeof TabsPrimitive.Content>,
   ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
 >(function TabsContent({ className, ...props }, ref) {
   return (

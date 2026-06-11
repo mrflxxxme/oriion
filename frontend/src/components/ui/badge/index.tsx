@@ -8,6 +8,7 @@ import type { HTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+// eslint-disable-next-line react-refresh/only-export-components -- cva helper co-located per shadcn convention
 export const badgeVariants = cva(
   "inline-flex items-center rounded-full font-medium tracking-wide whitespace-nowrap",
   {

@@ -3,7 +3,7 @@
  * Wraps @radix-ui/react-radio-group; Radix supplies role=radiogroup.
  */
 import { forwardRef, useId } from "react";
-import type { ElementRef } from "react";
+import type { ComponentRef } from "react";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export interface RadioGroupProps {
 }
 
 export const RadioGroup = forwardRef<
-  ElementRef<typeof RadioGroupPrimitive.Root>,
+  ComponentRef<typeof RadioGroupPrimitive.Root>,
   RadioGroupProps
 >(function RadioGroup(
   { options, value, defaultValue, onValueChange, name, disabled = false, className, ...aria },

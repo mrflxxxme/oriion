@@ -16,7 +16,7 @@
  *   </Dialog>
  */
 import { forwardRef } from "react";
-import type { ComponentPropsWithoutRef, ElementRef, HTMLAttributes } from "react";
+import type { ComponentPropsWithoutRef, ComponentRef, HTMLAttributes } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
@@ -28,7 +28,7 @@ const Portal = DialogPrimitive.Portal;
 const Close = DialogPrimitive.Close;
 
 const Overlay = forwardRef<
-  ElementRef<typeof DialogPrimitive.Overlay>,
+  ComponentRef<typeof DialogPrimitive.Overlay>,
   ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(function DialogOverlay({ className, ...props }, ref) {
   return (
@@ -61,7 +61,7 @@ export interface DialogContentProps
     VariantProps<typeof contentVariants> {}
 
 const Content = forwardRef<
-  ElementRef<typeof DialogPrimitive.Content>,
+  ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(function DialogContent({ className, size, children, ...props }, ref) {
   return (
@@ -107,7 +107,7 @@ function Footer({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
 }
 
 const Title = forwardRef<
-  ElementRef<typeof DialogPrimitive.Title>,
+  ComponentRef<typeof DialogPrimitive.Title>,
   ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(function DialogTitle({ className, ...props }, ref) {
   return (
@@ -120,7 +120,7 @@ const Title = forwardRef<
 });
 
 const Description = forwardRef<
-  ElementRef<typeof DialogPrimitive.Description>,
+  ComponentRef<typeof DialogPrimitive.Description>,
   ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(function DialogDescription({ className, ...props }, ref) {
   return (

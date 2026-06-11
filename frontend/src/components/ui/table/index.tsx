@@ -17,7 +17,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface TableProps<TData> {
-  columns: ColumnDef<TData, unknown>[];
+  columns: ColumnDef<TData>[];
   data: TData[];
   sortable?: boolean;
   loading?: boolean;
@@ -117,9 +117,9 @@ export function Table<TData>({
         <tbody>
           {loading
             ? Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
-                <tr key={`skeleton-${rowIndex}`} className="border-b border-default">
+                <tr key={`skeleton-${String(rowIndex)}`} className="border-b border-default">
                   {columns.map((_, colIndex) => (
-                    <td key={`skeleton-cell-${colIndex}`} className={pad}>
+                    <td key={`skeleton-cell-${String(colIndex)}`} className={pad}>
                       <div className="h-4 w-full animate-pulse rounded-sm bg-skeleton" />
                     </td>
                   ))}

@@ -3,7 +3,7 @@
  * Wraps @radix-ui/react-checkbox; optional `label` renders a linked <label>.
  */
 import { forwardRef } from "react";
-import type { ComponentPropsWithoutRef, ElementRef } from "react";
+import type { ComponentPropsWithoutRef, ComponentRef } from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import { Check, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,7 @@ export interface CheckboxProps
 }
 
 export const Checkbox = forwardRef<
-  ElementRef<typeof CheckboxPrimitive.Root>,
+  ComponentRef<typeof CheckboxPrimitive.Root>,
   CheckboxProps
 >(function Checkbox({ className, label, id, checked, ...props }, ref) {
   const box = (

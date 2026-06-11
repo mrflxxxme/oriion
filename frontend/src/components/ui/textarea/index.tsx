@@ -36,7 +36,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           // Inline style is the documented exception for autosize: we must read
           // scrollHeight and write it back to the element height each input.
           el.style.height = "auto";
-          el.style.height = `${el.scrollHeight}px`;
+          el.style.height = `${String(el.scrollHeight)}px`;
         }
         onInput?.(e);
       },
@@ -61,7 +61,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
             invalid ? "border-danger-600" : "border-default",
             className,
           )}
-          {...(props as Omit<TextareaProps, "value">)}
+          {...(props)}
         />
         {maxLength !== undefined ? (
           <span className="text-xs text-tertiary self-end" aria-live="polite">

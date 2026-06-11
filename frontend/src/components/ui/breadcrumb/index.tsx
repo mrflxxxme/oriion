@@ -44,7 +44,10 @@ export const Breadcrumb = forwardRef<HTMLElement, BreadcrumbProps>(function Brea
         {visible.map((item, index) => {
           const isLast = index === lastIndex;
           return (
-            <li key={item ? `${item.label}-${index}` : `ellipsis-${index}`} className="flex items-center gap-2">
+            <li
+              key={item ? `${item.label}-${String(index)}` : `ellipsis-${String(index)}`}
+              className="flex items-center gap-2"
+            >
               {item === null ? (
                 <span className="text-tertiary" aria-hidden="true">
                   {ELLIPSIS}

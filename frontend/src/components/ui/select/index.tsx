@@ -3,7 +3,7 @@
  * Wraps @radix-ui/react-select. Multi-select is Wave-1 — single value only here.
  */
 import { forwardRef } from "react";
-import type { ElementRef } from "react";
+import type { ComponentRef } from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ export interface SelectProps {
 }
 
 export const Select = forwardRef<
-  ElementRef<typeof SelectPrimitive.Trigger>,
+  ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectProps
 >(function Select(
   {

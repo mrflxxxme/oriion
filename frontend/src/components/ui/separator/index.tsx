@@ -3,7 +3,7 @@
  * Wraps @radix-ui/react-separator; decorative by default (aria-hidden).
  */
 import { forwardRef } from "react";
-import type { ComponentPropsWithoutRef, ElementRef } from "react";
+import type { ComponentPropsWithoutRef, ComponentRef } from "react";
 import * as SeparatorPrimitive from "@radix-ui/react-separator";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,7 @@ export interface SeparatorProps
 }
 
 export const Separator = forwardRef<
-  ElementRef<typeof SeparatorPrimitive.Root>,
+  ComponentRef<typeof SeparatorPrimitive.Root>,
   SeparatorProps
 >(function Separator(
   { className, orientation = "horizontal", decorative = true, ...props },

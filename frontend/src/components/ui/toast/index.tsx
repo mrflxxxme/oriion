@@ -47,6 +47,7 @@ export function Toaster(props: ToasterProps) {
  * Variant-aware helper around sonner's `toast`. Calling `toast(msg)` shows a
  * neutral toast; the variant methods map to sonner's semantic calls.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- toast helper co-located with Toaster per shadcn convention
 export const toast = Object.assign(
   (message: string) => sonnerToast(message),
   {

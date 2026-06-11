@@ -16,7 +16,7 @@ const data: Row[] = [
   { name: "Виктор", age: 42 },
 ];
 
-const columns: ColumnDef<Row, unknown>[] = [
+const columns: ColumnDef<Row>[] = [
   { accessorKey: "name", header: "Имя" },
   { accessorKey: "age", header: "Возраст" },
 ];

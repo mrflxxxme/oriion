@@ -72,7 +72,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
           aria-label="Первая страница"
           disabled={atStart}
           aria-disabled={atStart}
-          onClick={() => onPageChange(1)}
+          onClick={() => { onPageChange(1); }}
         >
           <ChevronsLeft className="size-4" aria-hidden="true" />
         </Button>
@@ -83,7 +83,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
         aria-label="Предыдущая страница"
         disabled={atStart}
         aria-disabled={atStart}
-        onClick={() => onPageChange(currentPage - 1)}
+        onClick={() => { onPageChange(currentPage - 1); }}
       >
         <ChevronLeft className="size-4" aria-hidden="true" />
       </Button>
@@ -91,7 +91,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
       {pages.map((page, index) =>
         page === ELLIPSIS ? (
           <span
-            key={`ellipsis-${index}`}
+            key={`ellipsis-${String(index)}`}
             aria-hidden="true"
             className="px-2 text-sm text-tertiary"
           >
@@ -102,13 +102,13 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
             key={page}
             variant="ghost"
             size="sm"
-            aria-label={`Страница ${page}`}
+            aria-label={`Страница ${String(page)}`}
             aria-current={page === currentPage ? "page" : undefined}
             className={cn(
               "min-w-8",
               page === currentPage && "bg-cta text-page hover:bg-cta",
             )}
-            onClick={() => onPageChange(page)}
+            onClick={() => { onPageChange(page); }}
           >
             {page}
           </Button>
@@ -121,7 +121,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
         aria-label="Следующая страница"
         disabled={atEnd}
         aria-disabled={atEnd}
-        onClick={() => onPageChange(currentPage + 1)}
+        onClick={() => { onPageChange(currentPage + 1); }}
       >
         <ChevronRight className="size-4" aria-hidden="true" />
       </Button>
@@ -132,7 +132,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
           aria-label="Последняя страница"
           disabled={atEnd}
           aria-disabled={atEnd}
-          onClick={() => onPageChange(totalPages)}
+          onClick={() => { onPageChange(totalPages); }}
         >
           <ChevronsRight className="size-4" aria-hidden="true" />
         </Button>

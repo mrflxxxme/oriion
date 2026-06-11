@@ -3,7 +3,7 @@
  * Wraps @radix-ui/react-avatar (Root/Image/Fallback); optional presence status dot.
  */
 import { forwardRef } from "react";
-import type { ComponentPropsWithoutRef, ElementRef } from "react";
+import type { ComponentPropsWithoutRef, ComponentRef } from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,7 @@ export interface AvatarProps
 }
 
 export const Avatar = forwardRef<
-  ElementRef<typeof AvatarPrimitive.Root>,
+  ComponentRef<typeof AvatarPrimitive.Root>,
   AvatarProps
 >(function Avatar(
   { className, src, fallback, size = "md", status, alt, ...props },
