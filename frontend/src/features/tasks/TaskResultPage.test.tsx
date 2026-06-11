@@ -77,6 +77,30 @@ describe("TaskResultPage", () => {
     expect(screen.getByRole("heading", { name: /бриф и контент-план/i })).toBeInTheDocument();
   });
 
+  it("collapses the intermediate analysis artifact into a closed disclosure", async () => {
+    mountResult();
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /результат/i })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole("tab", { name: /результат/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("region", { name: /итоговый ответ/i })).toBeInTheDocument();
+    });
+
+    // Final deliverables are visible outside the disclosure…
+    expect(screen.getByRole("heading", { name: /матрица исследования/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /бриф и контент-план/i })).toBeVisible();
+
+    // …the intermediate analyst document is collapsed by default…
+    const summary = screen.getByText(/промежуточные материалы/i);
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText(/аналитика \(рабочий документ\)/i)).not.toBeVisible();
+
+    // …and opens on click.
+    await userEvent.click(summary);
+    expect(screen.getByText(/аналитика \(рабочий документ\)/i)).toBeVisible();
+  });
+
   it("has no axe violations", async () => {
     const { container } = mountResult();
     await waitFor(() => {
