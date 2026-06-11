@@ -7,14 +7,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
-import {
-  Badge,
-  Breadcrumb,
-  Button,
-  EmptyState,
-  Pagination,
-  Table,
-} from "@/components/ui";
+import { Badge, Breadcrumb, Button, EmptyState, Pagination, Table } from "@/components/ui";
 import { t } from "@/lib/i18n";
 import type { Cell } from "@/api/cells";
 import { useCellsList } from "./hooks";
@@ -101,18 +94,10 @@ export function CellsListPage() {
           }}
         />
       ) : !isLoading && cells.length === 0 ? (
-        <EmptyState
-          title={t("cells.empty.title")}
-          description={t("cells.empty.description")}
-        />
+        <EmptyState title={t("cells.empty.title")} description={t("cells.empty.description")} />
       ) : (
         <>
-          <Table<Cell>
-            columns={columns}
-            data={pageCells}
-            sortable
-            loading={isLoading}
-          />
+          <Table<Cell> columns={columns} data={pageCells} sortable loading={isLoading} />
           {totalPages > 1 ? (
             <Pagination
               currentPage={page}

@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseSseTranscript, type SseEvent } from "@/api/sse";
-import {
-  replayProgress,
-  progressReducer,
-  initialProgressState,
-} from "./progress-reducer";
+import { replayProgress, progressReducer, initialProgressState } from "./progress-reducer";
 import transcript from "../../test/fixtures/sse-market-brief.transcript.txt?raw";
 
 describe("progressReducer", () => {

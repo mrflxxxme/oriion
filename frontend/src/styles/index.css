@@ -26,6 +26,13 @@
   --color-cta-hover: var(--cta-primary-hover);
   --color-skeleton: var(--skeleton-base);
 
+  /* Mode-invariant button foregrounds — the button bg (amber / rose) doesn't
+   * flip with the theme, so neither should its text. Dark text on amber and
+   * light text on rose both clear WCAG AA in both modes. */
+  --color-on-cta: var(--color-base-900);
+  /* Pure white clears AA on rose-600 with margin (base-50 lands at 4.48). */
+  --color-on-danger: #ffffff;
+
   /* Brand utilities (map from raw primary scale — distinct names, no cycle) */
   --color-brand-100: var(--color-primary-100);
   --color-brand-400: var(--color-primary-400);

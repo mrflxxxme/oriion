@@ -57,40 +57,35 @@ const contentVariants = cva(
 );
 
 export interface DialogContentProps
-  extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
+  extends
+    ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
     VariantProps<typeof contentVariants> {}
 
-const Content = forwardRef<
-  ComponentRef<typeof DialogPrimitive.Content>,
-  DialogContentProps
->(function DialogContent({ className, size, children, ...props }, ref) {
-  return (
-    <Portal>
-      <Overlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(contentVariants({ size }), className)}
-        {...props}
-      >
-        {children}
-        <DialogPrimitive.Close
-          aria-label="Закрыть"
-          className="absolute right-4 top-4 rounded-sm text-tertiary transition-colors duration-150 hover:text-primary focus-visible:outline-none focus-visible:shadow-focus-ring"
+const Content = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, DialogContentProps>(
+  function DialogContent({ className, size, children, ...props }, ref) {
+    return (
+      <Portal>
+        <Overlay />
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(contentVariants({ size }), className)}
+          {...props}
         >
-          <X className="size-4" aria-hidden="true" />
-        </DialogPrimitive.Close>
-      </DialogPrimitive.Content>
-    </Portal>
-  );
-});
+          {children}
+          <DialogPrimitive.Close
+            aria-label="Закрыть"
+            className="absolute right-4 top-4 rounded-sm text-tertiary transition-colors duration-150 hover:text-primary focus-visible:outline-none focus-visible:shadow-focus-ring"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </Portal>
+    );
+  },
+);
 
 function Header({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("flex flex-col gap-1.5 pr-6", className)}
-      {...props}
-    />
-  );
+  return <div className={cn("flex flex-col gap-1.5 pr-6", className)} {...props} />;
 }
 
 function Body({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

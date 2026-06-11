@@ -67,20 +67,13 @@ export function Table<TData>({
                 const canSort = sortable && header.column.getCanSort();
                 const sortDir = header.column.getIsSorted();
                 const ariaSort =
-                  sortDir === "asc"
-                    ? "ascending"
-                    : sortDir === "desc"
-                      ? "descending"
-                      : "none";
+                  sortDir === "asc" ? "ascending" : sortDir === "desc" ? "descending" : "none";
                 return (
                   <th
                     key={header.id}
                     scope="col"
                     aria-sort={canSort ? ariaSort : undefined}
-                    className={cn(
-                      "text-left font-semibold text-secondary",
-                      pad,
-                    )}
+                    className={cn("text-left font-semibold text-secondary", pad)}
                   >
                     {header.isPlaceholder ? null : canSort ? (
                       <button
@@ -92,10 +85,7 @@ export function Table<TData>({
                           "focus-visible:outline-none focus-visible:shadow-focus-ring rounded-sm",
                         )}
                       >
-                        {flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                        {flexRender(header.column.columnDef.header, header.getContext())}
                         {sortDir === "asc" ? (
                           <ChevronUp className="size-3.5" aria-hidden="true" />
                         ) : sortDir === "desc" ? (
@@ -103,10 +93,7 @@ export function Table<TData>({
                         ) : null}
                       </button>
                     ) : (
-                      flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )
+                      flexRender(header.column.columnDef.header, header.getContext())
                     )}
                   </th>
                 );
@@ -115,39 +102,36 @@ export function Table<TData>({
           ))}
         </thead>
         <tbody>
-          {loading
-            ? Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
-                <tr key={`skeleton-${String(rowIndex)}`} className="border-b border-default">
-                  {columns.map((_, colIndex) => (
-                    <td key={`skeleton-cell-${String(colIndex)}`} className={pad}>
-                      <div className="h-4 w-full animate-pulse rounded-sm bg-skeleton" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            : isEmpty
-              ? (
-                  <tr>
-                    <td
-                      colSpan={columns.length}
-                      className={cn("text-center text-tertiary", pad)}
-                    >
-                      {emptyState ?? "Нет данных"}
-                    </td>
-                  </tr>
-                )
-              : rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-default transition-colors duration-150 hover:bg-surface"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className={cn("text-primary", pad)}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
+          {loading ? (
+            Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
+              <tr key={`skeleton-${String(rowIndex)}`} className="border-b border-default">
+                {columns.map((_, colIndex) => (
+                  <td key={`skeleton-cell-${String(colIndex)}`} className={pad}>
+                    <div className="h-4 w-full animate-pulse rounded-sm bg-skeleton" />
+                  </td>
                 ))}
+              </tr>
+            ))
+          ) : isEmpty ? (
+            <tr>
+              <td colSpan={columns.length} className={cn("text-center text-tertiary", pad)}>
+                {emptyState ?? "Нет данных"}
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-default transition-colors duration-150 hover:bg-surface"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className={cn("text-primary", pad)}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

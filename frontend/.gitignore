@@ -1,0 +1,14 @@
+# Build + deps
+dist/
+node_modules/
+
+# Test + coverage artifacts
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Vite / TS caches
+.vite/
+.vitest-cache/
+*.tsbuildinfo

@@ -69,7 +69,8 @@ const ru = {
   "tasks.submit.submit": "Создать задачу",
   "tasks.submit.costHint": "Ориентировочная стоимость: 1–50 T-кредитов",
   "tasks.submit.crumb": "Новая задача",
-  "tasks.submit.promptHint": "Сформулируйте задачу в свободной форме — команда из трёх агентов выполнит её.",
+  "tasks.submit.promptHint":
+    "Сформулируйте задачу в свободной форме — команда из трёх агентов выполнит её.",
   "tasks.submit.promptRequired": "Опишите задачу хотя бы одним символом.",
   "tasks.submit.promptTooLong": "Описание не должно превышать 4000 символов.",
   "tasks.submit.pipelineHint": "Над задачей работает конвейер из трёх агентов:",

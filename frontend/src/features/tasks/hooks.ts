@@ -20,11 +20,7 @@ import { ApiException } from "@/api/client";
 import { streamSse } from "@/api/sse";
 import { useAuthStore } from "@/stores/auth";
 import { toast } from "@/components/ui";
-import {
-  progressReducer,
-  initialProgressState,
-  type ProgressState,
-} from "./progress-reducer";
+import { progressReducer, initialProgressState, type ProgressState } from "./progress-reducer";
 
 /** Default title when the prompt is long — backend requires a non-empty title. */
 const DEFAULT_TITLE = "Задача";
@@ -52,8 +48,7 @@ export function useCreateAndRunTask(cellId: string): UseCreateAndRunTask {
   const navigate = useNavigate();
 
   const mutation = useMutation<Task, ApiException, string>({
-    mutationFn: (prompt: string) =>
-      tasksApi.create(cellId, { title: deriveTitle(prompt), prompt }),
+    mutationFn: (prompt: string) => tasksApi.create(cellId, { title: deriveTitle(prompt), prompt }),
     onSuccess: (task) => {
       // Fire the blocking orchestration WITHOUT awaiting — the result page
       // owns progress. Swallow async rejection so it never bubbles unhandled.
@@ -102,11 +97,7 @@ export interface TaskStreamResult {
  * stream ends after the terminal event. On stream error the page relies on
  * useTask polling instead, so this is best-effort.
  */
-export function useTaskStream(
-  cellId: string,
-  taskId: string,
-  enabled: boolean,
-): TaskStreamResult {
+export function useTaskStream(cellId: string, taskId: string, enabled: boolean): TaskStreamResult {
   const [progress, dispatch] = useReducer(progressReducer, undefined, initialProgressState);
   const errorRef = useRef(false);
   const [, forceRender] = useReducer((n: number) => n + 1, 0);

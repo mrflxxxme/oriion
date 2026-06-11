@@ -6,33 +6,21 @@ import { EmptyState } from "./index";
 
 describe("EmptyState", () => {
   it("renders the title and description", () => {
-    render(
-      <EmptyState
-        title="Нет ячеек"
-        description="Создайте первую ячейку, чтобы начать."
-      />,
-    );
+    render(<EmptyState title="Нет ячеек" description="Создайте первую ячейку, чтобы начать." />);
     expect(screen.getByRole("heading", { name: "Нет ячеек" })).toBeInTheDocument();
-    expect(
-      screen.getByText("Создайте первую ячейку, чтобы начать."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Создайте первую ячейку, чтобы начать.")).toBeInTheDocument();
   });
 
   it("fires the action onClick", async () => {
     const onClick = vi.fn();
-    render(
-      <EmptyState title="Нет ячеек" action={{ label: "Создать", onClick }} />,
-    );
+    render(<EmptyState title="Нет ячеек" action={{ label: "Создать", onClick }} />);
     await userEvent.click(screen.getByRole("button", { name: "Создать" }));
     expect(onClick).toHaveBeenCalledOnce();
   });
 
   it("marks the illustration as decorative", () => {
     const { container } = render(
-      <EmptyState
-        title="Нет данных"
-        illustration={<svg data-testid="art" />}
-      />,
+      <EmptyState title="Нет данных" illustration={<svg data-testid="art" />} />,
     );
     const decorative = container.querySelector('[aria-hidden="true"]');
     expect(decorative).not.toBeNull();

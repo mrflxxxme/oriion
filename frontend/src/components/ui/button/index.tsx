@@ -15,10 +15,10 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-cta text-page hover:bg-cta-hover",
+        primary: "bg-cta text-on-cta hover:bg-cta-hover",
         secondary: "bg-surface text-primary border border-default hover:border-emphasis",
         ghost: "text-primary hover:bg-surface",
-        destructive: "bg-danger-600 text-page hover:bg-danger-700",
+        destructive: "bg-danger-600 text-on-danger hover:bg-danger-700",
         link: "text-cta underline-offset-4 hover:underline",
       },
       size: {
@@ -33,8 +33,7 @@ export const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   /** Render the child as the button (Radix Slot) — e.g. wrap a router <Link>. */
   asChild?: boolean;
   /** Show a spinner + set aria-busy; also disables interaction. */

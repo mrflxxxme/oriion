@@ -64,9 +64,7 @@ describe("CellDetailPage", () => {
   it("renders the error state when the query rejects", async () => {
     getCell.mockRejectedValue(new Error("boom"));
     mount();
-    expect(
-      await screen.findByRole("button", { name: "Повторить" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Повторить" })).toBeInTheDocument();
   });
 
   it("has no axe violations", async () => {

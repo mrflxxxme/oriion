@@ -28,7 +28,8 @@ const inputVariants = cva(
 export interface InputProps
   // native input has a numeric `size` attr and a string `prefix` global attr —
   // omit both so our variant `size` and ReactNode `prefix`/`suffix` win.
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "prefix">,
+  extends
+    Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "prefix">,
     Omit<VariantProps<typeof inputVariants>, "invalid"> {
   invalid?: boolean;
   prefix?: ReactNode;

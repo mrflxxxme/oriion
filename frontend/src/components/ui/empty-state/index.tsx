@@ -30,54 +30,42 @@ export interface EmptyStateProps extends HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "danger";
 }
 
-export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(
-  function EmptyState(
-    { className, illustration, title, description, action, variant = "default", ...props },
-    ref,
-  ) {
-    const isDanger = variant === "danger";
-    // Fall back to a tone-appropriate icon when no illustration is provided.
-    const visual =
-      illustration ??
-      (isDanger ? (
-        <AlertTriangle className="size-10 text-danger-600" />
-      ) : null);
+export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function EmptyState(
+  { className, illustration, title, description, action, variant = "default", ...props },
+  ref,
+) {
+  const isDanger = variant === "danger";
+  // Fall back to a tone-appropriate icon when no illustration is provided.
+  const visual =
+    illustration ?? (isDanger ? <AlertTriangle className="size-10 text-danger-600" /> : null);
 
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          "flex flex-col items-center justify-center gap-3 px-6 py-12 text-center",
-          className,
-        )}
-        {...props}
-      >
-        {visual ? (
-          <div className="mb-1 text-tertiary" aria-hidden="true">
-            {visual}
-          </div>
-        ) : null}
-        <h3
-          className={cn(
-            "text-lg font-medium",
-            isDanger ? "text-danger-600" : "text-primary",
-          )}
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex flex-col items-center justify-center gap-3 px-6 py-12 text-center",
+        className,
+      )}
+      {...props}
+    >
+      {visual ? (
+        <div className="mb-1 text-tertiary" aria-hidden="true">
+          {visual}
+        </div>
+      ) : null}
+      <h3 className={cn("text-lg font-medium", isDanger ? "text-danger-600" : "text-primary")}>
+        {title}
+      </h3>
+      {description ? <p className="max-w-sm text-sm text-secondary">{description}</p> : null}
+      {action ? (
+        <Button
+          variant={isDanger ? "destructive" : "primary"}
+          onClick={action.onClick}
+          className="mt-2"
         >
-          {title}
-        </h3>
-        {description ? (
-          <p className="max-w-sm text-sm text-secondary">{description}</p>
-        ) : null}
-        {action ? (
-          <Button
-            variant={isDanger ? "destructive" : "primary"}
-            onClick={action.onClick}
-            className="mt-2"
-          >
-            {action.label}
-          </Button>
-        ) : null}
-      </div>
-    );
-  },
-);
+          {action.label}
+        </Button>
+      ) : null}
+    </div>
+  );
+});

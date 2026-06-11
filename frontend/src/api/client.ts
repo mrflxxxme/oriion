@@ -49,7 +49,12 @@ async function parseError(res: Response): Promise<ApiError> {
   } catch {
     // non-JSON error body — fall through to status-based copy
   }
-  return { status: res.status, code: code ?? "", message: mapErrorMessage(code, res.status), details };
+  return {
+    status: res.status,
+    code: code ?? "",
+    message: mapErrorMessage(code, res.status),
+    details,
+  };
 }
 
 // ---- Single-flight refresh -------------------------------------------------
@@ -94,10 +99,15 @@ function refreshOnce(): Promise<boolean> {
 
 // ---- Core fetch ------------------------------------------------------------
 
-async function doFetch(path: string, opts: FetchOptions<unknown>, accessToken: string | null): Promise<Response> {
+async function doFetch(
+  path: string,
+  opts: FetchOptions<unknown>,
+  accessToken: string | null,
+): Promise<Response> {
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
-  if ((opts.authRequired ?? true) && accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  if ((opts.authRequired ?? true) && accessToken)
+    headers["Authorization"] = `Bearer ${accessToken}`;
 
   const init: RequestInit = {
     method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),

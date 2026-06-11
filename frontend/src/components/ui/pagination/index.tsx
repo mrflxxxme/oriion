@@ -5,17 +5,11 @@
  */
 import { forwardRef } from "react";
 import type { HTMLAttributes } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export interface PaginationProps
-  extends Omit<HTMLAttributes<HTMLElement>, "onChange"> {
+export interface PaginationProps extends Omit<HTMLAttributes<HTMLElement>, "onChange"> {
   currentPage: number;
   totalPages: number;
   pageSize?: number;
@@ -72,7 +66,9 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
           aria-label="Первая страница"
           disabled={atStart}
           aria-disabled={atStart}
-          onClick={() => { onPageChange(1); }}
+          onClick={() => {
+            onPageChange(1);
+          }}
         >
           <ChevronsLeft className="size-4" aria-hidden="true" />
         </Button>
@@ -83,7 +79,9 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
         aria-label="Предыдущая страница"
         disabled={atStart}
         aria-disabled={atStart}
-        onClick={() => { onPageChange(currentPage - 1); }}
+        onClick={() => {
+          onPageChange(currentPage - 1);
+        }}
       >
         <ChevronLeft className="size-4" aria-hidden="true" />
       </Button>
@@ -104,11 +102,10 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
             size="sm"
             aria-label={`Страница ${String(page)}`}
             aria-current={page === currentPage ? "page" : undefined}
-            className={cn(
-              "min-w-8",
-              page === currentPage && "bg-cta text-page hover:bg-cta",
-            )}
-            onClick={() => { onPageChange(page); }}
+            className={cn("min-w-8", page === currentPage && "bg-cta text-on-cta hover:bg-cta")}
+            onClick={() => {
+              onPageChange(page);
+            }}
           >
             {page}
           </Button>
@@ -121,7 +118,9 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
         aria-label="Следующая страница"
         disabled={atEnd}
         aria-disabled={atEnd}
-        onClick={() => { onPageChange(currentPage + 1); }}
+        onClick={() => {
+          onPageChange(currentPage + 1);
+        }}
       >
         <ChevronRight className="size-4" aria-hidden="true" />
       </Button>
@@ -132,7 +131,9 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
           aria-label="Последняя страница"
           disabled={atEnd}
           aria-disabled={atEnd}
-          onClick={() => { onPageChange(totalPages); }}
+          onClick={() => {
+            onPageChange(totalPages);
+          }}
         >
           <ChevronsRight className="size-4" aria-hidden="true" />
         </Button>

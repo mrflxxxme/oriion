@@ -5,14 +5,7 @@
  */
 import { useEffect } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import {
-  Breadcrumb,
-  Button,
-  Card,
-  EmptyState,
-  Skeleton,
-  Tabs,
-} from "@/components/ui";
+import { Breadcrumb, Button, Card, EmptyState, Skeleton, Tabs } from "@/components/ui";
 import { t } from "@/lib/i18n";
 import type { Cell } from "@/api/cells";
 import { useActiveCellStore } from "@/stores/active-cell";
@@ -34,10 +27,7 @@ function CellDetail({ cell }: { cell: Cell }) {
   return (
     <div className="flex flex-col gap-6">
       <Breadcrumb
-        items={[
-          { label: t("cells.title"), href: "/cells" },
-          { label: cell.display_name },
-        ]}
+        items={[{ label: t("cells.title"), href: "/cells" }, { label: cell.display_name }]}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

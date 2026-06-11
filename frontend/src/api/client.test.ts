@@ -49,7 +49,9 @@ describe("apiFetch", () => {
       // 1) original request → 401
       .mockResolvedValueOnce(jsonResponse(401, { code: "iam.token.invalid" }))
       // 2) refresh → new pair
-      .mockResolvedValueOnce(jsonResponse(200, { access_token: "access-2", refresh_token: "refresh-2" }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { access_token: "access-2", refresh_token: "refresh-2" }),
+      )
       // 3) retry → success
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }));
     vi.stubGlobal("fetch", fetchMock);

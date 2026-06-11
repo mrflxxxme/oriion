@@ -98,7 +98,9 @@ export function TaskResultPage() {
       await refetch();
       setCancelOpen(false);
     } catch (error) {
-      toast.error(error instanceof ApiException ? error.error.message : "Не удалось отменить задачу.");
+      toast.error(
+        error instanceof ApiException ? error.error.message : "Не удалось отменить задачу.",
+      );
     } finally {
       setCancelling(false);
     }
@@ -131,10 +133,7 @@ export function TaskResultPage() {
   return (
     <div className="flex flex-col gap-6">
       <Breadcrumb
-        items={[
-          { label: t("cells.title"), href: "/cells" },
-          { label: t("tasks.result.region") },
-        ]}
+        items={[{ label: t("cells.title"), href: "/cells" }, { label: t("tasks.result.region") }]}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -216,11 +215,7 @@ export function TaskResultPage() {
             >
               {t("common.cancel")}
             </Button>
-            <Button
-              variant="destructive"
-              loading={cancelling}
-              onClick={() => void handleCancel()}
-            >
+            <Button variant="destructive" loading={cancelling} onClick={() => void handleCancel()}>
               {t("tasks.result.cancel")}
             </Button>
           </Dialog.Footer>

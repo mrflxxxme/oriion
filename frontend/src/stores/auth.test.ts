@@ -13,9 +13,11 @@ describe("useAuthStore", () => {
   });
 
   it("setSession transitions to authenticated state", () => {
-    useAuthStore
-      .getState()
-      .setSession("access-xyz", "refresh-abc", { id: "1", email: "test@oriion.dev", displayName: "Тест" });
+    useAuthStore.getState().setSession("access-xyz", "refresh-abc", {
+      id: "1",
+      email: "test@oriion.dev",
+      displayName: "Тест",
+    });
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(true);
     expect(state.accessToken).toBe("access-xyz");
@@ -23,9 +25,11 @@ describe("useAuthStore", () => {
   });
 
   it("persists ONLY the refresh token (access never written to localStorage)", () => {
-    useAuthStore
-      .getState()
-      .setSession("access-xyz", "refresh-abc", { id: "1", email: "t@oriion.dev", displayName: null });
+    useAuthStore.getState().setSession("access-xyz", "refresh-abc", {
+      id: "1",
+      email: "t@oriion.dev",
+      displayName: null,
+    });
     const persisted = JSON.parse(localStorage.getItem("oriion-auth") ?? "{}") as {
       state?: Record<string, unknown>;
     };
@@ -45,7 +49,9 @@ describe("useAuthStore", () => {
   });
 
   it("clearSession resets to unauthenticated", () => {
-    useAuthStore.getState().setSession("a", "r", { id: "1", email: "t@oriion.dev", displayName: null });
+    useAuthStore
+      .getState()
+      .setSession("a", "r", { id: "1", email: "t@oriion.dev", displayName: null });
     useAuthStore.getState().clearSession();
     const state = useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);

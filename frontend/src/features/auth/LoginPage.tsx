@@ -39,7 +39,11 @@ export function LoginPage() {
         <h2 className="text-xl font-semibold text-primary">{t("auth.login.title")}</h2>
       </Card.Header>
       <Card.Body>
-        <form noValidate onSubmit={(e) => void handleSubmit(onValid)(e)} className="flex flex-col gap-4">
+        <form
+          noValidate
+          onSubmit={(e) => void handleSubmit(onValid)(e)}
+          className="flex flex-col gap-4"
+        >
           <div className="flex flex-col gap-1.5">
             <label htmlFor="login-email" className="text-sm font-medium text-primary">
               {t("auth.field.email")}
@@ -87,7 +91,10 @@ export function LoginPage() {
                   setValue("remember", checked === true);
                 }}
               />
-              <label htmlFor="login-remember" className="text-sm text-primary cursor-pointer select-none">
+              <label
+                htmlFor="login-remember"
+                className="text-sm text-primary cursor-pointer select-none"
+              >
                 {t("auth.field.remember")}
               </label>
             </span>

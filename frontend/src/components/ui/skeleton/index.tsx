@@ -21,8 +21,7 @@ const skeletonVariants = cva("bg-skeleton animate-pulse", {
 });
 
 export interface SkeletonProps
-  extends HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof skeletonVariants> {
+  extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof skeletonVariants> {
   /** Number of stacked bars for the `text` variant. */
   lines?: number;
   /** Explicit width — dynamic data, so applied via inline style. */
@@ -43,47 +42,40 @@ function dimensionStyle(
   };
 }
 
-export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(
-  function Skeleton(
-    { className, variant = "rectangular", lines = 1, width, height, style, ...props },
-    ref,
-  ) {
-    // Dimensions are dynamic content, so they must live in inline style.
-    const dims = dimensionStyle(width, height);
-    const mergedStyle: CSSProperties | undefined =
-      dims || style ? { ...dims, ...style } : undefined;
+export const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(function Skeleton(
+  { className, variant = "rectangular", lines = 1, width, height, style, ...props },
+  ref,
+) {
+  // Dimensions are dynamic content, so they must live in inline style.
+  const dims = dimensionStyle(width, height);
+  const mergedStyle: CSSProperties | undefined = dims || style ? { ...dims, ...style } : undefined;
 
-    if (variant === "text" && lines > 1) {
-      return (
-        <div
-          ref={ref}
-          className={cn("flex flex-col gap-2", className)}
-          {...props}
-        >
-          {Array.from({ length: lines }, (_, i) => (
-            <div
-              key={i}
-              aria-hidden="true"
-              className={cn(
-                skeletonVariants({ variant: "text" }),
-                // Last line is shorter for a natural paragraph rhythm.
-                i === lines - 1 && "w-3/4",
-              )}
-              style={mergedStyle ?? undefined}
-            />
-          ))}
-        </div>
-      );
-    }
-
+  if (variant === "text" && lines > 1) {
     return (
-      <div
-        ref={ref}
-        aria-hidden="true"
-        className={cn(skeletonVariants({ variant }), className)}
-        style={mergedStyle ?? undefined}
-        {...props}
-      />
+      <div ref={ref} className={cn("flex flex-col gap-2", className)} {...props}>
+        {Array.from({ length: lines }, (_, i) => (
+          <div
+            key={i}
+            aria-hidden="true"
+            className={cn(
+              skeletonVariants({ variant: "text" }),
+              // Last line is shorter for a natural paragraph rhythm.
+              i === lines - 1 && "w-3/4",
+            )}
+            style={mergedStyle ?? undefined}
+          />
+        ))}
+      </div>
     );
-  },
-);
+  }
+
+  return (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      className={cn(skeletonVariants({ variant }), className)}
+      style={mergedStyle ?? undefined}
+      {...props}
+    />
+  );
+});

@@ -17,11 +17,10 @@ import type { ToasterProps } from "sonner";
  * `richColors` so the palette stays on our semantic tokens.
  */
 const toastClassNames = {
-  toast:
-    "group bg-surface text-primary border border-default rounded-md shadow-lg text-sm",
+  toast: "group bg-surface text-primary border border-default rounded-md shadow-lg text-sm",
   title: "font-medium text-primary",
   description: "text-secondary",
-  actionButton: "bg-cta text-page rounded-sm font-medium",
+  actionButton: "bg-cta text-on-cta rounded-sm font-medium",
   cancelButton: "bg-surface text-secondary rounded-sm",
   closeButton: "bg-surface text-secondary border border-default",
 } as const;
@@ -48,13 +47,10 @@ export function Toaster(props: ToasterProps) {
  * neutral toast; the variant methods map to sonner's semantic calls.
  */
 // eslint-disable-next-line react-refresh/only-export-components -- toast helper co-located with Toaster per shadcn convention
-export const toast = Object.assign(
-  (message: string) => sonnerToast(message),
-  {
-    success: (message: string) => sonnerToast.success(message),
-    error: (message: string) => sonnerToast.error(message),
-    info: (message: string) => sonnerToast.info(message),
-    warning: (message: string) => sonnerToast.warning(message),
-    dismiss: (id?: string | number) => sonnerToast.dismiss(id),
-  },
-);
+export const toast = Object.assign((message: string) => sonnerToast(message), {
+  success: (message: string) => sonnerToast.success(message),
+  error: (message: string) => sonnerToast.error(message),
+  info: (message: string) => sonnerToast.info(message),
+  warning: (message: string) => sonnerToast.warning(message),
+  dismiss: (id?: string | number) => sonnerToast.dismiss(id),
+});

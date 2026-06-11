@@ -12,9 +12,7 @@ const TabsRoot = forwardRef<
   ComponentRef<typeof TabsPrimitive.Root>,
   ComponentPropsWithoutRef<typeof TabsPrimitive.Root>
 >(function TabsRoot({ className, ...props }, ref) {
-  return (
-    <TabsPrimitive.Root ref={ref} className={cn("flex flex-col", className)} {...props} />
-  );
+  return <TabsPrimitive.Root ref={ref} className={cn("flex flex-col", className)} {...props} />;
 });
 
 const TabsList = forwardRef<
@@ -56,10 +54,7 @@ const TabsContent = forwardRef<
   return (
     <TabsPrimitive.Content
       ref={ref}
-      className={cn(
-        "pt-4 focus-visible:outline-none focus-visible:shadow-focus-ring",
-        className,
-      )}
+      className={cn("pt-4 focus-visible:outline-none focus-visible:shadow-focus-ring", className)}
       {...props}
     />
   );

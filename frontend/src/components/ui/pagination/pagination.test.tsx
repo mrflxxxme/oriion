@@ -41,12 +41,7 @@ describe("Pagination", () => {
 
   it("hides first/last controls when showFirstLast is false", () => {
     render(
-      <Pagination
-        currentPage={1}
-        totalPages={5}
-        showFirstLast={false}
-        onPageChange={vi.fn()}
-      />,
+      <Pagination currentPage={1} totalPages={5} showFirstLast={false} onPageChange={vi.fn()} />,
     );
     expect(screen.queryByRole("button", { name: "Первая страница" })).not.toBeInTheDocument();
   });

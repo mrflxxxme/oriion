@@ -69,7 +69,11 @@ export const Breadcrumb = forwardRef<HTMLElement, BreadcrumbProps>(function Brea
               ) : (
                 <span className="text-secondary">{item.label}</span>
               )}
-              {!isLast ? <span aria-hidden="true" className="text-tertiary">{sep}</span> : null}
+              {!isLast ? (
+                <span aria-hidden="true" className="text-tertiary">
+                  {sep}
+                </span>
+              ) : null}
             </li>
           );
         })}

@@ -26,7 +26,12 @@ function mountAt(initial: string) {
 
 describe("app router guard", () => {
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false });
+    useAuthStore.setState({
+      accessToken: null,
+      refreshToken: null,
+      user: null,
+      isAuthenticated: false,
+    });
   });
 
   it("redirects unauthenticated access to /cells → /auth/login", async () => {

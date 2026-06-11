@@ -42,8 +42,10 @@ const statusDotSize = {
 type AvatarSize = NonNullable<VariantProps<typeof avatarVariants>["size"]>;
 type AvatarStatus = keyof typeof statusConfig;
 
-export interface AvatarProps
-  extends Omit<ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>, "children"> {
+export interface AvatarProps extends Omit<
+  ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>,
+  "children"
+> {
   src?: string;
   /** 1–2 initials shown while/if the image is unavailable. */
   fallback: string;
@@ -52,46 +54,42 @@ export interface AvatarProps
   alt?: string;
 }
 
-export const Avatar = forwardRef<
-  ComponentRef<typeof AvatarPrimitive.Root>,
-  AvatarProps
->(function Avatar(
-  { className, src, fallback, size = "md", status, alt, ...props },
-  ref,
-) {
-  return (
-    <AvatarPrimitive.Root
-      ref={ref}
-      className={cn(avatarVariants({ size }), className)}
-      {...props}
-    >
-      {src ? (
-        <AvatarPrimitive.Image
-          src={src}
-          alt={alt ?? fallback}
-          className="size-full rounded-full object-cover"
-        />
-      ) : null}
-      <AvatarPrimitive.Fallback
-        className="flex size-full items-center justify-center rounded-full font-medium text-secondary"
-        // Omit delayMs when there is no image so the fallback renders immediately
-        // (a delay would briefly leave an empty avatar). With a src, defer briefly
-        // to avoid a flash of initials while the image loads.
-        {...(src ? { delayMs: 200 } : {})}
+export const Avatar = forwardRef<ComponentRef<typeof AvatarPrimitive.Root>, AvatarProps>(
+  function Avatar({ className, src, fallback, size = "md", status, alt, ...props }, ref) {
+    return (
+      <AvatarPrimitive.Root
+        ref={ref}
+        className={cn(avatarVariants({ size }), className)}
+        {...props}
       >
-        {fallback}
-      </AvatarPrimitive.Fallback>
-      {status ? (
-        <span
-          role="status"
-          aria-label={statusConfig[status].label}
-          className={cn(
-            "absolute right-0 bottom-0 block rounded-full border-2 border-page",
-            statusConfig[status].className,
-            statusDotSize[size],
-          )}
-        />
-      ) : null}
-    </AvatarPrimitive.Root>
-  );
-});
+        {src ? (
+          <AvatarPrimitive.Image
+            src={src}
+            alt={alt ?? fallback}
+            className="size-full rounded-full object-cover"
+          />
+        ) : null}
+        <AvatarPrimitive.Fallback
+          className="flex size-full items-center justify-center rounded-full font-medium text-secondary"
+          // Omit delayMs when there is no image so the fallback renders immediately
+          // (a delay would briefly leave an empty avatar). With a src, defer briefly
+          // to avoid a flash of initials while the image loads.
+          {...(src ? { delayMs: 200 } : {})}
+        >
+          {fallback}
+        </AvatarPrimitive.Fallback>
+        {status ? (
+          <span
+            role="status"
+            aria-label={statusConfig[status].label}
+            className={cn(
+              "absolute right-0 bottom-0 block rounded-full border-2 border-page",
+              statusConfig[status].className,
+              statusDotSize[size],
+            )}
+          />
+        ) : null}
+      </AvatarPrimitive.Root>
+    );
+  },
+);

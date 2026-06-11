@@ -48,10 +48,7 @@ describe("Select", () => {
 
   it("invalid sets aria-invalid on the trigger", () => {
     render(<Select aria-label="Город" options={options} invalid />);
-    expect(screen.getByRole("combobox", { name: "Город" })).toHaveAttribute(
-      "aria-invalid",
-      "true",
-    );
+    expect(screen.getByRole("combobox", { name: "Город" })).toHaveAttribute("aria-invalid", "true");
   });
 
   it("has no axe violations", async () => {

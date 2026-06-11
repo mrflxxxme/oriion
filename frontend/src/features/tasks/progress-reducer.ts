@@ -92,7 +92,7 @@ function setAgentStatus(agents: AgentCard[], slug: AgentSlug, status: AgentStatu
 
 function readSlug(data: unknown): AgentSlug | null {
   if (data && typeof data === "object" && "target_agent_slug" in data) {
-    const slug = (data).target_agent_slug;
+    const slug = data.target_agent_slug;
     if (isAgentSlug(slug)) return slug;
   }
   return null;
@@ -103,8 +103,8 @@ function readArtifacts(data: unknown): Artifact[] {
     data &&
     typeof data === "object" &&
     "result" in data &&
-    (data).result &&
-    typeof (data).result === "object"
+    data.result &&
+    typeof data.result === "object"
   ) {
     const result = (data as { result: { artifacts?: unknown } }).result;
     if (Array.isArray(result.artifacts)) return result.artifacts as Artifact[];
@@ -124,7 +124,7 @@ export function progressReducer(state: ProgressState, event: SseEvent): Progress
     case "task.started": {
       const startedAt =
         event.data && typeof event.data === "object" && "started_at" in event.data
-          ? String((event.data).started_at)
+          ? String(event.data.started_at)
           : null;
       return withLog({ phase: "running", startedAt });
     }

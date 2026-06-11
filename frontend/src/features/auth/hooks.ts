@@ -20,13 +20,17 @@ interface LoginInput {
 /** Run login then /users/me, and persist the session. Returns the user. */
 async function loginAndLoadUser(email: string, password: string): Promise<AuthUser> {
   const tokens = await authApi.login(email, password);
+  // Store the tokens BEFORE calling /users/me — apiFetch reads the access token
+  // from the store, so without this the me() call would go out unauthenticated
+  // (401 → failed refresh → cleared session).
+  useAuthStore.getState().setTokens(tokens.access_token, tokens.refresh_token);
   const me = await authApi.me();
   const user: AuthUser = {
     id: me.id,
     email: me.email,
     displayName: me.display_name ?? null,
   };
-  useAuthStore.getState().setSession(tokens.access_token, tokens.refresh_token, user);
+  useAuthStore.getState().setUser(user);
   return user;
 }
 

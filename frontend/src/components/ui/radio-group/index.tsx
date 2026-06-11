@@ -56,10 +56,7 @@ export const RadioGroup = forwardRef<
             >
               <RadioGroupPrimitive.Indicator className="flex items-center justify-center after:block after:size-2.5 after:rounded-full after:bg-cta" />
             </RadioGroupPrimitive.Item>
-            <label
-              htmlFor={itemId}
-              className="text-sm text-primary cursor-pointer select-none"
-            >
+            <label htmlFor={itemId} className="text-sm text-primary cursor-pointer select-none">
               {option.label}
             </label>
           </span>

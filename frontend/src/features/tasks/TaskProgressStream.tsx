@@ -17,11 +17,12 @@ interface TaskProgressStreamProps {
   streamError: boolean;
 }
 
-const STATUS_BADGE: Record<AgentCard["status"], { variant: BadgeProps["variant"]; label: string }> = {
-  pending: { variant: "default", label: "Ожидание" },
-  running: { variant: "info", label: "Выполняется" },
-  done: { variant: "success", label: "Готово" },
-};
+const STATUS_BADGE: Record<AgentCard["status"], { variant: BadgeProps["variant"]; label: string }> =
+  {
+    pending: { variant: "default", label: "Ожидание" },
+    running: { variant: "info", label: "Выполняется" },
+    done: { variant: "success", label: "Готово" },
+  };
 
 /** Live elapsed timer (seconds) since the task started, while running. */
 function ElapsedTimer({ startedAt, running }: { startedAt: string | null; running: boolean }) {
@@ -41,7 +42,10 @@ function ElapsedTimer({ startedAt, running }: { startedAt: string | null; runnin
   if (Number.isNaN(started)) return null;
   const seconds = Math.max(0, Math.floor((now - started) / 1000));
   return (
-    <span className="font-mono text-xs text-tertiary" aria-label={`Прошло ${String(seconds)} секунд`}>
+    <span
+      className="font-mono text-xs text-tertiary"
+      aria-label={`Прошло ${String(seconds)} секунд`}
+    >
       {seconds}с
     </span>
   );

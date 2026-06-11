@@ -7,23 +7,20 @@ import type { HTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const cardVariants = cva(
-  "bg-surface rounded-lg transition-colors duration-150",
-  {
-    variants: {
-      variant: {
-        default: "",
-        elevated: "shadow-md",
-        outlined: "border border-default",
-      },
-      interactive: {
-        true: "cursor-pointer hover:shadow-sm focus-visible:outline-none focus-visible:shadow-focus-ring",
-        false: "",
-      },
+const cardVariants = cva("bg-surface rounded-lg transition-colors duration-150", {
+  variants: {
+    variant: {
+      default: "",
+      elevated: "shadow-md",
+      outlined: "border border-default",
     },
-    defaultVariants: { variant: "default", interactive: false },
+    interactive: {
+      true: "cursor-pointer hover:shadow-sm focus-visible:outline-none focus-visible:shadow-focus-ring",
+      false: "",
+    },
   },
-);
+  defaultVariants: { variant: "default", interactive: false },
+});
 
 const paddingClass = {
   none: "p-0",
@@ -33,8 +30,7 @@ const paddingClass = {
 } as const;
 
 export interface CardProps
-  extends HTMLAttributes<HTMLDivElement>,
-    Omit<VariantProps<typeof cardVariants>, "interactive"> {
+  extends HTMLAttributes<HTMLDivElement>, Omit<VariantProps<typeof cardVariants>, "interactive"> {
   padding?: "sm" | "md" | "lg" | "none";
   interactive?: boolean;
 }
@@ -45,9 +41,7 @@ const CardRoot = forwardRef<HTMLDivElement, CardProps>(function Card(
 ) {
   // `default` variant has no border; ensure it still reads as a surface block.
   const variantClass = variant ?? "default";
-  const interactiveProps = interactive
-    ? ({ role: "button", tabIndex: 0 } as const)
-    : {};
+  const interactiveProps = interactive ? ({ role: "button", tabIndex: 0 } as const) : {};
   return (
     <div
       ref={ref}
@@ -62,35 +56,26 @@ const CardRoot = forwardRef<HTMLDivElement, CardProps>(function Card(
   );
 });
 
-const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  function CardHeader({ className, ...props }, ref) {
-    return (
-      <div
-        ref={ref}
-        className={cn("flex flex-col gap-1 text-primary", className)}
-        {...props}
-      />
-    );
-  },
-);
+const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function CardHeader(
+  { className, ...props },
+  ref,
+) {
+  return <div ref={ref} className={cn("flex flex-col gap-1 text-primary", className)} {...props} />;
+});
 
-const CardBody = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  function CardBody({ className, ...props }, ref) {
-    return <div ref={ref} className={cn("text-secondary", className)} {...props} />;
-  },
-);
+const CardBody = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function CardBody(
+  { className, ...props },
+  ref,
+) {
+  return <div ref={ref} className={cn("text-secondary", className)} {...props} />;
+});
 
-const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  function CardFooter({ className, ...props }, ref) {
-    return (
-      <div
-        ref={ref}
-        className={cn("flex items-center gap-2", className)}
-        {...props}
-      />
-    );
-  },
-);
+const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function CardFooter(
+  { className, ...props },
+  ref,
+) {
+  return <div ref={ref} className={cn("flex items-center gap-2", className)} {...props} />;
+});
 
 export const Card = Object.assign(CardRoot, {
   Header: CardHeader,

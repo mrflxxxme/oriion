@@ -38,7 +38,10 @@ export function ConsentBlock({ control, consentError }: ConsentBlockProps) {
                 aria-describedby={consentError ? errorId : undefined}
                 className="mt-0.5"
               />
-              <label htmlFor="consentPdn" className="text-sm text-primary cursor-pointer select-none">
+              <label
+                htmlFor="consentPdn"
+                className="text-sm text-primary cursor-pointer select-none"
+              >
                 {t("auth.consent.pdn")}
               </label>
             </div>

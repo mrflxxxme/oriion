@@ -45,9 +45,7 @@ describe("Table", () => {
   });
 
   it("renders the empty state when data is empty", () => {
-    render(
-      <Table columns={columns} data={[]} emptyState={<span>Ничего не найдено</span>} />,
-    );
+    render(<Table columns={columns} data={[]} emptyState={<span>Ничего не найдено</span>} />);
     expect(screen.getByText("Ничего не найдено")).toBeInTheDocument();
   });
 
