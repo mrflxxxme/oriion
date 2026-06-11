@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { RouterProvider, createRouter, createMemoryHistory } from "@tanstack/react-router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { routeTree } from "./router";
 import { useAuthStore } from "@/stores/auth";
 import { createTestQueryClient } from "@/test/helpers/createTestQueryClient";
+
+// Keep the cells query deterministic (no real fetch) when the guard lets us in.
+vi.mock("@/api/cells", () => ({
+  cellsApi: { listAllCells: vi.fn().mockResolvedValue([]) },
+}));
 
 function mountAt(initial: string) {
   const router = createRouter({
@@ -29,7 +34,7 @@ describe("app router guard", () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/auth/login");
     });
-    expect(screen.getByTestId("login-page-stub")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /войти/i })).toBeInTheDocument();
   });
 
   it("renders the cells page when authenticated", async () => {
@@ -41,7 +46,7 @@ describe("app router guard", () => {
     });
     mountAt("/cells");
     await waitFor(() => {
-      expect(screen.getByTestId("cells-list-page-stub")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /ячейки/i, level: 1 })).toBeInTheDocument();
     });
   });
 

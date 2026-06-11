@@ -17,6 +17,15 @@ if (typeof window !== "undefined") {
   window.scrollTo = () => {};
 }
 
+// jsdom lacks ResizeObserver (used by some Radix primitives) — provide a no-op.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+
 afterEach(() => {
   cleanup();
 });
