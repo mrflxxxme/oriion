@@ -34,7 +34,8 @@ Wave 0 (Foundation)
   ├─ Phase 00.4 (LLM-gateway) ──→ зависят все agent-фазы
   ├─ Phase 00.5 (productivity-core horizontal team) ──→ зависят все team-фазы
   ├─ Phase 00.6 (deploy) ──→ зависят все public-релизы
-  └─ Phase 00.7 (frontend skeleton) ──→ зависят все UI-фазы
+  ├─ Phase 00.7 (frontend skeleton) ──→ зависят все UI-фазы
+  └─ Phase 00.8 (design restyling, ADR-031) ──→ visual base для 01.5 Dashboard UI + W2 brand refresh
 
 Wave 1 → после Wave 0 done; первая инстанциация Master-Agent layer + Coordinator subordinate-mode retrofit
 Wave 2 → после Wave 1 done; WB-vertical materialized; Pixel Department; Mini App

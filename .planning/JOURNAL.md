@@ -1,5 +1,22 @@
 # Development Journal
 
+## 2026-06-11 · reverent-euclid-3bbf83 · @claude-fable (grill-session)
+
+- Scope: **Промежуточный founder-аудит после 00.1–00.7** — grill-session по 4 темам (дизайн, универсальность агентов, чистота вывода, консистентность доков) → правки .planning + 3 быстрых кода-фикса чистоты вывода. Имплементация редизайна/универсализации — НЕ в этой сессии (фазами).
+- Done (код):
+  * `runtime/dispatch.py` — `strip_wrapping_fence` + `normalize_artifact_markdown`: обёрточные ```-фенсы срезаются у leaf-вывода; frontmatter + хвостовой structured-summary срезаются ТОЛЬКО при материализации `ArtifactRef` (межагентный `prior_context` сохраняет мету). +7 unit-тестов (runtime 50/50 pass).
+  * role-prompts 0.1.0 → **0.1.1** (обе копии, AC-W1-20): §3 output-контракт ужесточён — тело артефакта = чистый публикуемый документ; мета только во frontmatter/structured-summary (машинные, платформа срезает); writer `[assumption]`-маркеры → frontmatter-only.
+  * `TaskResultPage.tsx` — вкладка «Результат» показывает финальные документы (matrix + brief); межшаговая «Аналитика (рабочий документ)» + неизвестные типы — в свёрнутый `<details>` «Промежуточные материалы». Без нового ui-компонента (CI barrel = 18). Фронтенд 156/156, lint + build green.
+- Done (доки):
+  * **Phase 00.8 design-restyling** создана (wave-0/phases/00.8) + строки в PHASES/README/roadmap-README; НЕ гейтит D5.
+  * **ADR-031** (Proposed): professional nordic base, акцент bake-off внутри 00.8 (терракота ≈#d97757 vs muted amber), teamly.to как layout-референс; pixel = опциональный скин.
+  * ADR-004 revision-note + wave-2 README/PHASES: Pixel Department = opt-in skin, ассеты W2 без изменений; decisions/README + OQ-09 + design-tokens forward-note (v0.2 в 00.8) обновлены.
+  * **AC-W1-24** (Coordinator generalization: произвольные промпты; удалить `_SUB_PROMPT_FRAMING`/`DEFAULT_PIPELINE`/`_ARTIFACT_KIND`) + **AC-W1-25** (диверсификация §6-примеров + clean-artifact conformance) добавлены в `01.1-retro.md`; wave-1 PHASES 01.1 строка дополнена.
+  * Попутные фиксы консистентности: wave-0 PHASES счётчик «7 phases» → «9 (00.1–00.8 + 00.2.5)»; wave-0 README метрика «WB team» → `productivity-core`; wave-2 PHASES 02.1 «5 героев» → 3 в W2 + 2 в W3.
+- Decisions (6, через AskUserQuestion): (1) Pixel остаётся в W2, но как опциональный скин; (2) объём редизайна = рестайлинг токенов + полировка экранов; (3) сессия = доки + дешёвые код-фиксы; (4) агентов до 01.1 не трогаем — только доки; (5) чистота вывода = все 3 правки (промпты + бэкенд-нормализация + UI); (6) фаза 00.8 сейчас, акцент решает bake-off; справка по роадмапу — только в чате.
+- Next: PR этой сессии → merge → execute Phase 00.8 (gsd:ui-phase → plan → execute) ∥ founder staging 10× anchor run (gate D5) → Wave 1 (01.1-retro первым).
+- Refs: branch `claude/reverent-euclid-3bbf83`; ADR-031; wave-0/phases/00.8-design-restyling.md; 01.1-retro.md §From Session 2026-06-11.
+
 ## 2026-06-11 · romantic-hamilton-4b43c5 · @claude-opus (autonomous)
 - Scope: **Phase 00.7 — Frontend skeleton (functional Wave-0 demo UI)**. 17-commit ledger C0–C16 off post-merge main `7b8017c`. Builds the React UI on the proven 00.6 API and **live-validates the whole click-path end-to-end** (register → login → cells → submit «Маркет-бриф» → SSE 3-agent progress → 3 markdown artifacts). **AC7 (UI-demo) unblocked.**
 - Workflow: bootstrap-4 + 00.7 reading → /grill-me on 5 UI-forks (all recommended: generic form + «Маркет-бриф» preset; register+login+silent-refresh+logout; cells list+detail; agent step-cards + collapsible log; frontend-focused 3-agent audit) → plan approved → C0–C16 → 3-agent audit → Exit ritual.

@@ -7,7 +7,7 @@
 | Wave | Status | Anchor target |
 |---|---|---|
 | Pre-Wave-0 | ✅ Complete | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
-| Wave 0 (Foundation) | 🔄 **Closing** (all build phases ✅; architecture **live-validated locally**; only the founder staging 10× anchor run remains) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
+| Wave 0 (Foundation) | 🔄 **Closing** (build phases 00.1–00.7 ✅; architecture **live-validated locally**; remaining: **Phase 00.8 design restyling** (NEW per ADR-031) + founder staging 10× anchor run) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
 | Wave 1 (Core MVP) | ⏳ Pending — Phase 01.1 retro file created в PR-B C8 (AC-W1-1..17) | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + Telegram Business API |
 | Wave 2 (Pixel + каталог) | ⏳ Pending | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent first-instances |
 | Wave 3 (Глубина) | ⏳ Pending | +ИП-Бух + СМБ-Sales vertical + Vertical Rituals + PARA Workspace |
@@ -15,6 +15,10 @@
 | Wave 5+ (Enterprise) | ⏳ Pending | On-premise + open marketplace |
 
 ## Текущая активная фаза
+
+**Phase 00.8 (Design restyling — professional nordic v0.2)** — ⏳ **Pending** (created 2026-06-11 per founder grill-session + [ADR-031](./decisions/ADR-031-design-direction-restyling.md)). Tokens v0.2.0 (акцент: bake-off терракота vs muted amber) + полировка 6 экранов по teamly.to-паттернам. Spec: [`roadmap/wave-0-foundation/phases/00.8-design-restyling.md`](./roadmap/wave-0-foundation/phases/00.8-design-restyling.md). НЕ гейтит D5.
+
+**Session 2026-06-11 (grill-аудит)** — ✅ Complete: 3 быстрых фикса чистоты вывода (role-prompts 0.1.1 в обеих копиях + `normalize_artifact_markdown` в dispatch.py + сворачивание межшаговой аналитики на вкладке «Результат»; backend 50/50, frontend 156/156, lint+build green) + Phase 00.8 + ADR-031 + Pixel-reframing (opt-in skin) + AC-W1-24/25 в 01.1-retro.
 
 **Phase 00.7 (Frontend skeleton)** — ✅ **Complete** (2026-06-11; commit ledger C0–C16). Functional Wave-0 demo UI **live-validated end-to-end** against the real docker stack (register → login → cells → submit «Маркет-бриф» → SSE 3-agent progress → 3 markdown artifacts; `wave-0-demo.spec.ts` @live PASS 2.4min). 18 components, Nordic Warm tokens, axe 0 serious/critical on all 5 routes, cold-start 773ms, coverage 91.8%. 3-agent frontend audit PASS. **AC7 (UI-demo) unblocked.** Spec amendments (no flat `GET /cells`; SSE Bearer-fetch; types from live `/docs`; code-based router) flagged for architect. Deferred polish → [`revisions/00.7-audit-deferred.md`](./revisions/00.7-audit-deferred.md).
 
@@ -40,6 +44,7 @@
 | **00.6 PR-A** — Stage A local infra | ✅ Complete | [#36](https://github.com/mrflxxxme/oriion/pull/36) 2026-05-25 | 22 commits; self-audit 0H/9M/10L; AC-W1-11..15 pin block extension |
 | **00.6 PR-B** — Stage B + orchestrator-dispatch + live validation | ✅ Complete | [#38](https://github.com/mrflxxxme/oriion/pull/38) + [#39](https://github.com/mrflxxxme/oriion/pull/39) 2026-06-08 | C0–C19; 5-agent retro PASS; architecture live-proven; AC-W1-16..23 |
 | 00.7 — Frontend skeleton | ✅ Complete | TBD | 2026-06-11; C0–C16; @live demo PASS; 3-agent FE audit PASS; AC7 unblocked; AC1-AC12 (AC4 by-design) |
+| 00.8 — Design restyling | ⏳ Pending | — | Created 2026-06-11 per ADR-031 (grill-session); professional nordic v0.2; не гейтит D5 |
 
 ## Active blockers
 

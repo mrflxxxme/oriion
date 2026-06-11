@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 
+> **Revision 2026-06-11 (per [ADR-031](./ADR-031-design-direction-restyling.md)):** Pixel-герои и офис reframed как **опциональный «скин»/режим (opt-in, off by default)** поверх строго профессионального nordic base UI. Скоуп ассетов Wave 2 не меняется; marketing-positioning понижается с «defensible visual brand» до «memorable opt-in feature» — primary visual brand = professional nordic.
+
 ## Decision
 
 ### Технический стек

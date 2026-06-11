@@ -17,8 +17,9 @@
 
 | ID | Решение |
 |---|---|
-| [ADR-004](./ADR-004-pixel-department.md) | Pixel Department — Native Canvas 2D + AI-generated + 5 hand-drawn vertical-героев |
+| [ADR-004](./ADR-004-pixel-department.md) | Pixel Department — Native Canvas 2D + AI-generated + 5 hand-drawn vertical-героев (revision 2026-06-11: opt-in skin per ADR-031) |
 | [ADR-016](./ADR-016-team-first-ux.md) | Team-first UX — «нанять команду» как primary abstraction |
+| [ADR-031](./ADR-031-design-direction-restyling.md) | Design direction: professional nordic base + Phase 00.8 restyling; pixel = опциональный скин |
 | [ADR-021](./ADR-021-ai-generated-pixel-pipeline.md) | AI-generated pixel-asset pipeline + hand-drawn vertical-герои (`agent_archetype_id` FK к [ADR-024](./ADR-024-bounded-context-contracts.md)) |
 | [ADR-022](./ADR-022-coordinator-wizard-llm-hybrid.md) | Coordinator — Wizard (free) + LLM (trial/paid) гибрид |
 
