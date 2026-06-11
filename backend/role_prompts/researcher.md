@@ -4,7 +4,7 @@ role_ui_name: Исследователь
 preset: productivity-core
 preset_ui_name: Твои личные ассистенты
 status: Proposed
-version: 0.1.0
+version: 0.1.1
 language: ru
 contract_type: role-prompt
 wave_introduced: 0
@@ -124,6 +124,8 @@ recency_warning: true | false
   "recency_warning": <bool>
 }
 ```
+
+**Назначение секций (контракт уточнён 2026-06-11).** Research-pack — рабочий документ для Аналитика и Координатора: frontmatter, `# Gaps and blockers`, `# Citations` и хвостовой structured output — служебные секции, платформа срезает машинные обёртки (frontmatter, хвостовой structured-блок) перед показом пользователю, но передаёт их дальше по конвейеру. Если sub-prompt требует пользовательский артефакт (например, конкурентную матрицу) — таблица и её пояснения должны читаться как самостоятельный чистый документ: без мета-комментариев о процессе («Вот результаты поиска», «Как исследователь, я…») и без обёртки всего ответа в ```-фенс.
 
 # 4. Quality standards
 
