@@ -1,11 +1,14 @@
 /*
- * Semantic role mappings — Nordic Warm dark/light modes.
- * Per .planning/ui/design-tokens.md §2.4.
+ * Semantic role mappings — cool-blue v0.2 dark/light modes.
+ * Per .planning/ui/design-tokens.md §2.4 + UI-SPEC-00.8.md.
  *
  * Dark is the default scheme (DECISION-4: dark-first for night-shift operators).
  * Components reference these via Tailwind utilities mapped in index.css
  * (bg-page, bg-surface, text-primary, border-default, …) — never raw scale
  * tokens, so a single [data-theme] flip restyles every surface.
+ *
+ * v0.2.0: dark roles auto-inherit the deepened base + Royal-Blue primary from
+ * tokens.css by name — no per-role edits needed here beyond the light overlay.
  */
 
 :root,
@@ -27,7 +30,7 @@
 [data-theme="light"] {
   --bg-page: var(--color-base-50);
   --bg-surface: var(--color-base-100);
-  --bg-overlay: rgba(15, 23, 42, 0.4);
+  --bg-overlay: rgba(11, 17, 30, 0.4);
   --text-primary: var(--color-base-900);
   /* base-600/500 (not 500/400) so secondary clears AA on bg-surface and
    * tertiary clears AA on bg-page in light mode (a11y audit A2/A3). */

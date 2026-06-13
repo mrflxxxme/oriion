@@ -26,10 +26,10 @@
   --color-cta-hover: var(--cta-primary-hover);
   --color-skeleton: var(--skeleton-base);
 
-  /* Mode-invariant button foregrounds — the button bg (amber / rose) doesn't
-   * flip with the theme, so neither should its text. Dark text on amber and
-   * light text on rose both clear WCAG AA in both modes. */
-  --color-on-cta: var(--color-base-900);
+  /* Mode-invariant button foregrounds — the button bg (blue / rose) doesn't
+   * flip with the theme, so neither should its text. White on Royal Blue
+   * clears AA in both modes (5.17 on #2563eb dark, 6.70 on #1d4ed8 light). */
+  --color-on-cta: #ffffff;
   /* Pure white clears AA on rose-600 with margin (base-50 lands at 4.48). */
   --color-on-danger: #ffffff;
 
@@ -51,9 +51,11 @@
   --color-danger-100: #ffe4e6;
   --color-danger-600: #e11d48;
   --color-danger-700: #be123c;
-  --color-info-100: #dbeafe;
-  --color-info-500: #3b82f6;
-  --color-info-700: #1d4ed8;
+  /* info → cyan (v0.2): kept distinct from the Royal-Blue brand so the only
+   * "brand blue" is the accent — preserves single-accent discipline (§10.2). */
+  --color-info-100: #cffafe;
+  --color-info-500: #06b6d4;
+  --color-info-700: #0e7490;
 
   /* Fonts (§3.1) — system fallback in Wave 0; webfont bundling deferred */
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -90,7 +92,7 @@
   --shadow-md: 0 4px 6px rgba(15, 23, 42, 0.1), 0 2px 4px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 10px 15px rgba(15, 23, 42, 0.12), 0 4px 6px rgba(15, 23, 42, 0.08);
   --shadow-xl: 0 20px 25px rgba(15, 23, 42, 0.14), 0 10px 10px rgba(15, 23, 42, 0.1);
-  --shadow-focus-ring: 0 0 0 3px rgba(245, 158, 11, 0.4);
+  --shadow-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.4);
 
   /* Z-index (§9) — semantic layering utilities (z-modal, z-toast, …) */
   --z-index-dropdown: var(--z-dropdown);
