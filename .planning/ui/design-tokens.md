@@ -1,7 +1,7 @@
-﻿# Oriion Design Tokens — Nordic Warm
+﻿# Oriion Design Tokens — Professional cool-blue
 
-- **Version:** 0.1.0 (Wave 0)
-- **Status:** temporary palette (final после OQ-09 Wave 2 brand refresh). **v0.2 restyling запланирован в [Phase 00.8](../roadmap/wave-0-foundation/phases/00.8-design-restyling.md)** per [ADR-031](../decisions/ADR-031-design-direction-restyling.md): приглушённая professional-nordic палитра в духе Claude Code, акцент TBD (терракота ≈#d97757 vs muted amber — bake-off внутри фазы). Меняются только значения; имена/структура токенов стабильны.
+- **Version:** 0.2.0 (Wave 0)
+- **Status:** temporary palette (final после OQ-09 Wave 2 brand refresh). **v0.2.0 restyling выполнен в [Phase 00.8](../roadmap/wave-0-foundation/phases/00.8-design-restyling.md)** per [ADR-031 (Accepted)](../decisions/ADR-031-design-direction-restyling.md): глубокая прохладная professional-dark палитра + Royal-Blue акцент (`#2563eb`, выбран на bake-off 2026-06-13). Изменены только значения; имена/структура токенов стабильны. Контракт: [UI-SPEC-00.8.md](./UI-SPEC-00.8.md).
 - **Source of truth:** this file (per DECISION-4 — see [ADR-028](../decisions/ADR-028-policies-registry.md#decision-4))
 - **Materialization:** CSS variables в `frontend/src/styles/tokens.css` — Phase 00.7 deliverable. Здесь — spec only.
 
@@ -9,12 +9,13 @@
 
 ## 1. Philosophy
 
-**Nordic Warm** — холодная база (slate) + единый тёплый акцент (amber). Дизайн-стратегия:
+**Professional cool-blue (v0.2.0)** — глубокая прохладная slate-база + единый Royal-Blue акцент. Дизайн-стратегия (per ADR-031, founder bake-off 2026-06-13):
 
-- **Dark-first:** target audience — developers + WB-Seller power-users работающие в вечерних/ночных сменах. OLED energy efficiency. Reduces eye strain.
-- **Single accent:** amber-500 — единственный brand colour. Никаких "цветовых салатов" — info/warning разделены через iconography + semantic placement, а не через 5+ accent hues.
-- **Anti-cold-blue:** обычные SaaS используют cold-blue (#3b82f6) как primary. Это вызывает ассоциации с "корпоративным холодом". Amber conveys reliability + warmth without aggression.
-- **Structural stability:** scale / spacing / radius — структурные, остаются стабильны даже если Wave 2 brand refresh поменяет palette.
+- **Dark-first:** target audience — developers + WB-Seller power-users работающие в вечерних/ночных сменах. OLED energy efficiency. Reduces eye strain. Канва углублена (`bg-page` `#0f172a`→`#0b111e`) для «взрослого» professional-dark вида в духе Claude Code.
+- **Single accent:** Royal Blue `#2563eb` — единственный brand colour. Никаких "цветовых салатов" — feedback (success/warning/danger/info) разделён через iconography + semantic placement, а не через 5+ accent hues. Акцент только на: CTA, active-tab, ссылки (через `cta-hover`-стоп), focus-ring, `Badge primary`.
+- **Blue on dark — две роли акцента:** насыщенный `#2563eb` как фон CTA требует **белого** текста (5.17:1); как текст ссылки на тёмном он слишком тёмен (3.6:1), поэтому ссылки берут более светлый/прохладный стоп через `--cta-primary-hover` (dark `#60a5fa` 7.4:1 / light `#1e40af` ~9:1). Hover CTA **темнеет** (`brand-700`), а не светлеет — чтобы белый текст оставался читаемым.
+- **info ≠ brand:** семантический `info` переведён на **cyan** (`#06b6d4`), чтобы синий бренд оставался единственным «брендовым синим». `warning` (amber) теперь самостоятельная семантика, а не алиас бренда.
+- **Structural stability:** scale / spacing / radius / type — структурные, остаются стабильны даже если Wave 2 brand refresh поменяет palette.
 
 ---
 
@@ -30,21 +31,21 @@
 | `--color-base-300` | `#cbd5e1` | `203 213 225` | slate-300 | Border emphasis on light / text muted on dark |
 | `--color-base-400` | `#94a3b8` | `148 163 184` | slate-400 | Text tertiary / placeholder |
 | `--color-base-500` | `#64748b` | `100 116 139` | slate-500 | Text secondary |
-| `--color-base-600` | `#475569` | `71 85 105`   | slate-600 | Border emphasis on dark |
-| `--color-base-700` | `#334155` | `51 65 85`    | slate-700 | Border default on dark |
-| `--color-base-800` | `#1e293b` | `30 41 59`    | slate-800 | Surface elevated on dark |
-| `--color-base-900` | `#0f172a` | `15 23 42`    | slate-900 | Bg primary on dark / text on light |
-| `--color-base-950` | `#020617` | `2 6 23`      | slate-950 | Bg deepest on dark (modal backdrop) |
+| `--color-base-600` | `#37445f` | `55 68 95`    | deepened (v0.2) | Border emphasis on dark / text-secondary on light |
+| `--color-base-700` | `#26324a` | `38 50 74`    | deepened (v0.2) | Border default on dark |
+| `--color-base-800` | `#141c2b` | `20 28 43`    | deepened (v0.2) | Surface elevated on dark |
+| `--color-base-900` | `#0b111e` | `11 17 30`    | deepened (v0.2) | Bg primary on dark / text on light |
+| `--color-base-950` | `#060a13` | `6 10 19`     | deepened (v0.2) | Bg deepest on dark (modal backdrop) |
 
-### 2.2 Brand / Primary (amber accent)
+### 2.2 Brand / Primary (Royal Blue accent)
 
 | Token | Hex | RGB | Tailwind ref | Usage |
 |---|---|---|---|---|
-| `--color-primary-100` | `#fef3c7` | `254 243 199` | amber-100 | Badge bg / primary surface |
-| `--color-primary-400` | `#fbbf24` | `251 191 36`  | amber-400 | Primary disabled / muted |
-| `--color-primary-500` | `#f59e0b` | `245 158 11`  | amber-500 | **Primary CTA / brand accent** |
-| `--color-primary-600` | `#d97706` | `217 119 6`   | amber-600 | Primary hover |
-| `--color-primary-700` | `#b45309` | `180 83 9`    | amber-700 | Primary active/pressed |
+| `--color-primary-100` | `#dbeafe` | `219 234 254` | blue-100 | Badge bg / primary surface (light chip) |
+| `--color-primary-400` | `#60a5fa` | `96 165 250`  | blue-400 | **Links on dark** (via `cta-hover`) / dark-mode CTA hover-target / muted |
+| `--color-primary-500` | `#2563eb` | `37 99 235`   | blue-600 | **Primary CTA / brand accent** (white text) |
+| `--color-primary-600` | `#1d4ed8` | `29 78 216`   | blue-700 | Light-mode CTA / dark pressed |
+| `--color-primary-700` | `#1e40af` | `30 64 175`   | blue-800 | Active/pressed / CTA hover-darken / link-on-light |
 
 ### 2.3 Semantic
 
@@ -53,31 +54,34 @@
 | `--color-success-100` | `#d1fae5` | `209 250 229` | emerald-100 | Success surface (toast bg) |
 | `--color-success-500` | `#10b981` | `16 185 129`  | emerald-500 | Success text / icon |
 | `--color-success-600` | `#059669` | `5 150 105`   | emerald-600 | Success hover/emphasis |
-| `--color-warning-100` | `#fef3c7` | `254 243 199` | amber-100   | Warning surface (alias к primary) |
-| `--color-warning-500` | `#f59e0b` | `245 158 11`  | amber-500   | Warning text / icon (alias к primary — single-accent system) |
+| `--color-warning-100` | `#fef3c7` | `254 243 199` | amber-100   | Warning surface (standalone v0.2 — больше не алиас бренда) |
+| `--color-warning-500` | `#f59e0b` | `245 158 11`  | amber-500   | Warning text / icon (independent semantic — бренд теперь синий) |
 | `--color-danger-100`  | `#ffe4e6` | `255 228 230` | rose-100    | Danger surface |
 | `--color-danger-600`  | `#e11d48` | `225 29 72`   | rose-600    | **Danger text / destructive CTA** |
 | `--color-danger-700`  | `#be123c` | `190 18 60`   | rose-700    | Danger hover |
-| `--color-info-100`    | `#dbeafe` | `219 234 254` | blue-100    | Info surface |
-| `--color-info-500`    | `#3b82f6` | `59 130 246`  | blue-500    | Info text / icon (neutral, не brand) |
+| `--color-info-100`    | `#cffafe` | `207 250 254` | cyan-100    | Info surface (v0.2 — cyan, distinct from brand blue) |
+| `--color-info-500`    | `#06b6d4` | `6 182 212`   | cyan-500    | Info text / icon (cyan — anti-collision с brand) |
 
 ### 2.4 Dark/Light mode mappings
 
 **Default scheme:** `prefers-color-scheme: dark` OR `[data-theme="dark"]` selector.
 **Toggle:** `[data-theme="light"]` overrides root.
 
+> Names match the materialized `themes.css` (`--bg-page`/`--bg-surface`, post-00.7).
+
 | Semantic role | Dark mode | Light mode |
 |---|---|---|
-| `--bg-primary`     | `--color-base-900` (`#0f172a`) | `--color-base-50`  (`#f8fafc`) |
-| `--bg-elevated`    | `--color-base-800` (`#1e293b`) | `--color-base-100` (`#f1f5f9`) |
-| `--bg-overlay`     | `--color-base-950` (`#020617`) | `rgba(15,23,42,0.4)` |
-| `--text-primary`   | `--color-base-50`  (`#f8fafc`) | `--color-base-900` (`#0f172a`) |
-| `--text-secondary` | `--color-base-300` (`#cbd5e1`) | `--color-base-500` (`#64748b`) |
-| `--text-tertiary`  | `--color-base-400` (`#94a3b8`) | `--color-base-400` (`#94a3b8`) |
-| `--border-default` | `--color-base-700` (`#334155`) | `--color-base-200` (`#e2e8f0`) |
-| `--border-emphasis`| `--color-base-600` (`#475569`) | `--color-base-300` (`#cbd5e1`) |
-| `--cta-primary`    | `--color-primary-500`          | `--color-primary-600` |
-| `--cta-primary-hover` | `--color-primary-400`        | `--color-primary-700` |
+| `--bg-page`        | `--color-base-900` (`#0b111e`) | `--color-base-50`  (`#f8fafc`) |
+| `--bg-surface`     | `--color-base-800` (`#141c2b`) | `--color-base-100` (`#f1f5f9`) |
+| `--bg-overlay`     | `--color-base-950` (`#060a13`) | `rgba(11,17,30,0.4)` |
+| `--text-primary`   | `--color-base-50`  (`#f8fafc`) | `--color-base-900` (`#0b111e`) |
+| `--text-secondary` | `--color-base-300` (`#cbd5e1`) | `--color-base-600` (`#37445f`) |
+| `--text-tertiary`  | `--color-base-400` (`#94a3b8`) | `--color-base-500` (`#64748b`) |
+| `--border-default` | `--color-base-700` (`#26324a`) | `--color-base-200` (`#e2e8f0`) |
+| `--border-emphasis`| `--color-base-600` (`#37445f`) | `--color-base-300` (`#cbd5e1`) |
+| `--cta-primary`    | `--color-primary-500` (`#2563eb`) | `--color-primary-600` (`#1d4ed8`) |
+| `--cta-primary-hover` | `--color-primary-400` (`#60a5fa`) | `--color-primary-700` (`#1e40af`) |
+| `--color-on-cta`   | `#ffffff` (mode-invariant)     | `#ffffff` |
 
 ---
 
@@ -163,7 +167,7 @@
 | `--shadow-md` | `0 4px 6px rgba(15, 23, 42, 0.10), 0 2px 4px rgba(15, 23, 42, 0.06)` | Dropdowns, popovers |
 | `--shadow-lg` | `0 10px 15px rgba(15, 23, 42, 0.12), 0 4px 6px rgba(15, 23, 42, 0.08)` | Modals, drawers |
 | `--shadow-xl` | `0 20px 25px rgba(15, 23, 42, 0.14), 0 10px 10px rgba(15, 23, 42, 0.10)` | High-elevation overlays |
-| `--shadow-focus-ring` | `0 0 0 3px rgba(245, 158, 11, 0.40)` | **Focus indicator (amber-500 alpha 40%)** |
+| `--shadow-focus-ring` | `0 0 0 3px rgba(37, 99, 235, 0.40)` | **Focus indicator (Royal Blue / primary-500 alpha 40%)** |
 
 ---
 
@@ -223,22 +227,25 @@ Mobile-first: styles default к < sm, then progressively enhance.
 
 ## 10. Usage guidance
 
-### 10.1 When to use `primary-500` vs `primary-600`
+### 10.1 Blue accent — how the stops map (v0.2)
 
-- `primary-500` (amber-500) — default brand surface (CTA, link, badge). В dark mode это actionable default.
-- `primary-600` (amber-600) — hover/pressed state в light mode (default — dark mode так что hover = `primary-400`, lighter).
-- `primary-400` — disabled / muted brand surface, и hover state в dark mode.
+Royal Blue (`#2563eb`) насыщен/тёмен, поэтому ведёт себя не как amber: «фон CTA» и «текст ссылки» берут **разные** стопы.
+
+- **CTA фон** = `--cta-primary` → `primary-500` (`#2563eb`) dark / `primary-600` (`#1d4ed8`) light. Текст на CTA — **белый** (`--color-on-cta`), 5.17:1 / 6.70:1.
+- **CTA hover** = темнее, не светлее: `bg-brand-700` (`#1e40af`), чтобы белый текст оставался читаемым (9.7:1). (НЕ `cta-hover`, иначе hover светлеет и белый проваливает AA.)
+- **Ссылки / accent-as-text на поверхности** = `--cta-primary-hover` (`text-cta-hover`) → `primary-400` (`#60a5fa`) dark (7.4:1) / `primary-700` (`#1e40af`) light (~9:1). Mode-aware: светлый синий на тёмном, тёмный синий на светлом.
+- `primary-100` (`#dbeafe`) — `Badge primary` фон (светлый чип) с текстом `brand-700`.
 
 ### 10.2 Single-accent philosophy
 
-В Oriion **только amber** служит "цветным" акцентом. Semantic colours (success-emerald, danger-rose, info-blue) used **только** для semantic feedback:
+В Oriion **только Royal Blue** служит brand-акцентом. Semantic colours (success-emerald, warning-amber, danger-rose, info-cyan) used **только** для semantic feedback:
 
 - Success/error toasts
 - Form validation states
 - Status badges (active/inactive/error)
 - Destructive button variant
 
-Никогда не используй emerald/rose/blue для decoration, navigation highlights, или brand surfaces. Это сохраняет visual hierarchy: amber = "this is Oriion", semantic = "this is feedback".
+Никогда не используй emerald/amber/rose/cyan для decoration, navigation highlights, или brand surfaces. Это сохраняет visual hierarchy: Royal Blue = "this is Oriion", semantic = "this is feedback". info=cyan специально отделён от brand-blue.
 
 ### 10.3 Dark-first reasoning
 
@@ -273,3 +280,4 @@ Mobile-first: styles default к < sm, then progressively enhance.
 |---|---|---|
 | 0.1.0 | 2026-05-13 | Initial Wave 0 foundation (Nordic Warm). Generated per DECISION-4. |
 | 0.1.0+note | 2026-06-11 | Forward-note: v0.2.0 restyling запланирован в Phase 00.8 (professional nordic, accent TBD) per ADR-031. Значения не менялись. |
+| **0.2.0** | **2026-06-13** | **Phase 00.8 restyle (ADR-031 Accepted).** Amber accent → **Royal Blue `#2563eb`** (white CTA text; links via `cta-hover` stop; hover darkens to `brand-700`). Cool-slate canvas deepened (`base-600..950`). `info` blue→**cyan** (anti-collision); `warning`-amber now standalone semantic. `on-cta`→white; focus-ring→blue. Names/structure unchanged — values only. WCAG-AA table in [UI-SPEC-00.8.md](./UI-SPEC-00.8.md). |
