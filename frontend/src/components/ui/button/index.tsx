@@ -15,11 +15,11 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-cta text-on-cta hover:bg-cta-hover",
+        primary: "bg-cta text-on-cta hover:bg-brand-700",
         secondary: "bg-surface text-primary border border-default hover:border-emphasis",
         ghost: "text-primary hover:bg-surface",
         destructive: "bg-danger-600 text-on-danger hover:bg-danger-700",
-        link: "text-cta underline-offset-4 hover:underline",
+        link: "text-cta-hover underline-offset-4 hover:underline",
       },
       size: {
         sm: "h-8 px-3 text-xs",

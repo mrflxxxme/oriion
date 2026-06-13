@@ -150,7 +150,7 @@ export function RegisterPage() {
         </form>
       </Card.Body>
       <Card.Footer className="mt-6 justify-center">
-        <Link to="/auth/login" className="text-sm text-cta underline-offset-4 hover:underline">
+        <Link to="/auth/login" className="text-sm text-cta-hover underline-offset-4 hover:underline">
           {t("auth.register.toLogin")}
         </Link>
       </Card.Footer>

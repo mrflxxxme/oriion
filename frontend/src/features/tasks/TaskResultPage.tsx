@@ -82,7 +82,7 @@ function ArtifactSection({ artifact }: { artifact: Artifact }) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-lg font-semibold text-primary">{label}</h2>
-      <div className="max-w-none text-sm text-secondary [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-primary [&_h4]:mt-3 [&_h4]:font-semibold [&_h4]:text-primary [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-primary [&_table]:w-full [&_td]:border [&_td]:border-default [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-default [&_th]:px-2 [&_th]:py-1 [&_a]:text-cta [&_a]:underline">
+      <div className="max-w-none text-sm text-secondary [&_h3]:mt-4 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-primary [&_h4]:mt-3 [&_h4]:font-semibold [&_h4]:text-primary [&_li]:ml-4 [&_li]:list-disc [&_strong]:text-primary [&_table]:w-full [&_td]:border [&_td]:border-default [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-default [&_th]:px-2 [&_th]:py-1 [&_a]:text-cta-hover [&_a]:underline">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
           {artifact.path_or_inline}
         </ReactMarkdown>

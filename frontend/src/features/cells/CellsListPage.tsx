@@ -27,7 +27,7 @@ function useCellColumns(): ColumnDef<Cell>[] {
             <Link
               to="/cells/$cellId"
               params={{ cellId: info.row.original.id }}
-              className="font-medium text-cta underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-focus-ring rounded-sm"
+              className="font-medium text-cta-hover underline-offset-4 hover:underline focus-visible:outline-none focus-visible:shadow-focus-ring rounded-sm"
             >
               {info.getValue()}
             </Link>
