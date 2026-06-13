@@ -1,5 +1,22 @@
 # Development Journal
 
+## 2026-06-13 · upbeat-chaum-aed9b4 · @claude-opus (Phase 00.8 execute)
+
+- Scope: **Phase 00.8 — design restyling (professional cool-blue v0.2).** Полный цикл по founder-процессу: live accent bake-off → UI-SPEC → grill → execute. Token-VALUE restyle only (имена/структура/18-barrel/light-theme/dark-default frozen).
+- **Founder pivot (важно):** тёплая рамка ADR-031 (терракота/amber «в духе Claude Code») **отклонена**. Founder выбрал **более холодную палитру + синий бренд** (teamly.to-семья). 2 live-bake-off'а (визуальный виджет: warm 3-up → cool 4-blue с live-переключателем + WCAG-аннотациями) → зафиксирован **Royal Blue `#2563eb`** (опция Royal). Канва — углублённый **холодный** slate (не тёплый near-black).
+- Decisions (bake-off + grill): (1) accent = Royal Blue #2563eb; (2) canvas = deepened cold slate; (3) process = ui-phase→grill→plan→execute; (4) **info → cyan #06b6d4** (anti-collision бренд↔info; info не-юзан → риск 0); (5) полировка = палитра + ритм + точечные density-нюджи, без relayout.
+- Done (код, verified green):
+  * `styles/tokens.css`: base-600..950 → deepened cool-slate (`#37445f/#26324a/#141c2b/#0b111e/#060a13`); primary amber→**blue** (`#dbeafe/#60a5fa/#2563eb/#1d4ed8/#1e40af`).
+  * `styles/index.css`: `on-cta` base-900→**#ffffff**; `info-*` blue→**cyan** (`#cffafe/#06b6d4/#0e7490`); focus-ring amber→**blue** alpha (`rgba(37,99,235,.4)`).
+  * `styles/themes.css`: light overlay deepened; dark роли auto-inherit by name.
+  * **Blue-on-dark contrast fix (execution discovery, не было в драфте):** ссылки `text-cta`→**`text-cta-hover`** (mode-aware `#60a5fa` dark 7.4:1 / `#1e40af` light ~9:1; статический `brand-400` провалил бы light 2.4:1, `text-cta` провалил бы dark 3.6:1). Primary button hover `bg-cta-hover`→**`bg-brand-700`** (темнеет; белый текст 9.7:1, иначе светлый hover → 2.5:1 fail). Файлы: `components/ui/button`, `features/cells/CellsListPage`, `features/auth/{Login,Register}Page`, `features/tasks/TaskResultPage`.
+- Done (доки): `ui/UI-SPEC-00.8.md` (gsd-ui-checker 6/6 PASS, recompute контраста match); `ui/design-tokens.md` → **v0.2.0** (§1/§2/§10/§12); **ADR-031 → Accepted** (Royal Blue + WCAG-AA таблица + cool-pivot note); STATUS + phase-spec AC.
+- Verification: lint 0 · build (tsc+vite) OK · vitest PASS · §A/§B grep 0 · barrel 19≥18 · `e2e:ci` smoke 3/3 (auth-axe 0 violations на новой палитре + **AC8 toggle**). AC1/2/5/6 ✓.
+- **Pending (нет docker-стека в worktree):** `npm run e2e:live` (5-route axe + 3-agent demo) → AC3 full + AC4. Запустить на стенде → закрыть фазу.
+- Process note: GSD-оркестратор (`gsd:ui-phase`/`plan-phase`) НЕ работает на bespoke `.planning/` (нет ROADMAP.md/STATE.md) — артефакты сделаны проектным путём (ui-ux-pro-max + designer mandate + gsd-ui-checker per UI-DESIGN-PLAYBOOK).
+- Next: e2e:live на стенде → AC3/4 → 00.8 ✅; PR merge (глазами 6 экранов в обеих темах); ∥ founder staging 10× anchor (D5); → Wave 1 (01.1-retro).
+- Refs: branch `claude/upbeat-chaum-aed9b4`; ADR-031 (Accepted); `ui/UI-SPEC-00.8.md`; `ui/design-tokens.md` v0.2.0.
+
 ## 2026-06-11 · reverent-euclid-3bbf83 · @claude-fable (grill-session)
 
 - Scope: **Промежуточный founder-аудит после 00.1–00.7** — grill-session по 4 темам (дизайн, универсальность агентов, чистота вывода, консистентность доков) → правки .planning + 3 быстрых кода-фикса чистоты вывода. Имплементация редизайна/универсализации — НЕ в этой сессии (фазами).

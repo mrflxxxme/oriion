@@ -16,7 +16,7 @@
 
 ## Текущая активная фаза
 
-**Phase 00.8 (Design restyling — professional nordic v0.2)** — ⏳ **Pending** (created 2026-06-11 per founder grill-session + [ADR-031](./decisions/ADR-031-design-direction-restyling.md)). Tokens v0.2.0 (акцент: bake-off терракота vs muted amber) + полировка 6 экранов по teamly.to-паттернам. Spec: [`roadmap/wave-0-foundation/phases/00.8-design-restyling.md`](./roadmap/wave-0-foundation/phases/00.8-design-restyling.md). НЕ гейтит D5.
+**Phase 00.8 (Design restyling — professional cool-blue v0.2)** — 🔄 **Code-complete; e2e:live pending staging** (2026-06-13 per [ADR-031 Accepted](./decisions/ADR-031-design-direction-restyling.md)). Bake-off → founder выбрал **холодную палитру + Royal Blue `#2563eb`** (отклонил тёплую рамку); tokens v0.2.0 материализованы (deepened cold-slate canvas, info→cyan, on-cta→white, links→cta-hover). AC1/AC2/AC5/AC6 ✓ (lint+build+unit+smoke-axe+toggle green; CI-гейты §A/§B/barrel green). **AC3/AC4 pending:** прогнать `npm run e2e:live` (5-route axe + 3-agent demo) на стенде. Контракт: [`ui/UI-SPEC-00.8.md`](./ui/UI-SPEC-00.8.md). НЕ гейтит D5.
 
 **Session 2026-06-11 (grill-аудит)** — ✅ Complete: 3 быстрых фикса чистоты вывода (role-prompts 0.1.1 в обеих копиях + `normalize_artifact_markdown` в dispatch.py + сворачивание межшаговой аналитики на вкладке «Результат»; backend 50/50, frontend 156/156, lint+build green) + Phase 00.8 + ADR-031 + Pixel-reframing (opt-in skin) + AC-W1-24/25 в 01.1-retro.
 
@@ -44,7 +44,7 @@
 | **00.6 PR-A** — Stage A local infra | ✅ Complete | [#36](https://github.com/mrflxxxme/oriion/pull/36) 2026-05-25 | 22 commits; self-audit 0H/9M/10L; AC-W1-11..15 pin block extension |
 | **00.6 PR-B** — Stage B + orchestrator-dispatch + live validation | ✅ Complete | [#38](https://github.com/mrflxxxme/oriion/pull/38) + [#39](https://github.com/mrflxxxme/oriion/pull/39) 2026-06-08 | C0–C19; 5-agent retro PASS; architecture live-proven; AC-W1-16..23 |
 | 00.7 — Frontend skeleton | ✅ Complete | TBD | 2026-06-11; C0–C16; @live demo PASS; 3-agent FE audit PASS; AC7 unblocked; AC1-AC12 (AC4 by-design) |
-| 00.8 — Design restyling | ⏳ Pending | — | Created 2026-06-11 per ADR-031 (grill-session); professional nordic v0.2; не гейтит D5 |
+| 00.8 — Design restyling | 🔄 Code-complete | — | 2026-06-13; cool-blue v0.2 (Royal Blue #2563eb, info→cyan); AC1/2/5/6 ✓; AC3/4 pending `e2e:live` on staging; не гейтит D5 |
 
 ## Active blockers
 
