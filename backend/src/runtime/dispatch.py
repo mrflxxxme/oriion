@@ -547,7 +547,7 @@ async def dispatch_task(
         task_id=task.id,
         cell_id=task.cell_id,
         user_id=task.initiated_by_user_id,
-        coordinator_agent=coord,  # type: ignore[arg-type]  # ScriptedCoordinator is structurally compatible (.run)
+        coordinator_agent=coord,  # type: ignore[arg-type]  # PlanExecutingCoordinator is structurally compatible (.run)
         user_prompt=user_prompt,
         available_agent_slugs=slugs,
         leaf_runner=leaf_runner,
