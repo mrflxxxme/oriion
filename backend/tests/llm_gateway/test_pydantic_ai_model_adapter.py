@@ -194,6 +194,23 @@ async def test_llm_gateway_model_injects_prompted_output_schema(fake_router):
     assert any("JSON" in blob for blob in system_blobs)
 
 
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [("writer", 8192), ("coordinator", 2048), ("researcher", 4096), ("unknown-role", 4096)],
+)
+async def test_llm_gateway_model_resolves_per_role_max_tokens(
+    fake_router, model_request_params, role, expected
+):
+    """AC-W1-23a: the adapter resolves a per-role output budget and forwards it to acomplete()."""
+    model = LLMGatewayModel(role_key=role, llm_router=fake_router)
+    await model.request(
+        messages=[ModelRequest(parts=[UserPromptPart(content="hi")])],
+        model_settings=None,
+        model_request_parameters=model_request_params,
+    )
+    assert fake_router.acomplete.await_args.kwargs["max_tokens"] == expected
+
+
 def test_llm_gateway_model_name_property(fake_router):
     """model_name + system properties surface the role-key for usage logs."""
     model = LLMGatewayModel(role_key="writer", llm_router=fake_router)

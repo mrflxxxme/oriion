@@ -38,6 +38,8 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RequestUsage
 
+from src.llm_gateway.services.router_service import resolve_max_tokens
+
 # Pydantic-AI's ModelResponse.finish_reason is typed as a strict Literal.
 _FinishReason = Literal["stop", "length", "content_filter", "tool_call", "error"]
 
@@ -127,6 +129,7 @@ class LLMGatewayModel(Model):
             model_hint=self._model_hint,
             messages=openai_messages,
             metadata={"role_key": self._role_key, "workspace_id": str(self._workspace_id)},
+            max_tokens=resolve_max_tokens(self._role_key),
         )
         self._last_model_name = target_model
 
