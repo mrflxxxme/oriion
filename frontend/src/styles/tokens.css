@@ -1,6 +1,6 @@
 /*
- * Oriion design tokens — Nordic Warm (Wave 0)
- * Materialized from .planning/ui/design-tokens.md §2–§9.
+ * Oriion design tokens — Professional cool-blue (Wave 0, v0.2.0)
+ * Materialized from .planning/ui/design-tokens.md §2–§9 + UI-SPEC-00.8.md.
  *
  * This file holds the RAW palette + motion + z-index scales that are consumed
  * either by themes.css (semantic role mappings) or directly in component CSS.
@@ -10,29 +10,32 @@
  * them here too would collide with Tailwind's own `--radius-*` / `--shadow-*`
  * namespace names and create circular var references.
  *
- * DECISION-4 (ADR-028 §5.1) — temporary palette until OQ-09 (Wave 2 brand refresh).
+ * v0.2.0 (Phase 00.8, ADR-031) — amber accent → Royal Blue; canvas deepened.
+ * Token NAMES/structure frozen; values only. Temporary until OQ-09 (Wave 2).
  */
 
 :root {
-  /* §2.1 Base — neutral slate scale (consumed by themes.css semantic roles) */
+  /* §2.1 Base — deepened cool-slate scale (consumed by themes.css roles).
+   * 50–500 unchanged (light surfaces + dark text); 600–950 deepened/cooled. */
   --color-base-50: #f8fafc;
   --color-base-100: #f1f5f9;
   --color-base-200: #e2e8f0;
   --color-base-300: #cbd5e1;
   --color-base-400: #94a3b8;
   --color-base-500: #64748b;
-  --color-base-600: #475569;
-  --color-base-700: #334155;
-  --color-base-800: #1e293b;
-  --color-base-900: #0f172a;
-  --color-base-950: #020617;
+  --color-base-600: #37445f;
+  --color-base-700: #26324a;
+  --color-base-800: #141c2b;
+  --color-base-900: #0b111e;
+  --color-base-950: #060a13;
 
-  /* §2.2 Brand / Primary — amber accent (single brand colour) */
-  --color-primary-100: #fef3c7;
-  --color-primary-400: #fbbf24;
-  --color-primary-500: #f59e0b;
-  --color-primary-600: #d97706;
-  --color-primary-700: #b45309;
+  /* §2.2 Brand / Primary — Royal Blue accent (single brand colour).
+   * 500 = CTA (white text); 400 = links on dark + dark-mode hover. */
+  --color-primary-100: #dbeafe;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #2563eb;
+  --color-primary-600: #1d4ed8;
+  --color-primary-700: #1e40af;
 
   /* §7.1 Motion durations (direct use in component transitions) */
   --duration-fast: 150ms;

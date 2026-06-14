@@ -1,8 +1,8 @@
 # ADR-031: Design direction — professional nordic base, pixel as optional skin
 
-- **Status:** Proposed (акцентный цвет выбирается внутри Phase 00.8; flip → Accepted при exit фазы)
-- **Date:** 2026-06-11
-- **Deciders:** Founder (grill-session 2026-06-11), architect, designer
+- **Status:** **Accepted** (2026-06-13) — accent = **Royal Blue `#2563eb`**; materialized in Phase 00.8.
+- **Date:** 2026-06-11 (proposed) · 2026-06-13 (accepted)
+- **Deciders:** Founder (grill-session 2026-06-11 + bake-off 2026-06-13), architect, designer
 
 ## Context
 
@@ -18,8 +18,29 @@ Constraints: OQ-09 (финальный бренд/имя/домен) остаё�
 Принять направление **«professional nordic»** как базовую визуальную идентичность продукта на W0–W2:
 
 1. **Phase 00.8 (Design restyling)** вставляется в Wave 0 после 00.7: рестайлинг значений токенов (палитра/акцент) + полировка 6 существующих экранов по layout-паттернам teamly.to. Архитектура токенов, 18 компонентов, светлая тема и dark-default **не меняются**.
-2. **Акцентный цвет выбирается внутри Phase 00.8** сравнением 2–3 вариантов на макетах: терракота ≈`#d97757` (Claude-эстетика) vs приглушённый amber vs один дополнительный кандидат. Выбор фиксируется flip-ом этого ADR → Accepted + design-tokens v0.2.0.
+2. **Акцентный цвет выбран внутри Phase 00.8** через live bake-off. ⚠️ **Founder pivot (2026-06-13):** первоначальная рамка «тёплый приглушённый акцент» (терракота/amber) **отклонена** — founder выбрал **более холодную палитру** и **синий бренд-акцент** в духе teamly.to. После второго bake-off (4 cool-blue кандидата, все WCAG-AA проверены) зафиксирован **Royal Blue `#2563eb`**. Канва — углублённый **холодный** slate (не тёплый near-black). См. контраст-таблицу ниже + [UI-SPEC-00.8.md](../ui/UI-SPEC-00.8.md).
 3. **Pixel-герои = опциональный скин** (поправка к ADR-004): off by default; пользователь включает «пиксельный офис» сознательно. Маркетинговое позиционирование пикселей понижается с «defensible visual brand» до «memorable opt-in feature». Скоуп ассетов Wave 2 не меняется.
+
+## Resolution (2026-06-13) — accent + WCAG AA contrast table
+
+Final accent: **Royal Blue `#2563eb`** (brand CTA, white text) on a deepened cold-slate canvas
+(`bg-page` `#0f172a`→`#0b111e`). Because a saturated blue is dark, the accent splits into two roles
+(CTA fill with white text; lighter link/text stop via `cta-hover`); `info` semantic moved blue→cyan
+to keep brand-blue unique. Token names/structure unchanged — values only.
+
+| Pairing | Ratio | Gate | Verdict |
+|---|---|---|---|
+| White on CTA `#2563eb` (dark) | 5.17:1 | ≥4.5 | ✓ AA |
+| White on light-CTA `#1d4ed8` | 6.70:1 | ≥4.5 | ✓ AA (on-cta mode-invariant) |
+| White on CTA-hover `#1e40af` | 9.7:1 | ≥4.5 | ✓ AA |
+| Link `#60a5fa` (`cta-hover` dark) on `#0b111e` | 7.4:1 | ≥4.5 | ✓ AA |
+| Link `#1e40af` (`cta-hover` light) on `#f8fafc` | ~9:1 | ≥4.5 | ✓ AA |
+| Focus ring `rgba(37,99,235,.4)` | non-text | ≥3 | ✓ |
+| Badge primary `#1e40af` on `#dbeafe` | 7.15:1 | ≥4.5 | ✓ |
+| Badge info `#0e7490` on `#cffafe` | 4.79:1 | ≥4.5 | ✓ |
+
+Verified live: `gsd-ui-checker` recomputation + axe-core 0 violations on auth routes (smoke spec) +
+theme-toggle pass. Full 5-route axe runs on the staging stack (`e2e:live`).
 
 ## Consequences
 
