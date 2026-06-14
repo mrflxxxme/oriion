@@ -1,11 +1,18 @@
 """Coordinator — top-level orchestrator of the productivity-core preset.
 
-Wave 0: horizontal preset, no Master-Agent layer above. Coordinator is
-the single role with the ``delegate_task`` tool — leaf specialists
-(Researcher, Writer, Analyst) cannot delegate (per ADR-016 team-first UX).
+Wave 0: horizontal preset, no Master-Agent layer above. The Coordinator
+produces a delegation plan over the leaf specialists (Researcher, Writer,
+Analyst), which cannot delegate themselves (per ADR-016 team-first UX).
+
+AC-W1-16b/24: the Coordinator runs **plan-then-execute** via Pydantic-AI
+``PromptedOutput`` — it returns the whole ``delegation_plan`` as one JSON
+completion (no function-calling, robust across all providers), and
+``runtime.dispatch.PlanExecutingCoordinator`` executes each step, re-applying
+the ``delegate_task`` depth/slug guards. ``delegate_task`` itself is retained
+for the shared guard helper + the DelegateInput/DelegateResult contracts.
 
 Per phase-spec 00.5 inline definition + ADR-022 (Coordinator top-level in
-horizontal preset).
+horizontal preset) + ADR-023/024 plan-then-execute amendment.
 """
 
 from __future__ import annotations
@@ -15,13 +22,12 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent, PromptedOutput
 
 from src.agents.services.role_prompt_loader import RolePrompt, load_role_prompt
 from src.agents.tools.delegate import (
     DelegateInput,
     DelegateResult,
-    delegate_task,
 )
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
 
@@ -106,9 +112,13 @@ def build_coordinator_agent(
     return Agent(
         model=model,
         deps_type=CoordinatorDeps,
-        output_type=CoordinatorOutput,
+        # AC-W1-16b/24: plan-then-execute. The Coordinator emits the whole
+        # delegation_plan as one PromptedOutput JSON completion (no function-
+        # calling); runtime.dispatch.PlanExecutingCoordinator executes the plan
+        # and re-applies the delegate_task depth/slug guards per step.
+        output_type=PromptedOutput(CoordinatorOutput),
         system_prompt=prompt,
-        tools=[delegate_task],
+        tools=[],
     )
 
 
