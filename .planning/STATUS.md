@@ -8,7 +8,7 @@
 |---|---|---|
 | Pre-Wave-0 | ✅ Complete | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
 | Wave 0 (Foundation) | 🔄 **Closing** (build phases 00.1–00.7 ✅; architecture **live-validated locally**; remaining: **Phase 00.8 design restyling** (NEW per ADR-031) + founder staging 10× anchor run) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
-| Wave 1 (Core MVP) | ⏳ Pending — Phase 01.1 retro file created в PR-B C8 (AC-W1-1..17) | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + Telegram Business API |
+| Wave 1 (Core MVP) | 🔄 **In progress** — Phase 01.1 Track A (Coordinator generalization) code-complete; live golden pending founder | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + Telegram Business API |
 | Wave 2 (Pixel + каталог) | ⏳ Pending | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent first-instances |
 | Wave 3 (Глубина) | ⏳ Pending | +ИП-Бух + СМБ-Sales vertical + Vertical Rituals + PARA Workspace |
 | Wave 4 (Масштаб) | ⏳ Pending | K8s + Partner programme + Telegram Stars billing |

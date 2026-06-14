@@ -91,7 +91,7 @@ JIT-loading: каждый sub-файл загружается только ко�
 
 - **Spawning:** native Claude Code `Task` tool с `subagent_type=<our-role>`, где `<our-role>` определён в `.claude/agents/<role>/profile.md` через extends GSD или Anthropic base-agent.
 - **Memory:** AgentDB через `claude-flow` MCP. ONNX 384-dim embeddings (all-MiniLM-L6-v2). DiskANN или HNSW vector search в зависимости от scale.
-- **GSD reuse:** команды `/gsd:plan-phase`, `/gsd:execute-phase`, `/gsd:verify-work`, `/gsd:ship` работают «из коробки» — структура `.planning/` совпадает с GSD-ожиданиями.
+- **GSD reuse:** команды `/gsd:plan-phase`, `/gsd:execute-phase`, `/gsd:verify-work`, `/gsd:ship` работают «из коробки» — структура `.planning/` совпадает с GSD-ожиданиями. **(Revision 2026-06-15, [ADR-033](./ADR-033-gsd-methodology-reenablement.md)): неточно — bespoke `.planning/` НЕ имеет `ROADMAP.md`/`STATE.md`/`config.json`/GSD phase-dir layout; slash-оркестраторы требуют L2-bridge. Сейчас работает L1 — gsd-субагенты напрямую через Agent tool.)**
 
 ### 7. AgentDB namespaces
 

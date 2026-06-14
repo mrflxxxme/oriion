@@ -1,5 +1,25 @@
 # Development Journal
 
+## 2026-06-15 · goofy-darwin-194c68 · @claude-opus (Phase 01.1-retro Track A — Coordinator generalization)
+
+- Scope: **Phase 01.1 Track A — генерализация Координатора** (связный срез «AI-команда становится универсальной»). 9 атомарных коммитов (C1–C9) off post-merge main `d86b3ba`. Реализует AC-W1-16b + 24 + 25 + 20 + 22 + 23a; AC-W1-16a/19/1 + observability-пины отложены в infra-PR (по плану).
+- Workflow: bootstrap-4 + 01.1-retro → `/grill-me` (8 развилок, все через AskUserQuestion) → Plan-агент (де-рискнул PromptedOutput живым round-trip: pydantic-ai **1.102**, `prepare_request`) → execute → `gsd-verifier` (GSD L1) → exit ritual.
+- **Ключевое архитектурное решение ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md)):** Координатор решает декомпозицию **plan-then-execute через PromptedOutput**, не native tool-call (как формулировал AC-W1-16). Причины: `deepseek-reasoner` не умеет tools/JSON; только DeepSeek форвардит tools (Yandex/GigaChat нет → native loop ломает failover). PromptedOutput plain-text → робастно на всех 3 провайдерах, gateway tool-forwarding = 0.
+- Done (код, verified green):
+  * `llm_gateway/pydantic_ai_model.py` — `request()` вызывает `prepare_request` и инжектит `prompted_output_instructions` системным сообщением (C1).
+  * `agents/coordinator.py` — `output_type=PromptedOutput(CoordinatorOutput)`, `tools=[]`, `DelegationStep.artifact_type` (C2/C5).
+  * `llm_gateway/services/router_service.py` — coordinator→`deepseek-chat`; `ROLE_TO_MAX_TOKENS` (C3/C4).
+  * `runtime/dispatch.py` — `PlanExecutingCoordinator` (план→исполнение через orchestrator runner; guard'ы через `assert_delegation_allowed`; artifact_type из плана; web_search гейтится researcher-шагом); удалены `_SUB_PROMPT_FRAMING`/`DEFAULT_PIPELINE`/`_ARTIFACT_KIND`/`ScriptedCoordinator` (C5, AC-W1-24).
+  * `contracts/role-prompts/*` — Координатор §1/§2/§3/§6 → JSON-план output (один блок, без прозы); researcher/analyst/writer +≥2 non-brief §6-примера; все → v1.0.0/stable (C7, AC-W1-25/22).
+  * single-source: `scripts/sync_role_prompts.{sh,ps1}` + `backend/.gitignore` + CI drift-check; удалён committed `backend/role_prompts/` дубль (C8, AC-W1-20).
+  * frontend `TaskSubmitPage` пресет несёт полный deliverable-контракт; backend prompt-agnostic (C9, AC-W1-24).
+- Verification: backend `ruff`+`mypy --strict`(145)+`pytest` **567 passed, cov 87.9%** ✓; role-prompt drift-check ✓; frontend `TaskSubmitPage` 5/5 + prettier/eslint ✓. `gsd-verifier` (GSD L1) goal-backward verdict — см. HANDOFF «Verification state».
+- **Pending (нет BYOK-`.env` в worktree):** live golden-прогон + ручной non-brief submit — **founder-action**, как 00.8 e2e:live. Runbook в HANDOFF «Next actions».
+- Decisions (8, grill/AskUserQuestion): scope=Track A; arch=plan-then-execute; 16a defer; 19 defer; GSD=L1 now+L2 spike; verify=CI+live до merge; venue=local docker; single-source=build-time sync.
+- ADRs: **ADR-032** (plan-then-execute, Accepted) + **ADR-033** (GSD re-enablement L1/L2, Proposed; correction-note к ADR-023 §6).
+- Next: founder live golden + non-brief → закрыть AC-W1-24/25 → merge. Затем infra-PR (16a Dramatiq + AC-W1-1 Redis-SSE + 19 native web_search + observability-пины).
+- Refs: branch `claude/goofy-darwin-194c68`; ADR-032/033; `01.1-retro.md` AC-W1-16/22/23/24/25.
+
 ## 2026-06-13 · upbeat-chaum-aed9b4 · @claude-opus (Phase 00.8 execute)
 
 - Scope: **Phase 00.8 — design restyling (professional cool-blue v0.2).** Полный цикл по founder-процессу: live accent bake-off → UI-SPEC → grill → execute. Token-VALUE restyle only (имена/структура/18-barrel/light-theme/dark-default frozen).
