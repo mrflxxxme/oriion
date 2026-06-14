@@ -156,6 +156,44 @@ async def test_llm_gateway_model_forwards_model_hint(fake_router, model_request_
     assert call_kwargs["model_hint"] == "byok-openai/gpt-4o"
 
 
+async def test_llm_gateway_model_injects_prompted_output_schema(fake_router):
+    """AC-W1-16b: a PromptedOutput-configured Agent over the gateway model gets its
+    JSON schema injected as a system message, and a fenced-JSON response round-trips
+    into the Pydantic output model — no function-calling, no tool-forwarding."""
+    from pydantic import BaseModel
+    from pydantic_ai import Agent, PromptedOutput
+
+    class _Plan(BaseModel):
+        summary: str
+        steps: list[str]
+
+    fenced = '```json\n{"summary": "ok", "steps": ["research", "write"]}\n```'
+    fake_router.acomplete = AsyncMock(
+        return_value=(
+            LLMResponse(
+                content=fenced,
+                finish_reason="stop",
+                usage=LLMUsage(tokens_input=20, tokens_output=15),
+                raw_provider_metadata={"provider": "deepseek"},
+            ),
+            "deepseek-chat",
+            "deepseek",
+        )
+    )
+    model = LLMGatewayModel(role_key="coordinator", llm_router=fake_router)
+    agent = Agent(model=model, output_type=PromptedOutput(_Plan))
+
+    result = await agent.run("Plan a market brief.")
+
+    # The fenced JSON round-tripped into the typed output.
+    assert isinstance(result.output, _Plan)
+    assert result.output.steps == ["research", "write"]
+    # The schema directive reached the provider as a system message.
+    sent_messages = fake_router.acomplete.await_args.kwargs["messages"]
+    system_blobs = [m["content"] for m in sent_messages if m["role"] == "system"]
+    assert any("JSON" in blob for blob in system_blobs)
+
+
 def test_llm_gateway_model_name_property(fake_router):
     """model_name + system properties surface the role-key for usage logs."""
     model = LLMGatewayModel(role_key="writer", llm_router=fake_router)

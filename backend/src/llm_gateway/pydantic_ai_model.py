@@ -97,12 +97,26 @@ class LLMGatewayModel(Model):
     async def request(
         self,
         messages: list[ModelRequest | ModelResponse],
-        model_settings: ModelSettings | None,  # noqa: ARG002 — reserved, Wave-1+
-        model_request_parameters: ModelRequestParameters,  # noqa: ARG002 — tools/output_mode wire-up Wave 1
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
     ) -> ModelResponse:
         """One-shot completion. Streaming sibling lives in ``request_stream``
-        (inherited default raises until Wave 1 SSE-on-runtime lands)."""
-        openai_messages = _messages_to_openai_shape(messages)
+        (inherited default raises until Wave 1 SSE-on-runtime lands).
+
+        ``prepare_request`` resolves the PromptedOutput schema instructions
+        (AC-W1-16b): for a ``PromptedOutput``-configured Agent (the Coordinator)
+        ``prompted_output_instructions`` is the JSON-schema directive, which we
+        inject as a system message so the provider returns schema-conformant JSON
+        — no function-calling required (works across DeepSeek/Yandex/GigaChat).
+        Leaf agents (``output_type=str``) yield ``None`` here → unchanged path.
+        """
+        _, model_request_parameters = self.prepare_request(
+            model_settings, model_request_parameters
+        )
+        openai_messages = _messages_to_openai_shape(
+            messages,
+            prompted_instructions=model_request_parameters.prompted_output_instructions,
+        )
 
         # acomplete walks the failover chain (DeepSeek → YandexGPT → GigaChat),
         # so a single provider error (e.g. 402 Payment Required) fails over to
@@ -142,14 +156,20 @@ class LLMGatewayModel(Model):
 
 def _messages_to_openai_shape(
     messages: list[ModelRequest | ModelResponse],
+    *,
+    prompted_instructions: str | None = None,
 ) -> list[dict[str, str]]:
     """Translate Pydantic-AI ``ModelRequest``/``ModelResponse`` parts → OpenAI-shape.
 
-    Only Text-style parts are handled in Wave 0 (the productivity-core demo
-    flow doesn't surface tool-calls or media yet). Tool-call wiring lands
-    with Commit 5 when ``delegate_task`` ships.
+    Text-style parts only: the productivity-core flow uses plan-then-execute via
+    ``PromptedOutput`` (no native tool-calls; AC-W1-19 native web_search is a later
+    pin). ``prompted_instructions`` (from ``ModelRequestParameters.prompted_output_instructions``)
+    carries the PromptedOutput JSON-schema directive; when present it is prepended as
+    a system message so the provider emits schema-conformant JSON.
     """
     openai_messages: list[dict[str, str]] = []
+    if prompted_instructions:
+        openai_messages.append({"role": "system", "content": prompted_instructions})
     for msg in messages:
         if isinstance(msg, ModelRequest):
             for req_part in msg.parts:
