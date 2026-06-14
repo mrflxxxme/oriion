@@ -11,7 +11,7 @@ def test_load_canonical_coordinator_prompt():
     """The shipped coordinator.md must parse + present 9 sections."""
     rp = load_role_prompt("coordinator")
     assert rp.role_id == "coordinator"
-    assert rp.version.startswith("0.")
+    assert rp.version == "1.0.0"  # hardened at Phase 01.1 (AC-W1-25)
     assert rp.contract_type == "role-prompt"
     assert len(rp.sections) >= 9
     # Section 1 is identity & mission per the canonical structure.
