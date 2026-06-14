@@ -34,7 +34,7 @@ async def test_router_returns_primary_when_all_circuits_closed() -> None:
         model_hint=None,
     )
     assert provider.name == "deepseek"
-    assert model == "deepseek-reasoner"
+    assert model == "deepseek-chat"  # AC-W1-16b: coordinator on chat, not reasoner
 
 
 @pytest.mark.asyncio

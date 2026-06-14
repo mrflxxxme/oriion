@@ -26,7 +26,12 @@ logger = structlog.get_logger(__name__)
 
 # ── ROLE_TO_MODEL — per ADR-018 ───────────────────────────────────────────
 ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
-    "coordinator": ("deepseek", "deepseek-reasoner"),
+    # AC-W1-16b: Coordinator runs plan-then-execute via PromptedOutput (JSON).
+    # deepseek-reasoner (R1) does NOT support JSON/function-calling and emits
+    # reasoning prose in `content` (breaks the fenced-JSON parse) — so the
+    # Coordinator uses deepseek-chat, which reliably follows the fence directive
+    # and is cheaper/faster against the AC8/AC10 gates.
+    "coordinator": ("deepseek", "deepseek-chat"),
     "specialist": ("deepseek", "deepseek-chat"),
     "embedder": ("yandexgpt", "text-search-doc"),
     "default": ("deepseek", "deepseek-chat"),
