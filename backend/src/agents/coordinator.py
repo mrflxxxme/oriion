@@ -72,6 +72,10 @@ class DelegationStep(BaseModel):
     agent: str
     goal: str
     status: str  # 'completed' | 'skipped' | 'failed'
+    # AC-W1-24: the Coordinator names each step's artifact type (e.g. 'matrix',
+    # 'analysis', 'brief', 'landing-copy'), so artifact typing comes from the
+    # plan output schema — NOT from a code-side agent-slug → type map.
+    artifact_type: str = "document"
     depends_on: list[int] = Field(default_factory=list)
     cost_estimate_tcredits: int = 0
 

@@ -264,23 +264,18 @@ async def test_fake_model_exhaustion_raises():
 
 
 async def test_fake_model_returns_canned_in_order():
-    """Successive calls walk the registered list in order."""
+    """A request returns the registered canned response for (role, scenario)."""
     model = FakeLLMGatewayModel(role_key="coordinator")
     for (role_key, scenario_id), responses in RESPONSES.items():
         model.set_response(role_key, scenario_id, responses)
     model.set_scenario(SCENARIO_ID)
 
-    resp_1 = await model.request(messages=[], model_settings=None, model_request_parameters=None)  # type: ignore[arg-type]
-    resp_2 = await model.request(messages=[], model_settings=None, model_request_parameters=None)  # type: ignore[arg-type]
+    resp = await model.request(messages=[], model_settings=None, model_request_parameters=None)  # type: ignore[arg-type]
 
-    # Coordinator has 2 canned responses in market_brief_demo — first is
-    # the decompose plan, second is the synthesize summary.
-    assert "План декомпозиции" in resp_1.parts[0].content
-    assert "Финальный синтез" in resp_2.parts[0].content
-    assert model.calls == [
-        ("coordinator", SCENARIO_ID),
-        ("coordinator", SCENARIO_ID),
-    ]
+    # The Coordinator now emits a single fenced-JSON plan (AC-W1-16b) — no more
+    # decompose-then-synthesize two-call shape.
+    assert "delegation_plan" in resp.parts[0].content
+    assert model.calls == [("coordinator", SCENARIO_ID)]
 
 
 def test_pydantic_ai_test_model_fixture_seeded(pydantic_ai_test_model):

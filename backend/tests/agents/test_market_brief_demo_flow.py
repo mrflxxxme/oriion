@@ -40,8 +40,8 @@ from tests._fixtures.canned_pydantic_ai.market_brief_demo import (
 def _canned_text_for(role_key: str) -> str:
     key = (role_key, SCENARIO_ID)
     responses = RESPONSES[key]
-    # Use the first canned response (specialists have exactly one; coordinator
-    # has two — we only consume the synthesize one here for shape checks).
+    # Every role now has exactly one canned response (the coordinator emits a
+    # single JSON plan; specialists emit their artifact body).
     return responses[0].parts[0].content
 
 
@@ -170,26 +170,82 @@ async def test_demo_flow_budget_guard_blocks_runaway():
         check_budget(accumulated_cost=accumulated, pending_cost=per_leaf)
 
 
-def test_canned_coordinator_synthesize_mentions_three_specialists():
-    """Coordinator's second canned response (synthesize) must reference
-    all three leaves — proves the demo flow returns a synthesis, not a raw
-    concatenation."""
+def test_canned_coordinator_emits_json_plan():
+    """AC-W1-16b: the Coordinator's single canned response is a fenced-JSON
+    CoordinatorOutput with the 3-step plan + artifact types carried in-plan."""
+    import json
+
     coord_responses = RESPONSES[("coordinator", SCENARIO_ID)]
-    synthesize_text = coord_responses[1].parts[0].content
-    assert "Researcher" in synthesize_text
-    assert "Writer" in synthesize_text
-    assert "Analyst" in synthesize_text
+    assert len(coord_responses) == 1
+    text = coord_responses[0].parts[0].content
+    payload = json.loads(text.removeprefix("```json").removesuffix("```").strip())
+    plan = payload["delegation_plan"]
+    assert [s["agent"] for s in plan] == ["researcher", "analyst", "writer"]
+    assert [s["artifact_type"] for s in plan] == ["matrix", "analysis", "brief"]
 
 
-def test_canned_coordinator_decompose_describes_delegation_plan():
-    """Coordinator's first canned response (decompose) lays out the
-    3-step plan — proves the demo flow starts with a delegation plan,
-    not direct work."""
-    coord_responses = RESPONSES[("coordinator", SCENARIO_ID)]
-    decompose_text = coord_responses[0].parts[0].content
-    assert "Researcher" in decompose_text
-    assert "Writer" in decompose_text
-    assert "Analyst" in decompose_text
+async def test_demo_flow_real_path_drives_coordinator():
+    """AC-W1-16b/24: drive the REAL PlanExecutingCoordinator + orchestrator with the
+    canned coordinator plan + canned leaf outputs. The plan (not code-side framing)
+    decides the steps, artifacts are typed from the plan, and the SSE ledger comes
+    from the production orchestrator path."""
+    from src.agents.coordinator import build_coordinator_agent
+    from src.agents.tools.delegate import DelegateInput, DelegateResult
+    from src.runtime.dispatch import PlanExecutingCoordinator
+    from src.runtime.orchestrator import execute_agent_task
+
+    from tests._fixtures.canned_pydantic_ai import FakeLLMGatewayModel
+
+    coord_model = FakeLLMGatewayModel(role_key="coordinator")
+    coord_model.set_response("coordinator", SCENARIO_ID, RESPONSES[("coordinator", SCENARIO_ID)])
+    coord_model.set_scenario(SCENARIO_ID)
+    coord = PlanExecutingCoordinator(coordinator_agent=build_coordinator_agent(model=coord_model))
+
+    async def _leaf_runner(inp: DelegateInput, _ctx: object) -> DelegateResult:
+        return DelegateResult(
+            sub_task_id=uuid4(),
+            target_agent_slug=inp.target_agent_slug,
+            output=_canned_text_for(inp.target_agent_slug),
+            cost_credits=Decimal("4.5"),
+            tokens_used=100,
+        )
+
+    class _NoTaskSession:
+        async def get(self, _model: object, _id: object) -> None:
+            return None
+
+        def add(self, _obj: object) -> None: ...
+
+        async def flush(self) -> None: ...
+
+    publisher = InProcessSSEPublisher()
+    task_id = uuid4()
+    result = await execute_agent_task(
+        task_id=task_id,
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        coordinator_agent=coord,  # type: ignore[arg-type]
+        user_prompt="Подготовь market & content brief.",
+        available_agent_slugs=["researcher", "analyst", "writer"],
+        leaf_runner=_leaf_runner,
+        sse_publisher=publisher,
+        session=_NoTaskSession(),  # type: ignore[arg-type]
+    )
+
+    # AC-W1-24: artifacts typed from the plan, in execution order.
+    assert [a["type"] for a in result["artifacts"]] == ["matrix", "analysis", "brief"]
+    # AC5: the SSE ledger from the real orchestrator path.
+    collected = [ev.event_type async for ev in publisher.subscribe(task_id)]
+    assert collected == [
+        "task.started",
+        "task.delegation_started",
+        "task.delegation_completed",
+        "task.delegation_started",
+        "task.delegation_completed",
+        "task.delegation_started",
+        "task.delegation_completed",
+        "task.completed",
+    ]
 
 
 def test_demo_flow_artifacts_have_ru_content():
