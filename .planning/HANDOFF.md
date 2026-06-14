@@ -64,7 +64,7 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
      --jwt <fresh-login-token> --cell-id <cell> --runs 3 --output .tmp/golden/
    ```
    Core-тезис (PromptedOutput-парсинг + генерализация Координатора) **уже live-validated** на GigaChat (см. Verification state); осталась только market-brief content-shape (AC9) + latency (AC8) на DeepSeek.
-3. **Merge PR** (verify-bar = CI + market-brief golden на DeepSeek). Founder-merge per ADR-027.
+3. **Merge [PR #44](https://github.com/mrflxxxme/oriion/pull/44)** (verify-bar = CI + market-brief golden на DeepSeek). Founder-merge per ADR-027.
 4. **Infra-PR (следующий):** AC-W1-16a (Dramatiq) + AC-W1-1 (Redis-SSE) + AC-W1-19 (native web_search) + observability/IaC-пины (3/4/5/9/10/11-15/21). **+ live-surfaced:** per-provider httpx-timeout (GigaChat медленный на long-gen — 30s мало) + GigaChat RU-CA в образе (AC-W1-21).
 5. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + `/gsd:health --repair` + layout-bridge.
 
