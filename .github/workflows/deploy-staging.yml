@@ -57,6 +57,11 @@ jobs:
           echo '${{ secrets.YC_SA_JSON }}' | docker login \
             --username json_key --password-stdin cr.yandex
 
+      - name: Sync role-prompts into backend build context (AC-W1-20)
+        # backend/role_prompts/ is gitignored + build-populated from the canonical
+        # .planning/contracts/role-prompts/ — populate it before the image build.
+        run: sh scripts/sync_role_prompts.sh
+
       - name: Build + push backend image
         run: |
           IMG="cr.yandex/${{ vars.YC_CR_FOLDER }}/oriion-backend:${{ steps.tag.outputs.tag }}"

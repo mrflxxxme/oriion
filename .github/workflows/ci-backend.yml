@@ -10,12 +10,14 @@ on:
     paths:
       - 'backend/**'
       - 'scripts/**'
+      - '.planning/contracts/role-prompts/**'
       - '.github/workflows/ci-backend.yml'
   push:
     branches: [main]
     paths:
       - 'backend/**'
       - 'scripts/**'
+      - '.planning/contracts/role-prompts/**'
       - '.github/workflows/ci-backend.yml'
 
 concurrency:
@@ -80,6 +82,17 @@ jobs:
       - name: Sync dependencies
         working-directory: backend
         run: uv sync --frozen 2>/dev/null || uv sync
+
+      - name: Role-prompts single-source (AC-W1-20) — drift check
+        run: |
+          # The packaged copy must NOT be committed — it is build-populated.
+          if [ -n "$(git ls-files backend/role_prompts)" ]; then
+            echo "::error::backend/role_prompts/ is committed; it must be gitignored + synced from .planning/contracts/role-prompts/ (scripts/sync_role_prompts.sh)"
+            exit 1
+          fi
+          sh scripts/sync_role_prompts.sh
+          # The synced copy must match canonical exactly (loader + prod image rely on it).
+          diff -rq .planning/contracts/role-prompts backend/role_prompts
 
       - name: Enable pgvector + pg_trgm + unaccent extensions
         env:

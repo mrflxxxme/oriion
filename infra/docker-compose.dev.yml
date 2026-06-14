@@ -80,11 +80,16 @@ services:
       MINIO_ACCESS_KEY: oriion
       MINIO_SECRET_KEY: oriion-dev-s3
       PYTHONUNBUFFERED: "1"
+      # AC-W1-20: read role-prompts from the canonical mount below (the loader's
+      # in-container parents-walk can't reach .planning under ../backend:/app).
+      ROLE_PROMPTS_DIR: /app/role_prompts
     ports:
       - "8000:8000"
     volumes:
       - ../backend:/app
       - backend_venv:/app/.venv
+      # Canonical role-prompts, read-only — single source, no committed copy.
+      - ../.planning/contracts/role-prompts:/app/role_prompts:ro
     command:
       - sh
       - -c
