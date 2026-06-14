@@ -194,6 +194,37 @@ async def test_llm_gateway_model_injects_prompted_output_schema(fake_router):
     assert any("JSON" in blob for blob in system_blobs)
 
 
+async def test_llm_gateway_model_merges_system_messages(fake_router):
+    """ADR-032: a base system prompt + the PromptedOutput schema directive are
+    merged into ONE system message (a live GigaChat run 422'd on two system roles)."""
+    from pydantic import BaseModel
+    from pydantic_ai import Agent, PromptedOutput
+
+    class _Plan(BaseModel):
+        summary: str
+
+    fake_router.acomplete = AsyncMock(
+        return_value=(
+            LLMResponse(
+                content='```json\n{"summary": "ok"}\n```',
+                finish_reason="stop",
+                usage=LLMUsage(tokens_input=5, tokens_output=5),
+            ),
+            "deepseek-chat",
+            "deepseek",
+        )
+    )
+    model = LLMGatewayModel(role_key="coordinator", llm_router=fake_router)
+    agent = Agent(model=model, output_type=PromptedOutput(_Plan), system_prompt="Ты Координатор.")
+    await agent.run("Plan it.")
+
+    sent = fake_router.acomplete.await_args.kwargs["messages"]
+    system_msgs = [m for m in sent if m["role"] == "system"]
+    assert len(system_msgs) == 1, f"expected ONE merged system message, got {len(system_msgs)}"
+    assert "Ты Координатор." in system_msgs[0]["content"]
+    assert "JSON" in system_msgs[0]["content"]
+
+
 @pytest.mark.parametrize(
     ("role", "expected"),
     [("writer", 8192), ("coordinator", 2048), ("researcher", 4096), ("unknown-role", 4096)],

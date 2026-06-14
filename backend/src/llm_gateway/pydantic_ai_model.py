@@ -165,28 +165,42 @@ def _messages_to_openai_shape(
     Text-style parts only: the productivity-core flow uses plan-then-execute via
     ``PromptedOutput`` (no native tool-calls; AC-W1-19 native web_search is a later
     pin). ``prompted_instructions`` (from ``ModelRequestParameters.prompted_output_instructions``)
-    carries the PromptedOutput JSON-schema directive; when present it is prepended as
-    a system message so the provider emits schema-conformant JSON.
+    carries the PromptedOutput JSON-schema directive.
+
+    **All system content is merged into a SINGLE system message** (role prompt
+    first, then the schema directive). PromptedOutput would otherwise add a second
+    system message, and some providers in the failover chain reject multiple system
+    roles — a live GigaChat run returned 422 on the two-system-message Coordinator
+    request (ADR-032 multi-system fallback). DeepSeek accepts either, so merging is
+    strictly safer across DeepSeek / YandexGPT / GigaChat.
     """
-    openai_messages: list[dict[str, str]] = []
-    if prompted_instructions:
-        openai_messages.append({"role": "system", "content": prompted_instructions})
+    system_parts: list[str] = []
+    rest: list[dict[str, str]] = []
     for msg in messages:
         if isinstance(msg, ModelRequest):
             for req_part in msg.parts:
                 if isinstance(req_part, SystemPromptPart):
-                    openai_messages.append({"role": "system", "content": req_part.content})
+                    system_parts.append(req_part.content)
                 elif isinstance(req_part, UserPromptPart):
                     content = (
                         req_part.content
                         if isinstance(req_part.content, str)
                         else str(req_part.content)
                     )
-                    openai_messages.append({"role": "user", "content": content})
+                    rest.append({"role": "user", "content": content})
         elif isinstance(msg, ModelResponse):
             for resp_part in msg.parts:
                 if isinstance(resp_part, TextPart):
-                    openai_messages.append({"role": "assistant", "content": resp_part.content})
+                    rest.append({"role": "assistant", "content": resp_part.content})
+
+    # Schema directive goes after the role/system context.
+    if prompted_instructions:
+        system_parts.append(prompted_instructions)
+
+    openai_messages: list[dict[str, str]] = []
+    if system_parts:
+        openai_messages.append({"role": "system", "content": "\n\n".join(system_parts)})
+    openai_messages.extend(rest)
     return openai_messages
 
 
