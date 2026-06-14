@@ -112,9 +112,7 @@ class LLMGatewayModel(Model):
         — no function-calling required (works across DeepSeek/Yandex/GigaChat).
         Leaf agents (``output_type=str``) yield ``None`` here → unchanged path.
         """
-        _, model_request_parameters = self.prepare_request(
-            model_settings, model_request_parameters
-        )
+        _, model_request_parameters = self.prepare_request(model_settings, model_request_parameters)
         openai_messages = _messages_to_openai_shape(
             messages,
             prompted_instructions=model_request_parameters.prompted_output_instructions,
