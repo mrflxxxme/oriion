@@ -46,12 +46,16 @@ describe("TaskSubmitPage", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
-  it("preset chip fills the textarea with the proven prompt", async () => {
+  it("preset chip fills the textarea with the full deliverable contract", async () => {
     const user = userEvent.setup();
     mount();
     await user.click(await screen.findByRole("button", { name: "Маркет-бриф" }));
     const textarea = screen.getByLabelText("Опишите задачу");
-    expect((textarea as HTMLTextAreaElement).value).toContain("market brief");
+    const value = (textarea as HTMLTextAreaElement).value;
+    // The preset carries the AC9 contract client-side (backend is prompt-agnostic).
+    expect(value).toContain("market brief");
+    expect(value).toContain("1500");
+    expect(value).toContain("10 постов");
   });
 
   it("shows a validation error when submitting empty", async () => {

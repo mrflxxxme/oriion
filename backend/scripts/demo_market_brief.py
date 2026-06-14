@@ -62,8 +62,13 @@ from typing import Any
 import httpx
 
 DEMO_PROMPT = (
-    "Запускаем платформу AI-команд для SMB в РФ. "
-    "Сделай нам market brief + контент-план первого месяца."
+    "Запускаем платформу AI-команд для SMB в РФ. Подготовь маркетинговый пакет: "
+    "(1) market brief на русском ≥1500 слов (контекст рынка, ICP, конкуренты, "
+    "позиционирование, риски, next steps); "
+    "(2) конкурентную матрицу ≥5 строк × ≥4 колонки с заголовком "
+    "«| Игрок | Сегмент | Сильная сторона | Слабая сторона |»; "
+    "(3) контент-план ровно на 10 постов (Telegram + vc.ru), каждый пост — "
+    "заголовком «### Пост N — <канал> — <день>»."
 )
 DEMO_TITLE = "Market & content brief (Wave-0 demo)"
 
@@ -75,9 +80,9 @@ AC9_MATRIX_MIN_ROWS = 5
 AC9_MATRIX_MIN_COLS = 4
 AC9_CONTENT_PLAN_POSTS = 10
 
-# Artifact-type keys emitted by the Wave-0 ScriptedCoordinator
-# (src/runtime/dispatch.py::_ARTIFACT_KIND). The writer's "brief" artifact
-# carries BOTH the market brief and the 10-post content plan.
+# Artifact-type keys the Coordinator names in its plan (AC-W1-24: artifact_type
+# travels in the delegation_plan, no longer a code-side map). The writer's "brief"
+# artifact carries BOTH the market brief and the 10-post content plan.
 ARTIFACT_MATRIX = "matrix"
 ARTIFACT_BRIEF = "brief"
 

@@ -14,9 +14,17 @@ import { t } from "@/lib/i18n";
 import { taskSubmitSchema, type TaskSubmitValues, PROMPT_MAX_LENGTH } from "./schemas";
 import { useCreateAndRunTask } from "./hooks";
 
-/** Proven Wave-0 prompt the preset chip fills in. */
+/**
+ * Proven Wave-0 demo prompt the preset chip fills in. It carries the full
+ * deliverable contract (≥1500-word brief, ≥5×4 matrix, exactly 10 posts) because
+ * the backend Coordinator is now prompt-agnostic — the market-brief framing lives
+ * here, in the demo preset, not in server code (AC-W1-24).
+ */
 const PRESET_PROMPT =
-  "Запускаем платформу AI-команд для SMB в РФ. Сделай нам market brief + контент-план первого месяца.";
+  "Запускаем платформу AI-команд для SMB в РФ. Подготовь маркетинговый пакет: " +
+  "(1) market brief на русском ≥1500 слов (контекст рынка, ICP, конкуренты, позиционирование, риски, next steps); " +
+  "(2) конкурентную матрицу ≥5 строк × ≥4 колонки с заголовком «| Игрок | Сегмент | Сильная сторона | Слабая сторона |»; " +
+  "(3) контент-план ровно на 10 постов (Telegram + vc.ru), каждый пост — заголовком «### Пост N — <канал> — <день>».";
 
 const ROLE_KEYS = [
   "tasks.submit.roleResearcher",
