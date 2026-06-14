@@ -47,6 +47,15 @@ AC (фиксируется здесь, не «тихо»).
 - Native tool-calling возвращается точечно для leaf web_search (AC-W1-19), не для
   Координатора.
 
+## Validated live (2026-06-15, локальный `oriion_live` стек)
+
+Прогон на живом стеке (DeepSeek **402** out-of-balance + YandexGPT **401** expired-IAM → failover на GigaChat):
+
+- ✅ **PromptedOutput на реальном провайдере:** GigaChat вернул schema-conformant JSON → распарсился в `CoordinatorOutput`. Центральный риск (fenced-JSON discipline на реальном LLM) — снят на GigaChat.
+- ✅ **Генерализация (AC-W1-24):** разные промпты → разные планы: тривиальный + «сравни 3 CRM» → **direct-action** (пустой план, ответ в `summary`); «перепиши лендинг» → **writer-only** план с `artifact_type="copywriting"` (НЕ `brief` — тип из плана, не из slug).
+- ✅ **Multi-system fallback подтверждён live:** двух-system-message запрос Координатора (PromptedOutput) GigaChat отверг **422**; после merge в один system-message — **200**. Зафиксировано в `_messages_to_openai_shape` + unit-тест (fix-commit).
+- ⚠️ **Market-brief AC8/9/10 НЕ подтверждён:** GigaChat ReadTimeout'ит на ≥1500-словном writer (30s per-call provider timeout) и не уложится в AC8 latency. Закрытие требует **funded DeepSeek** (быстрый primary) — founder billing action.
+
 ## Links
 
 - [ADR-002](./ADR-002-llm-gateway.md) — LLM gateway + failover (почему plain-text важен)

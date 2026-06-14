@@ -10,7 +10,7 @@
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A code-complete** (9 атомарных коммитов C1–C9 off `d86b3ba`). CI-deterministic green; **live golden pending founder** (нет BYOK-`.env` в worktree).
+- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A code-complete** (C1–C9 + live-fix off `d86b3ba`). CI-deterministic green; **core live-validated на GigaChat** (PromptedOutput + генерализация); market-brief AC8/9/10 pending **funded DeepSeek** (текущий ключ 402 out-of-balance).
 - **Phase 01.1 Track A scope:** AC-W1-16b ✅, AC-W1-24 ✅, AC-W1-25 ✅, AC-W1-20 ✅, AC-W1-22 ✅, AC-W1-23a ✅. **AC-W1-16 PARTIAL** — 16b (реальный Координатор) done; **16a (Dramatiq 202<1s) + AC-W1-1 (Redis-SSE) → infra-PR.**
 - **Phase 00.8 (design restyling):** code-complete, e2e:live pending staging (independent, не блокирует 01.1).
 
@@ -47,24 +47,26 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
 
 ## Verification state
 
-- **CI-deterministic (green, без ключей):** backend `ruff` + `ruff format --check` ✓; `mypy --strict` (145 files) ✓; `pytest` **567 passed, 23 deselected (@live), cov 87.9%** ✓; role-prompt drift-check (`diff -rq` canonical vs synced) ✓; frontend `TaskSubmitPage` 5/5 + prettier + eslint ✓.
-- **gsd-verifier (GSD L1) — GOAL ACHIEVED:** все 6 in-scope AC verified. Минорные не-блокеры (учтены): canned writer-fixture рендерит контент-план нумерованным списком, а не `### Пост N`-заголовком (CI self-consistent; **реальную форму проверяет только live**).
-- **Pending — live golden (founder-action, нет `.env`):** real DeepSeek/Yandex BYOK на локальном docker.
+- **CI-deterministic (green):** backend `ruff` + `ruff format --check` ✓; `mypy --strict` (145 files) ✓; `pytest` **568 passed, 23 deselected (@live), cov 87.9%** ✓; role-prompt drift-check ✓; frontend `TaskSubmitPage` 5/5 + prettier + eslint ✓.
+- **gsd-verifier (GSD L1) — GOAL ACHIEVED:** все 6 in-scope AC verified.
+- **Live-валидация (2026-06-15, локальный `oriion_live` стек):** ключи `.env` из `great-engelbart` worktree. DeepSeek **402** (out-of-balance), YandexGPT **401** (IAM-токен 2026-05-25 истёк) → failover на **GigaChat**.
+  - ✅ **PromptedOutput на реальном LLM:** GigaChat вернул schema-conformant JSON → распарсилось в `CoordinatorOutput`. Центральный риск verifier'а (fenced-JSON на реальном провайдере) — снят.
+  - ✅ **Генерализация (AC-W1-24):** тривиальный + «сравни 3 CRM» → **direct-action** (пустой план); «перепиши лендинг» → **writer-only** план, `artifact_type="copywriting"` (НЕ `brief`).
+  - ✅ **Fix surfaced live → commit `193a1fc`:** GigaChat 422 на двух system-message (PromptedOutput добавляет 2-й) → `_messages_to_openai_shape` мёржит в один → **200** ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md) §Validated live).
+  - ⚠️ **Market-brief AC8/9/10 НЕ закрыт:** GigaChat ReadTimeout'ит на ≥1500-словном writer (30s per-call provider timeout) + не уложится в AC8 latency. **Нужен funded DeepSeek** (быстрый primary).
 
 ## Next actions
 
-1. **Founder: провизионить `backend/.env`** (DeepSeek + YandexGPT/GigaChat ключи, как в Phase 00.6 PR-A — gitignored, per-worktree).
-2. **Live golden-прогон** из repo root:
+1. **Founder: пополнить DeepSeek-баланс** (сейчас 402 out-of-balance) и/или обновить YandexGPT IAM-токен (`yc iam create-token` → `YANDEX_IAM_TOKEN` в `backend/.env`; текущий от 2026-05-25 истёк). Ключи аутентифицируются, но DeepSeek без денег + Yandex IAM протух → live шёл через GigaChat.
+2. **Закрыть market-brief AC8/9/10 на funded DeepSeek** (быстрый primary — без GigaChat ReadTimeout'ов):
    ```sh
-   sh scripts/sync_role_prompts.sh
-   docker compose -f infra/docker-compose.staging.yml -f infra/docker-compose.staging-local.override.yml --env-file backend/.env up -d --build
-   python -m scripts.demo_market_brief --api-base-url http://localhost:8000/api/v1 --jwt $DEMO_JWT --cell-id $DEMO_CELL_ID --runs 3 --output .tmp/golden/
+   uv run python -m scripts.demo_market_brief --api-base-url http://localhost:8001/api/v1 \
+     --jwt <fresh-login-token> --cell-id <cell> --runs 3 --output .tmp/golden/
    ```
-   Assert: `delegation_plan` от реального Координатора (3 шага); AC9 (brief ≥1500 слов, матрица ≥5×4, 10 постов `### Пост N — <канал> — <день>`); AC10 (≤0.30 USD/run); AC8 (cohort p95 ≤120s); SSE-леджер `started → 3×(deleg) → completed`.
-3. **★ Главная live-проверка (gsd-verifier):** прогнать **non-market-brief** промпт через frontend (напр. «Перепиши лендинг и сделай 3 A/B-варианта заголовка») → fenced-JSON план парсится в `CoordinatorOutput`, `artifact_type` осмыслен под intent (напр. `landing-copy`, не `brief`), прозы вокруг JSON нет (парсер строгий). Заодно глазами: writer реально эмитит `### Пост N`-заголовки.
-4. **Merge PR** (verify-bar = CI + live golden, per founder grill-decision).
-5. **Infra-PR (следующий):** AC-W1-16a (Dramatiq actor) + AC-W1-1 (Redis-pubsub SSE) + AC-W1-19 (native web_search tool) + observability/IaC-пины (3/4/5/9/10/11-15/21).
-6. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + `/gsd:health --repair` + layout-bridge.
+   Core-тезис (PromptedOutput-парсинг + генерализация Координатора) **уже live-validated** на GigaChat (см. Verification state); осталась только market-brief content-shape (AC9) + latency (AC8) на DeepSeek.
+3. **Merge PR** (verify-bar = CI + market-brief golden на DeepSeek). Founder-merge per ADR-027.
+4. **Infra-PR (следующий):** AC-W1-16a (Dramatiq) + AC-W1-1 (Redis-SSE) + AC-W1-19 (native web_search) + observability/IaC-пины (3/4/5/9/10/11-15/21). **+ live-surfaced:** per-provider httpx-timeout (GigaChat медленный на long-gen — 30s мало) + GigaChat RU-CA в образе (AC-W1-21).
+5. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + `/gsd:health --repair` + layout-bridge.
 
 ## Exit ritual (this session)
 
@@ -72,6 +74,7 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
 - [x] JOURNAL.md — 2026-06-15 goofy-darwin entry
 - [x] STATUS.md — Wave 1 in-progress + 01.1 Track A active-phase
 - [x] HANDOFF.md rewritten (this file)
-- [x] CI-deterministic green + gsd-verifier GOAL ACHIEVED
-- [ ] live golden + non-brief submit (founder, нужен `.env`)
-- [ ] PR merge
+- [x] CI-deterministic green (568) + gsd-verifier GOAL ACHIEVED
+- [x] Live-валидация: PromptedOutput + генерализация на GigaChat ✓; multi-system merge-fix (commit `193a1fc`)
+- [ ] market-brief AC8/9/10 на funded DeepSeek (founder billing action)
+- [ ] PR merge (founder, per ADR-027)
