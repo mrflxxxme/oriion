@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -115,10 +115,9 @@ def app(
     a.include_router(tasks_router, prefix="/api/v1")
     a.include_router(stream_router, prefix="/api/v1")
 
-    # The run_task endpoint reads request.app.state.llm_router (via
-    # llm_gateway.deps.get_llm_router). dispatch_task is patched in the
-    # run tests, so a sentinel object is enough to satisfy the lookup.
-    a.state.llm_router = object()
+    # run_task now enqueues a Dramatiq actor (dispatch_task_actor.send) and
+    # returns 202 — no app.state/llm_router lookup. The run tests patch the
+    # actor so nothing is really enqueued.
 
     @a.exception_handler(TasksError)
     async def _tasks_error_handler(_request: Request, exc: TasksError) -> JSONResponse:
@@ -191,31 +190,28 @@ def test_stream_endpoint_mounted_in_app(app: FastAPI) -> None:
     assert "/api/v1/cells/{cell_id}/tasks/{task_id}/stream" in routes
 
 
-# ── POST /run — inline orchestrator-dispatch (Phase 00.6 PR-B C1) ──────────
+# ── POST /run — async Dramatiq dispatch (AC-W1-16a, ADR-034) ───────────────
 
 
 def test_run_endpoint_mounted_in_app(app: FastAPI) -> None:
-    """Route-registration check for the new dispatch endpoint."""
+    """Route-registration check for the dispatch endpoint."""
     routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
     assert "/api/v1/cells/{cell_id}/tasks/{task_id}/run" in routes
 
 
-def test_run_task_dispatches_queued_task_returns_202(
-    app: FastAPI, fake_service: _FakeTaskService, fake_db: _FakeDbSession
+def test_run_task_enqueues_queued_task_returns_202(
+    app: FastAPI, fake_user: _FakeUser, fake_service: _FakeTaskService, fake_db: _FakeDbSession
 ) -> None:
-    """A queued task → dispatch_task invoked → 202 + result echoed.
-
-    dispatch_task is patched so no real LLM/orchestrator runs; we assert the
-    endpoint wiring (queued-gate pass, dispatch call, commit, response shape).
-    """
+    """A queued task → dispatched_at stamped + committed + actor enqueued → 202
+    with status 'dispatched' and NO inline result (the result now arrives via
+    the task.completed SSE frame). dispatch_task_actor is patched so nothing is
+    really sent to a broker."""
     queued = _build_fake_task(uuid4(), uuid4(), uuid4())
     queued.status = "queued"
+    queued.dispatched_at = None
     fake_service.next_task = queued
 
-    with patch(
-        "src.tasks.routers.tasks.dispatch_task",
-        new=AsyncMock(return_value={"summary": "ok", "total_cost_credits": "1.0"}),
-    ) as mock_dispatch:
+    with patch("src.tasks.routers.tasks.dispatch_task_actor") as mock_actor:
         client = TestClient(app)
         cell_id, task_id = uuid4(), uuid4()
         r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
@@ -223,68 +219,47 @@ def test_run_task_dispatches_queued_task_returns_202(
     assert r.status_code == 202
     body = r.json()
     assert body["task_id"] == str(task_id)
-    assert body["result"] == {"summary": "ok", "total_cost_credits": "1.0"}
-    mock_dispatch.assert_awaited_once()
-    assert fake_db.commits == 1
+    assert body["status"] == "dispatched"
+    assert "result" not in body  # contract change: result comes via /stream
+    assert queued.dispatched_at is not None  # marker stamped
+    assert fake_db.commits == 1  # commit-then-enqueue
+    mock_actor.send.assert_called_once_with(str(task_id), str(fake_user.id))
 
 
-def test_run_task_non_queued_returns_409(app: FastAPI, fake_service: _FakeTaskService) -> None:
-    """A task already running/succeeded must NOT be re-dispatched → 409."""
+def test_run_task_non_queued_returns_409_without_enqueue(
+    app: FastAPI, fake_service: _FakeTaskService, fake_db: _FakeDbSession
+) -> None:
+    """A task already running/succeeded must NOT be re-dispatched → 409, and
+    nothing is enqueued or committed."""
     running = _build_fake_task(uuid4(), uuid4(), uuid4())
     running.status = "running"
     fake_service.next_task = running
 
-    with patch(
-        "src.tasks.routers.tasks.dispatch_task",
-        new=AsyncMock(),
-    ) as mock_dispatch:
+    with patch("src.tasks.routers.tasks.dispatch_task_actor") as mock_actor:
         client = TestClient(app)
         cell_id, task_id = uuid4(), uuid4()
         r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
 
     assert r.status_code == 409
     assert r.json()["code"] == "tasks.not_dispatchable"
-    mock_dispatch.assert_not_awaited()
+    mock_actor.send.assert_not_called()
+    assert fake_db.commits == 0
 
 
-def test_run_task_unknown_id_returns_404(app: FastAPI, fake_service: _FakeTaskService) -> None:
-    """F-TR-2 fix: an unknown task_id → get_task raises TaskNotFound → 404."""
+def test_run_task_unknown_id_returns_404_without_enqueue(
+    app: FastAPI, fake_service: _FakeTaskService
+) -> None:
+    """F-TR-2: an unknown task_id → get_task raises TaskNotFound → 404, no enqueue."""
 
     async def _raise_not_found(_task_id: Any) -> Task:
         raise TaskNotFound("nope")
 
     fake_service.get_task = _raise_not_found  # type: ignore[method-assign]
-    with patch("src.tasks.routers.tasks.dispatch_task", new=AsyncMock()) as mock_dispatch:
+    with patch("src.tasks.routers.tasks.dispatch_task_actor") as mock_actor:
         client = TestClient(app)
         cell_id, task_id = uuid4(), uuid4()
         r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
 
     assert r.status_code == 404
     assert r.json()["code"] == "tasks.not_found"
-    mock_dispatch.assert_not_awaited()
-
-
-def test_run_task_dispatch_failure_commits_then_propagates(
-    app: FastAPI, fake_service: _FakeTaskService, fake_db: _FakeDbSession
-) -> None:
-    """F-CR-2 fix: when dispatch_task raises, the endpoint commits the
-    orchestrator's failed-state write BEFORE re-raising (so the 'failed' row
-    survives get_db's rollback-on-exception) and the error still propagates."""
-    queued = _build_fake_task(uuid4(), uuid4(), uuid4())
-    queued.status = "queued"
-    fake_service.next_task = queued
-
-    boom = RuntimeError("provider melted mid-dispatch")
-    with patch(
-        "src.tasks.routers.tasks.dispatch_task",
-        new=AsyncMock(side_effect=boom),
-    ) as mock_dispatch:
-        client = TestClient(app, raise_server_exceptions=False)
-        cell_id, task_id = uuid4(), uuid4()
-        r = client.post(f"/api/v1/cells/{cell_id}/tasks/{task_id}/run")
-
-    # The exception propagated (no RFC-7807 handler for bare RuntimeError → 500).
-    assert r.status_code == 500
-    mock_dispatch.assert_awaited_once()
-    # Crucially: the failed-state write was committed before the re-raise.
-    assert fake_db.commits == 1
+    mock_actor.send.assert_not_called()
