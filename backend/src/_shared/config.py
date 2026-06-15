@@ -46,6 +46,26 @@ class Settings(BaseSettings):
         default="redis://localhost:6379/0",
         description="Redis DSN. Used for rate-limit + JWT blacklist + (future) event streams.",
     )
+    sse_backend: Literal["inprocess", "redis"] = Field(
+        default="inprocess",
+        description=(
+            "SSE publisher backing store. 'inprocess' (default) keeps the Wave-0 "
+            "asyncio.Queue publisher — required for deterministic CI + single-worker "
+            "dev. 'redis' selects the Redis-Streams publisher so events survive a "
+            "multi-worker / out-of-process Dramatiq dispatch (AC-W1-1 / AC-W1-16a); "
+            "docker + staging set SSE_BACKEND=redis on both the web and worker "
+            "services so they share per-task streams."
+        ),
+    )
+    sse_redis_poll_fallback: bool = Field(
+        default=False,
+        description=(
+            "When True, RedisSSEPublisher.subscribe uses non-blocking XREAD + "
+            "asyncio.sleep polling instead of XREAD BLOCK. Needed where the Redis "
+            "implementation lacks BLOCK support (e.g. fakeredis in tests); "
+            "production uses real BLOCK for low latency."
+        ),
+    )
 
     # ── JWT (Phase 00.2) ────────────────────────────────────────────────
     jwt_secret_access_v1: SecretStr = Field(
@@ -156,6 +176,24 @@ class Settings(BaseSettings):
         description=(
             "Sber GigaChat Basic auth key (base64-encoded `client_id:client_secret`). "
             "Used by GigaChatProvider to obtain OAuth tokens on demand."
+        ),
+    )
+    gigachat_verify_ssl: bool = Field(
+        default=True,
+        description=(
+            "TLS verification for GigaChat's httpx clients. Keep True in all real "
+            "environments. False is a dev-only escape hatch for hosts missing the "
+            "Russian Trusted Root CA (AC-W1-21) — prefer GIGACHAT_CA_BUNDLE instead."
+        ),
+    )
+    gigachat_ca_bundle: str = Field(
+        default="",
+        description=(
+            "Path to a CA bundle that includes the Russian Trusted Root CA, which "
+            "signs *.sberbank.ru. httpx/certifi does NOT read the system store, so "
+            "the prod image sets this to /etc/ssl/certs/ca-certificates.crt (where "
+            "the Dockerfile installs the RU CA via update-ca-certificates). Empty = "
+            "fall back to gigachat_verify_ssl (certifi default bundle). AC-W1-21."
         ),
     )
     llm_provider_timeout_seconds: float = Field(
