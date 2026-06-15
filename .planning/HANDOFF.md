@@ -58,7 +58,7 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
 ## Next actions
 
 1. **✅ DONE — DeepSeek funded + wired.** New funded key `sk-69fe…358ab` (USD $6.93, `is_available:true`) in `backend/.env`; live-verified HTTP 200 for `deepseek-chat`/`reasoner`/`v4-flash`. Market-brief golden re-run on it (below).
-2. **⚠️ Yandex still blocked (founder action).** Balance fixed by founder, but the `.env` IAM token is **time-expired** (2026-05-26) AND the local `yc` CLI's own OAuth is expired → cannot mint a replacement non-interactively. **Unblock:** run `yc init` (browser re-auth) on the dev box, then `yc iam create-token --impersonate-service-account-id ajen5nokvbqalrt97tbd` → paste into `YANDEX_IAM_TOKEN`. Failover-only — does **not** block the DeepSeek-primary golden.
+2. **✅ RESOLVED — Yandex via Api-Key.** Founder выдал статический `YANDEX_API_KEY` (Api-Key схема, не протухает). Провайдер теперь гибридный: Api-Key (приоритет) → Bearer IAM (legacy/failover) → clear config error ([commit `57744ec`](https://github.com/mrflxxxme/oriion/pull/44)). Verified: live curl + gateway-smoke (`YandexGPTProvider.chat` from Settings) → HTTP 200 + контент. Failover-цепочка снова полноценная (DeepSeek primary + Yandex failover). Expired IAM-токен оставлен закомментированным fallback'ом — больше не блокер.
 3. **✅ Market-brief golden re-run (funded DeepSeek, `--runs 3`, 2026-06-15):** **AC9 ✅ 3/3** (brief 2067/1917/1954w; matrix 7×5/7×5/7×6; content-plan 10/10/10), **AC10 ✅ 3/3** ($0.026/run). **AC8 ❌** — cohort p95 **163s > 120s** (analyst ~45s + writer ~46s long-gen on v4-flash dominate). Two live-surfaced fixes committed: provider-timeout 30→120s + demo content-plan counter (H3-preferred). **AC8 decision pending founder** (faster model / pipeline-parallelism = infra-PR, OR accept latency latitude).
 4. **Merge [PR #44](https://github.com/mrflxxxme/oriion/pull/44):** verify-bar = CI ✅ (568) + golden AC9/AC10 ✅; **AC8 latency is the remaining founder call** per ADR-027.
 4. **Infra-PR (следующий):** AC-W1-16a (Dramatiq) + AC-W1-1 (Redis-SSE) + AC-W1-19 (native web_search) + observability/IaC-пины (3/4/5/9/10/11-15/21). **+ live-surfaced:** per-provider httpx-timeout (GigaChat медленный на long-gen — 30s мало) + GigaChat RU-CA в образе (AC-W1-21).
@@ -75,6 +75,6 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
 - [x] market-brief golden on **funded DeepSeek** (`--runs 3`): **AC9 ✅ 3/3 + AC10 ✅ 3/3**; **AC8 ❌** (p95 163s)
 - [x] live-surfaced fixes committed: provider-timeout 30→120s (`config.py`+`main.py`) + demo content-plan counter H3-preferred
 - [x] CI-deterministic re-green with fixes: ruff/mypy(145)/pytest **568 passed**
-- [ ] **Yandex IAM** refresh (founder: `yc init` → mint token) — failover-only
+- [x] **Yandex auth** — switched to non-expiring **Api-Key** scheme (`YANDEX_API_KEY`), IAM kept as fallback; live + gateway-smoke 200 (commit `57744ec`)
 - [ ] **AC8 latency** decision (founder: faster model / pipeline-parallel = infra-PR, or accept latitude)
 - [ ] PR merge (founder, per ADR-027)
