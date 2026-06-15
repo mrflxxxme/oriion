@@ -19,7 +19,7 @@ import os
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Final, cast
+from typing import Final
 
 import structlog
 from fastapi import FastAPI, Request
@@ -37,19 +37,14 @@ from src.agents.routers.teams import router as teams_router
 from src.iam.exceptions import IamError, RateLimitExceeded
 from src.iam.routers.auth import router as auth_router
 from src.iam.routers.me import router as me_router
-from src.llm_gateway.circuit_breaker import ProviderCircuit
 from src.llm_gateway.exceptions import LLMGatewayException
-from src.llm_gateway.providers.base import LLMProvider
-from src.llm_gateway.providers.deepseek import DeepSeekProvider
-from src.llm_gateway.providers.gigachat import GigaChatProvider
-from src.llm_gateway.providers.yandex import YandexGPTProvider
+from src.llm_gateway.factory import build_llm_router
 from src.llm_gateway.routers.byok import router as byok_router
 from src.llm_gateway.routers.chat import router as chat_router
 from src.llm_gateway.routers.embeddings import router as embeddings_router
 from src.llm_gateway.routers.providers import router as providers_router
 from src.llm_gateway.routers.usage import router as usage_router
 from src.llm_gateway.services.kms_provider import KMSProvider, LocalAESKMS, YandexKMS
-from src.llm_gateway.services.router_service import LLMRouter
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
 from src.multitenancy.exceptions import MultitenancyError
 from src.multitenancy.routers.cells import router as cells_router
@@ -163,46 +158,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         master_key = _resolve_master_key_bytes(settings)
         kms_provider = LocalAESKMS(master_key=master_key)
 
-    # ── LLM providers ────────────────────────────────────────────────────
-    # Providers are constructed with whatever credentials Settings holds.
-    # An empty credential just means calls to that provider's HTTP API will
-    # fail at request-time — the lifespan boot stays green so routers like
-    # /api/v1/llm/providers (health probe) can still answer.
-    # The provider classes implement the LLMProvider Protocol structurally
-    # (they don't inherit from it). mypy --strict in dict-assignment context
-    # doesn't auto-narrow concrete -> Protocol, so cast() is the explicit
-    # acknowledgement that we've verified the shape matches at the Protocol
-    # boundary in tests/llm_gateway/test_provider_*_mock.py.
-    providers: dict[str, LLMProvider] = {}
-    provider_timeout = settings.llm_provider_timeout_seconds
-    providers["deepseek"] = cast(
-        LLMProvider,
-        DeepSeekProvider(
-            api_key=settings.deepseek_api_key.get_secret_value(),
-            timeout_seconds=provider_timeout,
-        ),
-    )
-    providers["yandexgpt"] = cast(
-        LLMProvider,
-        YandexGPTProvider(
-            catalog_id=settings.yandex_catalog_id,
-            # Api-Key scheme preferred (non-expiring); IAM Bearer is the
-            # legacy/failover credential. Empty IAM → None so the provider
-            # treats it as unset.
-            api_key=settings.yandex_api_key,
-            iam_token=settings.yandex_iam_token.get_secret_value() or None,
-            timeout_seconds=provider_timeout,
-        ),
-    )
-    providers["gigachat"] = cast(
-        LLMProvider,
-        GigaChatProvider(
-            auth_key=settings.gigachat_auth_key.get_secret_value(),
-            timeout_seconds=provider_timeout,
-        ),
-    )
-    circuits = {slug: ProviderCircuit(provider=slug) for slug in providers}
-    llm_router = LLMRouter(providers=providers, circuits=circuits)
+    # ── LLM providers + router ───────────────────────────────────────────
+    # Single source of truth shared with the Dramatiq dispatch worker
+    # (src.runtime.queue.worker) so the web and worker processes never drift
+    # in provider matrix / failover / timeout / TLS config (AC-W1-16a).
+    providers, circuits, llm_router = build_llm_router(settings)
 
     # Stash everything on app.state — llm_gateway.deps reads from here.
     app.state.settings = settings

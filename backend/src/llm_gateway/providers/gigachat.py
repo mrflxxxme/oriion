@@ -40,13 +40,17 @@ class GigaChatProvider:
         base_url: str = "https://gigachat.devices.sberbank.ru/api/v1",
         oauth_url: str = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
         timeout_seconds: float = 30.0,
-        verify_ssl: bool = True,
+        verify_ssl: bool | str = True,
     ) -> None:
         self._auth_key = auth_key
         self._scope = scope
         self._base_url = base_url.rstrip("/")
         self._oauth_url = oauth_url
         self._timeout = timeout_seconds
+        # bool → enable/disable verification; str → path to a CA bundle that
+        # carries the Russian Trusted Root CA (httpx accepts a path for
+        # `verify=`). httpx/certifi ignores the OS store, so the prod image
+        # points this at /etc/ssl/certs/ca-certificates.crt (AC-W1-21).
         self._verify_ssl = verify_ssl
         self._token: str | None = None
         # Epoch seconds — refresh ~60s before expiry.
