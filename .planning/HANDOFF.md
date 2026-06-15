@@ -4,13 +4,13 @@
 
 ## Last updated
 
-- Date: 2026-06-15 (Phase 01.1-retro **Track A — Coordinator generalization**: execute)
-- Session: `goofy-darwin-194c68`
+- Date: 2026-06-15 (Phase 01.1-retro **Track A** — funded-DeepSeek live validation + 2 live-surfaced fixes)
+- Session: `goofy-darwin-194c68` (continued)
 - Agent: @claude-opus
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A code-complete** (C1–C9 + live-fix off `d86b3ba`). CI-deterministic green; **core live-validated на GigaChat** (PromptedOutput + генерализация); market-brief AC8/9/10 pending **funded DeepSeek** (текущий ключ 402 out-of-balance).
+- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A code-complete** (C1–C9 + live-fixes). CI-deterministic green (568 passed); **core live-validated** (PromptedOutput + генерализация); **market-brief golden re-run on funded DeepSeek: AC9 ✅ 3/3 + AC10 ✅ 3/3; AC8 ❌ (cohort p95 163s > 120s — DeepSeek v4-flash long-gen latency, infra-PR perf item).**
 - **Phase 01.1 Track A scope:** AC-W1-16b ✅, AC-W1-24 ✅, AC-W1-25 ✅, AC-W1-20 ✅, AC-W1-22 ✅, AC-W1-23a ✅. **AC-W1-16 PARTIAL** — 16b (реальный Координатор) done; **16a (Dramatiq 202<1s) + AC-W1-1 (Redis-SSE) → infra-PR.**
 - **Phase 00.8 (design restyling):** code-complete, e2e:live pending staging (independent, не блокирует 01.1).
 
@@ -57,14 +57,10 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
 
 ## Next actions
 
-1. **Founder: пополнить DeepSeek-баланс** (сейчас 402 out-of-balance) и/или обновить YandexGPT IAM-токен (`yc iam create-token` → `YANDEX_IAM_TOKEN` в `backend/.env`; текущий от 2026-05-25 истёк). Ключи аутентифицируются, но DeepSeek без денег + Yandex IAM протух → live шёл через GigaChat.
-2. **Закрыть market-brief AC8/9/10 на funded DeepSeek** (быстрый primary — без GigaChat ReadTimeout'ов):
-   ```sh
-   uv run python -m scripts.demo_market_brief --api-base-url http://localhost:8001/api/v1 \
-     --jwt <fresh-login-token> --cell-id <cell> --runs 3 --output .tmp/golden/
-   ```
-   Core-тезис (PromptedOutput-парсинг + генерализация Координатора) **уже live-validated** на GigaChat (см. Verification state); осталась только market-brief content-shape (AC9) + latency (AC8) на DeepSeek.
-3. **Merge [PR #44](https://github.com/mrflxxxme/oriion/pull/44)** (verify-bar = CI + market-brief golden на DeepSeek). Founder-merge per ADR-027.
+1. **✅ DONE — DeepSeek funded + wired.** New funded key `sk-69fe…358ab` (USD $6.93, `is_available:true`) in `backend/.env`; live-verified HTTP 200 for `deepseek-chat`/`reasoner`/`v4-flash`. Market-brief golden re-run on it (below).
+2. **⚠️ Yandex still blocked (founder action).** Balance fixed by founder, but the `.env` IAM token is **time-expired** (2026-05-26) AND the local `yc` CLI's own OAuth is expired → cannot mint a replacement non-interactively. **Unblock:** run `yc init` (browser re-auth) on the dev box, then `yc iam create-token --impersonate-service-account-id ajen5nokvbqalrt97tbd` → paste into `YANDEX_IAM_TOKEN`. Failover-only — does **not** block the DeepSeek-primary golden.
+3. **✅ Market-brief golden re-run (funded DeepSeek, `--runs 3`, 2026-06-15):** **AC9 ✅ 3/3** (brief 2067/1917/1954w; matrix 7×5/7×5/7×6; content-plan 10/10/10), **AC10 ✅ 3/3** ($0.026/run). **AC8 ❌** — cohort p95 **163s > 120s** (analyst ~45s + writer ~46s long-gen on v4-flash dominate). Two live-surfaced fixes committed: provider-timeout 30→120s + demo content-plan counter (H3-preferred). **AC8 decision pending founder** (faster model / pipeline-parallelism = infra-PR, OR accept latency latitude).
+4. **Merge [PR #44](https://github.com/mrflxxxme/oriion/pull/44):** verify-bar = CI ✅ (568) + golden AC9/AC10 ✅; **AC8 latency is the remaining founder call** per ADR-027.
 4. **Infra-PR (следующий):** AC-W1-16a (Dramatiq) + AC-W1-1 (Redis-SSE) + AC-W1-19 (native web_search) + observability/IaC-пины (3/4/5/9/10/11-15/21). **+ live-surfaced:** per-provider httpx-timeout (GigaChat медленный на long-gen — 30s мало) + GigaChat RU-CA в образе (AC-W1-21).
 5. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + `/gsd:health --repair` + layout-bridge.
 
@@ -76,5 +72,9 @@ Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-аг�
 - [x] HANDOFF.md rewritten (this file)
 - [x] CI-deterministic green (568) + gsd-verifier GOAL ACHIEVED
 - [x] Live-валидация: PromptedOutput + генерализация на GigaChat ✓; multi-system merge-fix (commit `193a1fc`)
-- [ ] market-brief AC8/9/10 на funded DeepSeek (founder billing action)
+- [x] market-brief golden on **funded DeepSeek** (`--runs 3`): **AC9 ✅ 3/3 + AC10 ✅ 3/3**; **AC8 ❌** (p95 163s)
+- [x] live-surfaced fixes committed: provider-timeout 30→120s (`config.py`+`main.py`) + demo content-plan counter H3-preferred
+- [x] CI-deterministic re-green with fixes: ruff/mypy(145)/pytest **568 passed**
+- [ ] **Yandex IAM** refresh (founder: `yc init` → mint token) — failover-only
+- [ ] **AC8 latency** decision (founder: faster model / pipeline-parallel = infra-PR, or accept latitude)
 - [ ] PR merge (founder, per ADR-027)

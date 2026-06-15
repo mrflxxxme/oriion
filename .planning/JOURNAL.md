@@ -1,5 +1,20 @@
 # Development Journal
 
+## 2026-06-15 · goofy-darwin-194c68 (continued) · @claude-opus (Track A — funded-DeepSeek live validation + 2 fixes)
+
+- Scope: актуализировать LLM-ключи и **закрыть market-brief golden на funded DeepSeek** (тот самый pending-блокер из предыдущей записи), дополнить PR #44.
+- Keys (live-verified):
+  * **DeepSeek ✅** — старый ключ `sk-feca…905` всё ещё **402** ($0.00). Founder выдал funded `sk-69fe…358ab` (USD **$6.93**, `is_available:true`) → прописан в `backend/.env`; live HTTP 200 для `deepseek-chat`/`reasoner`/`v4-flash` (все маппятся в `deepseek-v4-flash`).
+  * **YandexGPT ⚠️** — баланс founder починил, но `.env` IAM-токен **time-expired** (2026-05-26) И локальный `yc` CLI OAuth тоже протух → mint невозможен без `yc init` (browser). Failover-only, golden не блокирует.
+  * **GigaChat ✅** OAuth 200 (но RU-CA не в контейнерном certifi — последний failover).
+- **Live-валидация на полном стеке** (docker `teamly-dev` off goofy `.env`, backend :8001, alembic `upgrade heads`, register→login→`/tasks/{id}/run`): market-brief `--runs 3` на funded DeepSeek → **AC9 ✅ 3/3** (brief 2067/1917/1954w; matrix 7×5/7×5/7×6; content-plan **10/10/10**), **AC10 ✅ 3/3** ($0.026/run), **AC8 ❌** cohort p95 **163s > 120s** (analyst ~45s + writer ~46s long-gen на v4-flash доминируют).
+- **2 фикса, surfaced live (committed → PR #44):**
+  * `fix(llm-gateway)` — per-provider httpx timeout **30→120s** (config-driven `llm_provider_timeout_seconds`, wired в 3 провайдера). Корень 1-й попытки: writer >30s → `httpx.ReadTimeout` (пустой `str(exc)`) → ложный failover DeepSeek→Yandex(401)→GigaChat(SSL) → 500.
+  * `fix(demo)` — `_count_content_plan_posts`: H3-идиом приоритетен над numbered-bold fallback (раньше складывал оба по всему brief-артефакту → 10 постов + 15 numbered-bold prose = ложные 25 → AC9 fail).
+- Verification: CI-deterministic re-green с фиксами — `ruff`(src tests) ✓, `ruff format --check` ✓, `mypy --strict`(145) ✓, `pytest` **568 passed**.
+- Next: founder — (1) `yc init` → mint YANDEX_IAM_TOKEN (failover); (2) **AC8-решение** (faster model / pipeline-parallel = infra-PR, либо принять latency-latitude); (3) merge PR #44 (CI ✅ + golden AC9/AC10 ✅).
+- Refs: PR #44; commits `901da5f` (timeout) + `b817b73` (counter); `01.1-retro.md` AC8/AC-W1-21.
+
 ## 2026-06-15 · goofy-darwin-194c68 · @claude-opus (Phase 01.1-retro Track A — Coordinator generalization)
 
 - Scope: **Phase 01.1 Track A — генерализация Координатора** (связный срез «AI-команда становится универсальной»). 9 атомарных коммитов (C1–C9) off post-merge main `d86b3ba`. Реализует AC-W1-16b + 24 + 25 + 20 + 22 + 23a; AC-W1-16a/19/1 + observability-пины отложены в infra-PR (по плану).
