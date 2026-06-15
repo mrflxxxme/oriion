@@ -126,12 +126,21 @@ class Settings(BaseSettings):
             "YC Lockbox (Wave 1+) or .env (Wave 0 dev/staging). Empty in test."
         ),
     )
+    yandex_api_key: str | None = Field(
+        default=None,
+        description=(
+            "Yandex Cloud API key (Api-Key auth scheme). PREFERRED over the "
+            "IAM token: a static API key does not expire, whereas IAM tokens "
+            "have a ~12h TTL and need `yc iam create-token` rotation. When set, "
+            "YandexGPTProvider sends `Authorization: Api-Key <key>`."
+        ),
+    )
     yandex_iam_token: SecretStr = Field(
         default=SecretStr(""),
         description=(
-            "Yandex Cloud IAM token (Bearer) used by YandexGPTProvider. "
-            "Long-lived OAuth token Wave 0; auto-refresh via yc-iam-token "
-            "lands Wave 1+."
+            "Yandex Cloud IAM token (Bearer) — LEGACY / failover when "
+            "yandex_api_key is unset. ~12h TTL; rotate via `yc iam create-token`. "
+            "Prefer yandex_api_key (Api-Key scheme, non-expiring)."
         ),
     )
     yandex_catalog_id: str = Field(
@@ -147,6 +156,17 @@ class Settings(BaseSettings):
         description=(
             "Sber GigaChat Basic auth key (base64-encoded `client_id:client_secret`). "
             "Used by GigaChatProvider to obtain OAuth tokens on demand."
+        ),
+    )
+    llm_provider_timeout_seconds: float = Field(
+        default=120.0,
+        description=(
+            "Per-call httpx timeout (seconds) shared by all LLM providers "
+            "(DeepSeek / YandexGPT / GigaChat). Raised from the 30s provider "
+            "default because long-form writer generation (≥1500-word brief, "
+            "AC-W1-22) exceeds 30s and tripped a ReadTimeout that cascaded into "
+            "spurious failover. Aligned with AC8 cohort p95 ≤120s. Surfaced by "
+            "Phase 01.1 Track A live validation."
         ),
     )
 

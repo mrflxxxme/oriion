@@ -4,18 +4,19 @@ Phase 00.5b Commit 4 — keyed by ``(role_key, scenario_id="market_brief_demo")`
 Content is shape-correct for AC9 assertions (brief ≥1500w RU, competitive
 matrix ≥5×4 markdown table, content plan exactly 10 posts).
 
-Each role's bucket is a list. Element [0] is the role's first canned response
-in the demo flow (typically the only one for specialists; coordinator's
-list has 2 entries to cover decompose-then-synthesize).
+Each role's bucket is a list walked in order. Every role now has exactly ONE
+canned response: the specialists emit their artifact body; the Coordinator
+emits a single fenced-JSON ``CoordinatorOutput`` plan (AC-W1-16b plan-then-
+execute — it no longer decomposes-then-synthesizes across two calls).
 
-Refining content in Phase 00.5b Commit 7 is fine — the keying + Fail-loud
-contract is what Commit 4 nails down. Commit 7 demo-flow integration test
-asserts artifact shapes against these strings, so any refinement must keep
-the AC9 word-count / row-count invariants.
+Refining content is fine — the keying + Fail-loud contract is what matters.
+The demo-flow integration test asserts artifact shapes against these strings,
+so any refinement must keep the AC9 word-count / row-count invariants.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 from pydantic_ai.messages import ModelResponse, TextPart
@@ -316,54 +317,51 @@ _ANALYST_OUTPUT = """\
 
 
 # ── Coordinator canned output ────────────────────────────────────────────
-# Two-call shape: first call decomposes + delegates; second call synthesizes
-# after the three specialists return. Both keep the same role_key key.
-_COORDINATOR_DECOMPOSE = """\
-План декомпозиции:
-
-1. Researcher: собрать конкурентную матрицу + 3+ источника на тему российского
-   AI-инструментария для СМБ. Output: competitive-matrix.md ≥5×4.
-2. Writer: написать market brief ≥1500 слов на RU + content-plan.md из 10
-   постов с outline.
-3. Analyst: посчитать TAM/SAM/SOM с диапазонами + двумерная позиционная
-   сетка locality × team-readiness.
-
-Делегирую параллельно. Жду 3 результата + синтез.
-"""
-
-_COORDINATOR_SYNTHESIZE = """\
-# Финальный синтез: Market & content brief
-
-## Summary
-
-Российский SMB-рынок AI-инструментов открыт для team-first платформы с
-RU-locality, ФЗ-152 compliance и vertical-templates layer'ом. TEAMLY_RU
-заходит через dual-positioning: горизонтальный productivity-core preset
-+ 5 RU-вертикалей. Окно возможностей открыто в Q2-Q3 2026.
-
-## Delegation plan executed
-
-1. Researcher: competitive-matrix.md (5×4 + 3 источника) ✓
-2. Writer: brief.md (≥1500 слов) + content-plan.md (10 постов) ✓
-3. Analyst: positioning + TAM/SAM/SOM с диапазонами ✓
-
-## Citations
-
-* Statista 2025: Russia AI SMB market size & growth ($480M, CAGR 42%).
-* RBK 2026-Q1: Adoption rate survey (18% RU vs 34% global).
-* TAdviser 2026-04: Barrier analysis (price + integration + compliance).
-
-## Artifacts
-
-* brief.md — ≥1500 слов RU, 7 секций
-* competitive-matrix.md — 5×4 markdown table + источники
-* content-plan.md — 10 постов с outline
-
-## Confidence
-
-0.82 — высокая для Wave 0 horizontal preset; vertical sizing требует
-доп. валидации с founder-cohort до Wave 1.
-"""
+# AC-W1-16b plan-then-execute: ONE fenced-JSON CoordinatorOutput plan. The
+# Coordinator emits the whole delegation_plan in a single completion (no more
+# decompose-then-synthesize two-call shape); PlanExecutingCoordinator executes
+# it. artifact_type travels IN the plan (AC-W1-24), not a code-side slug map.
+_COORDINATOR_PLAN_OBJ = {
+    "summary": "Декомпозиция «Market & content brief»: research → analyst → writer.",
+    "delegation_plan": [
+        {
+            "step": 1,
+            "agent": "researcher",
+            "goal": (
+                "Собери конкурентную матрицу ≥5×4 (Игрок | Сегмент | Сильная сторона | "
+                "Слабая сторона) и 3 источника по рынку AI-инструментов для СМБ в РФ."
+            ),
+            "status": "planned",
+            "artifact_type": "matrix",
+        },
+        {
+            "step": 2,
+            "agent": "analyst",
+            "goal": (
+                "На основе исследования дай TAM/SAM/SOM с диапазонами и позиционную "
+                "сетку locality × team-readiness."
+            ),
+            "status": "planned",
+            "artifact_type": "analysis",
+            "depends_on": [1],
+        },
+        {
+            "step": 3,
+            "agent": "writer",
+            "goal": (
+                "Напиши market brief ≥1500 слов на русском и контент-план ровно на 10 "
+                "постов в формате '### Пост N — <канал> — <день>'."
+            ),
+            "status": "planned",
+            "artifact_type": "brief",
+            "depends_on": [2],
+        },
+    ],
+    "confidence": "high",
+}
+_COORDINATOR_PLAN = (
+    "```json\n" + json.dumps(_COORDINATOR_PLAN_OBJ, ensure_ascii=False, indent=2) + "\n```"
+)
 
 
 def _make_response(text: str, *, in_tokens: int = 150, out_tokens: int = 600) -> ModelResponse:
@@ -384,10 +382,7 @@ def _make_response(text: str, *, in_tokens: int = 150, out_tokens: int = 600) ->
 
 # Public registry: (role_key, scenario_id) → list of ModelResponse.
 RESPONSES: dict[tuple[str, str], list[ModelResponse]] = {
-    ("coordinator", SCENARIO_ID): [
-        _make_response(_COORDINATOR_DECOMPOSE, out_tokens=200),
-        _make_response(_COORDINATOR_SYNTHESIZE, out_tokens=400),
-    ],
+    ("coordinator", SCENARIO_ID): [_make_response(_COORDINATOR_PLAN, out_tokens=300)],
     ("researcher", SCENARIO_ID): [_make_response(_RESEARCHER_OUTPUT, out_tokens=550)],
     ("writer", SCENARIO_ID): [_make_response(_WRITER_BRIEF_AND_PLAN, out_tokens=2200)],
     ("analyst", SCENARIO_ID): [_make_response(_ANALYST_OUTPUT, out_tokens=480)],

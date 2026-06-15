@@ -19,6 +19,30 @@ def _make_provider(name: str) -> AsyncMock:
 
 
 @pytest.mark.asyncio
+async def test_acomplete_forwards_max_tokens_to_provider() -> None:
+    """AC-W1-23a: the per-role max_tokens reaches the provider's LLMRequest."""
+    provider = _make_provider("deepseek")
+    providers = {
+        "deepseek": provider,
+        "yandexgpt": _make_provider("yandexgpt"),
+        "gigachat": _make_provider("gigachat"),
+    }
+    circuits = {slug: ProviderCircuit(provider=slug) for slug in providers}
+    router = LLMRouter(providers=providers, circuits=circuits)
+
+    await router.acomplete(
+        workspace_id=uuid4(),
+        role_key="writer",
+        model_hint=None,
+        messages=[{"role": "user", "content": "x"}],
+        max_tokens=8192,
+    )
+
+    sent_request = provider.chat.await_args.args[0]
+    assert sent_request.max_tokens == 8192
+
+
+@pytest.mark.asyncio
 async def test_router_returns_primary_when_all_circuits_closed() -> None:
     providers = {
         "deepseek": _make_provider("deepseek"),
@@ -34,7 +58,7 @@ async def test_router_returns_primary_when_all_circuits_closed() -> None:
         model_hint=None,
     )
     assert provider.name == "deepseek"
-    assert model == "deepseek-reasoner"
+    assert model == "deepseek-chat"  # AC-W1-16b: coordinator on chat, not reasoner
 
 
 @pytest.mark.asyncio

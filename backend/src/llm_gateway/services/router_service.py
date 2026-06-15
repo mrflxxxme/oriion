@@ -26,11 +26,37 @@ logger = structlog.get_logger(__name__)
 
 # ── ROLE_TO_MODEL — per ADR-018 ───────────────────────────────────────────
 ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
-    "coordinator": ("deepseek", "deepseek-reasoner"),
+    # AC-W1-16b: Coordinator runs plan-then-execute via PromptedOutput (JSON).
+    # deepseek-reasoner (R1) does NOT support JSON/function-calling and emits
+    # reasoning prose in `content` (breaks the fenced-JSON parse) — so the
+    # Coordinator uses deepseek-chat, which reliably follows the fence directive
+    # and is cheaper/faster against the AC8/AC10 gates.
+    "coordinator": ("deepseek", "deepseek-chat"),
     "specialist": ("deepseek", "deepseek-chat"),
     "embedder": ("yandexgpt", "text-search-doc"),
     "default": ("deepseek", "deepseek-chat"),
 }
+
+# ── Per-role output budget (AC-W1-23a) ────────────────────────────────────
+# The global 8192 cap (LLMRequest default) was sized for the writer's market
+# brief (≥1500 words + 10-post plan ≈ 6-8k tokens). The Coordinator only emits
+# a delegation_plan JSON, and the researcher/analyst don't need 8192 — capping
+# per role trims cost/latency against the AC8/AC10 gates. coordinator=2048
+# leaves headroom for a multi-step arbitrary-prompt plan (AC-W1-24), not just
+# the 3-step demo. (Full per-role tuning incl. temperature is deferred AC-W1-23.)
+ROLE_TO_MAX_TOKENS: dict[str, int] = {
+    "coordinator": 2048,
+    "researcher": 4096,
+    "analyst": 4096,
+    "writer": 8192,
+    "default": 4096,
+}
+
+
+def resolve_max_tokens(role_key: str) -> int:
+    """Per-role output cap, falling back to the default budget."""
+    return ROLE_TO_MAX_TOKENS.get(role_key, ROLE_TO_MAX_TOKENS["default"])
+
 
 # ── Per-vertical failover order — first available wins ────────────────────
 # Order chosen per phase-spec AC7: DeepSeek → YandexGPT → GigaChat.
@@ -131,6 +157,7 @@ class LLMRouter:
         model_hint: str | None,
         messages: list[dict[str, str]],
         metadata: dict[str, str] | None = None,
+        max_tokens: int = 8192,
     ) -> tuple[LLMResponse, str, str]:
         """Run a completion, failing over across the chain on retryable errors.
 
@@ -148,7 +175,13 @@ class LLMRouter:
                 workspace_id=workspace_id, role_key=role_key, model_hint=model_hint
             )
             resp = await provider.chat(
-                LLMRequest(messages=messages, model=model, stream=False, metadata=metadata or {})
+                LLMRequest(
+                    messages=messages,
+                    model=model,
+                    stream=False,
+                    metadata=metadata or {},
+                    max_tokens=max_tokens,
+                )
             )
             return resp, model, provider.name
 
@@ -168,7 +201,11 @@ class LLMRouter:
             try:
                 resp = await candidate.chat(
                     LLMRequest(
-                        messages=messages, model=model, stream=False, metadata=metadata or {}
+                        messages=messages,
+                        model=model,
+                        stream=False,
+                        metadata=metadata or {},
+                        max_tokens=max_tokens,
                     )
                 )
                 circuit.record_success()

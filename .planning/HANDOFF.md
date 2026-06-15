@@ -4,15 +4,15 @@
 
 ## Last updated
 
-- Date: 2026-06-13 (Phase 00.8 — design restyling, professional cool-blue v0.2: execute)
-- Session: `upbeat-chaum-aed9b4`
+- Date: 2026-06-15 (Phase 01.1-retro **Track A** — funded-DeepSeek live validation + 2 live-surfaced fixes)
+- Session: `goofy-darwin-194c68` (continued)
 - Agent: @claude-opus
 
 ## Project status
 
-- **Wave:** Wave 0 (Foundation) — **closing**. Build-фазы 00.1–00.7 ✅. **Phase 00.8 (design restyling) — code-complete, e2e:live pending staging.** Остаётся founder staging 10× anchor run (gate D5 — независимый Track A).
-- **Phase 00.8 (design restyling)**: 🔄 **Code-complete** per [ADR-031 Accepted](./decisions/ADR-031-design-direction-restyling.md). AC1/AC2/AC5/AC6 ✓; AC3/AC4 pending live стек.
-- **Phase 01.1 retro**: ⏳ Pending — AC-W1-1..25.
+- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A code-complete** (C1–C9 + live-fixes). CI-deterministic green (568 passed); **core live-validated** (PromptedOutput + генерализация); **market-brief golden re-run on funded DeepSeek: AC9 ✅ 3/3 + AC10 ✅ 3/3; AC8 ❌ (cohort p95 163s > 120s — DeepSeek v4-flash long-gen latency, infra-PR perf item).**
+- **Phase 01.1 Track A scope:** AC-W1-16b ✅, AC-W1-24 ✅, AC-W1-25 ✅, AC-W1-20 ✅, AC-W1-22 ✅, AC-W1-23a ✅. **AC-W1-16 PARTIAL** — 16b (реальный Координатор) done; **16a (Dramatiq 202<1s) + AC-W1-1 (Redis-SSE) → infra-PR.**
+- **Phase 00.8 (design restyling):** code-complete, e2e:live pending staging (independent, не блокирует 01.1).
 
 ## Active blockers
 
@@ -21,51 +21,60 @@
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Wave 1) |
 
-## What just happened — Phase 00.8 execute (2026-06-13)
+## What just happened — Phase 01.1 Track A (2026-06-15)
 
-Полный цикл по выбранному founder процессу: **bake-off → ui-phase → grill → execute**.
+Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-агент → execute (C1–C9) → `gsd-verifier` (GSD L1) → exit ritual.
 
-### Решения (founder)
-- **Accent pivot:** тёплая рамка ADR-031 (терракота/amber «в духе Claude Code») **отклонена**. Founder выбрал **более холодную палитру + синий бренд** (teamly.to-семья). После 2 live-bake-off'ов (warm 3-up, затем cool 4-blue) зафиксирован **Royal Blue `#2563eb`** (опция Royal). Канва — углублённый **холодный** slate.
-- **info → cyan `#06b6d4`** (grill): бренд-синий ↔ info-синий коллизия разведена; info был не-юзан ни на одном экране → риск 0.
-- **Полировка:** палитра + ритм + точечные density-нюджи (без relayout; founder одобрил текущий лейаут).
+### Ключевое решение ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md))
+Координатор решает декомпозицию **plan-then-execute через Pydantic-AI `PromptedOutput`**, НЕ native tool-call (отклонение от буквы AC-W1-16, зафиксировано). Причина: `deepseek-reasoner` не умеет tools/JSON; только DeepSeek форвардит tools (Yandex/GigaChat — нет → native loop ломает failover). Plain-text in/out → робастно на всех 3 провайдерах; **gateway tool-forwarding = 0**.
 
-### Код (frontend) — verified green
-- `styles/tokens.css`: base-600..950 deepened cool-slate; primary scale amber→**blue** (`#dbeafe/#60a5fa/#2563eb/#1d4ed8/#1e40af`).
-- `styles/index.css`: `on-cta` base-900→**#ffffff**; `info-*` blue→**cyan**; focus-ring amber→**blue** alpha.
-- `styles/themes.css`: light overlay → deepened; dark роли auto-inherit by name.
-- **Blue-on-dark contrast fix (execution discovery):** ссылки `text-cta`→**`text-cta-hover`** (mode-aware: `#60a5fa` dark 7.4:1 / `#1e40af` light ~9:1) — статический `brand-400` провалил бы light (2.4:1), `text-cta` провалил бы dark (3.6:1). Primary button hover `bg-cta-hover`→**`bg-brand-700`** (темнеет, белый текст остаётся 9.7:1). Файлы: `components/ui/button`, `features/cells/CellsListPage`, `features/auth/{Login,Register}Page`, `features/tasks/TaskResultPage`.
+### Код (9 коммитов, verified green)
+- **C1** `pydantic_ai_model.py` — `request()` → `prepare_request` + инъекция `prompted_output_instructions` системным сообщением.
+- **C2** `agents/coordinator.py` — `PromptedOutput(CoordinatorOutput)`, `tools=[]`.
+- **C3** `router_service.py` — coordinator→`deepseek-chat`. **C4** — `ROLE_TO_MAX_TOKENS` (coord 2048 / r,a 4096 / writer 8192).
+- **C5** `runtime/dispatch.py` — `PlanExecutingCoordinator` (план→исполнение через orchestrator runner; guard'ы через `assert_delegation_allowed`; `DelegationStep.artifact_type`); удалены `_SUB_PROMPT_FRAMING`/`DEFAULT_PIPELINE`/`_ARTIFACT_KIND`/`ScriptedCoordinator`.
+- **C6** canned coordinator fixture → один fenced-JSON план + real-path demo-flow тест.
+- **C7** role-prompts → v1.0.0/stable; Координатор §1/§2/§3/§6 → JSON-план output; r/a/w +≥2 non-brief §6-примера.
+- **C8** single-source: `scripts/sync_role_prompts.{sh,ps1}` + `backend/.gitignore` + CI drift-check; committed `backend/role_prompts/` дубль удалён.
+- **C9** frontend `TaskSubmitPage` пресет несёт полный AC9-контракт; backend prompt-agnostic + `demo_market_brief.py` DEMO_PROMPT синхронизирован.
 
 ### Доки
-- `ui/UI-SPEC-00.8.md` — design-контракт (gsd-ui-checker 6/6 PASS); link-rule исправлен на cta-hover.
-- `ui/design-tokens.md` → **v0.2.0** (§1 philosophy, §2 палитра, §10 guidance, §12 changelog).
-- `ADR-031` → **Accepted** (Royal Blue + WCAG-AA контраст-таблица + founder cool-pivot note).
-- STATUS / phase-spec AC обновлены.
+- **ADR-032** (plan-then-execute, Accepted) + **ADR-033** (GSD re-enablement L1/L2, Proposed; correction-note к ADR-023 §6). decisions/README обновлён.
+- STATUS / JOURNAL обновлены.
 
-### Note — процесс
-GSD-оркестратор (`gsd:ui-phase`/`plan-phase`) НЕ запускается на bespoke `.planning/` (нет `ROADMAP.md`/`STATE.md`) — артефакты сделаны проектным путём (ui-ux-pro-max + designer mandate + gsd-ui-checker per UI-DESIGN-PLAYBOOK). UI-SPEC лежит в `ui/UI-SPEC-00.8.md` (per ui/README §Расширение).
+### GSD (per [ADR-033](./decisions/ADR-033-gsd-methodology-reenablement.md))
+**L1 восстановлен и продемонстрирован:** `gsd-verifier` прогнан goal-backward на Track A → **verdict GOAL ACHIEVED**. **L2** (slash-оркестраторы: ROADMAP.md/STATE.md/config.json/layout-bridge) — отдельный planning-spike, НЕ в этом PR.
 
 ## Verification state
 
-- Frontend (в worktree, deps installed from lockfile): `npm run lint` 0 warnings ✓; `npm run build` (tsc -b + vite) OK ✓; `npm test` (vitest) PASS ✓.
-- CI-гейты: §A no-inline-hex (.tsx) 0 ✓; §B no-arbitrary-values (.tsx) 0 ✓; barrel ≥18 (19, untouched) ✓.
-- a11y/e2e: `npm run e2e:ci` smoke — 3/3 PASS (auth-routes axe 0 violations на новой палитре; AC12 consent; **AC8 theme-toggle**) ✓.
-- **Pending (требует docker-стека):** `npm run e2e:live` — `wave-0-demo.spec.ts` (@live): 5-route axe + 3-agent demo (AC3 full + AC4).
+- **CI-deterministic (green):** backend `ruff` + `ruff format --check` ✓; `mypy --strict` (145 files) ✓; `pytest` **568 passed, 23 deselected (@live), cov 87.9%** ✓; role-prompt drift-check ✓; frontend `TaskSubmitPage` 5/5 + prettier + eslint ✓.
+- **gsd-verifier (GSD L1) — GOAL ACHIEVED:** все 6 in-scope AC verified.
+- **Live-валидация (2026-06-15, локальный `oriion_live` стек):** ключи `.env` из `great-engelbart` worktree. DeepSeek **402** (out-of-balance), YandexGPT **401** (IAM-токен 2026-05-25 истёк) → failover на **GigaChat**.
+  - ✅ **PromptedOutput на реальном LLM:** GigaChat вернул schema-conformant JSON → распарсилось в `CoordinatorOutput`. Центральный риск verifier'а (fenced-JSON на реальном провайдере) — снят.
+  - ✅ **Генерализация (AC-W1-24):** тривиальный + «сравни 3 CRM» → **direct-action** (пустой план); «перепиши лендинг» → **writer-only** план, `artifact_type="copywriting"` (НЕ `brief`).
+  - ✅ **Fix surfaced live → commit `193a1fc`:** GigaChat 422 на двух system-message (PromptedOutput добавляет 2-й) → `_messages_to_openai_shape` мёржит в один → **200** ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md) §Validated live).
+  - ⚠️ **Market-brief AC8/9/10 НЕ закрыт:** GigaChat ReadTimeout'ит на ≥1500-словном writer (30s per-call provider timeout) + не уложится в AC8 latency. **Нужен funded DeepSeek** (быстрый primary).
 
 ## Next actions
 
-1. **Прогнать `npm run e2e:live`** на staging-стеке → закрыть AC3/AC4 → Phase 00.8 ✅ full.
-2. **Merge PR этой сессии** (frontend cool-blue v0.2 + .planning доки). Глазами проверить 6 экранов на новой палитре (особенно task-result links + CTA hover в обоих темах).
-3. **Founder staging 10× anchor run** (gate D5) — параллельно, независимо от 00.8.
-4. Wave 1 старт: 01.1-retro (AC-W1-1..25).
+1. **✅ DONE — DeepSeek funded + wired.** New funded key `sk-69fe…358ab` (USD $6.93, `is_available:true`) in `backend/.env`; live-verified HTTP 200 for `deepseek-chat`/`reasoner`/`v4-flash`. Market-brief golden re-run on it (below).
+2. **✅ RESOLVED — Yandex via Api-Key.** Founder выдал статический `YANDEX_API_KEY` (Api-Key схема, не протухает). Провайдер теперь гибридный: Api-Key (приоритет) → Bearer IAM (legacy/failover) → clear config error ([commit `57744ec`](https://github.com/mrflxxxme/oriion/pull/44)). Verified: live curl + gateway-smoke (`YandexGPTProvider.chat` from Settings) → HTTP 200 + контент. Failover-цепочка снова полноценная (DeepSeek primary + Yandex failover). Expired IAM-токен оставлен закомментированным fallback'ом — больше не блокер.
+3. **✅ Market-brief golden re-run (funded DeepSeek, `--runs 3`, 2026-06-15):** **AC9 ✅ 3/3** (brief 2067/1917/1954w; matrix 7×5/7×5/7×6; content-plan 10/10/10), **AC10 ✅ 3/3** ($0.026/run). **AC8 ❌** — cohort p95 **163s > 120s** (analyst ~45s + writer ~46s long-gen on v4-flash dominate). Two live-surfaced fixes committed: provider-timeout 30→120s + demo content-plan counter (H3-preferred). **AC8 decision pending founder** (faster model / pipeline-parallelism = infra-PR, OR accept latency latitude).
+4. **Merge [PR #44](https://github.com/mrflxxxme/oriion/pull/44):** verify-bar = CI ✅ (568) + golden AC9/AC10 ✅; **AC8 latency is the remaining founder call** per ADR-027.
+4. **Infra-PR (следующий):** AC-W1-16a (Dramatiq) + AC-W1-1 (Redis-SSE) + AC-W1-19 (native web_search) + observability/IaC-пины (3/4/5/9/10/11-15/21). **+ live-surfaced:** per-provider httpx-timeout (GigaChat медленный на long-gen — 30s мало) + GigaChat RU-CA в образе (AC-W1-21).
+5. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + `/gsd:health --repair` + layout-bridge.
 
 ## Exit ritual (this session)
 
-- [x] design-tokens.md → v0.2.0; tokens materialized (tokens/themes/index.css)
-- [x] UI-SPEC-00.8.md created + checker-approved (6/6)
-- [x] ADR-031 → Accepted (Royal Blue + contrast table)
-- [x] STATUS.md updated (00.8 code-complete; history row)
+- [x] ADR-032 (plan-then-execute) + ADR-033 (GSD L1/L2) созданы; decisions/README + ADR-023 §6 correction-note
+- [x] JOURNAL.md — 2026-06-15 goofy-darwin entry
+- [x] STATUS.md — Wave 1 in-progress + 01.1 Track A active-phase
 - [x] HANDOFF.md rewritten (this file)
-- [x] JOURNAL.md prepended — 2026-06-13 upbeat-chaum entry
-- [ ] e2e:live on staging → AC3/AC4 (next session / staging)
-- [ ] PR merge
+- [x] CI-deterministic green (568) + gsd-verifier GOAL ACHIEVED
+- [x] Live-валидация: PromptedOutput + генерализация на GigaChat ✓; multi-system merge-fix (commit `193a1fc`)
+- [x] market-brief golden on **funded DeepSeek** (`--runs 3`): **AC9 ✅ 3/3 + AC10 ✅ 3/3**; **AC8 ❌** (p95 163s)
+- [x] live-surfaced fixes committed: provider-timeout 30→120s (`config.py`+`main.py`) + demo content-plan counter H3-preferred
+- [x] CI-deterministic re-green with fixes: ruff/mypy(145)/pytest **568 passed**
+- [x] **Yandex auth** — switched to non-expiring **Api-Key** scheme (`YANDEX_API_KEY`), IAM kept as fallback; live + gateway-smoke 200 (commit `57744ec`)
+- [ ] **AC8 latency** decision (founder: faster model / pipeline-parallel = infra-PR, or accept latitude)
+- [ ] PR merge (founder, per ADR-027)

@@ -32,6 +32,7 @@
 | [ADR-011](./ADR-011-memory-2-level.md) | Memory 2-уровневая + persistent в Wave 2 + «Знания команды» (PARA) в Wave 3 |
 | [ADR-019](./ADR-019-vertical-autonomous-mode.md) | Vertical-specific Autonomous Mode + Knowledge Workspace |
 | [ADR-020](./ADR-020-pyodide-code-execution.md) | Pyodide WASM в браузере для code-execution (Analyst роль) |
+| [ADR-032](./ADR-032-coordinator-plan-then-execute.md) | Координатор: plan-then-execute через PromptedOutput (не native tool-calling); failover-робастно (Phase 01.1) |
 
 ## LLM / AI
 
@@ -67,6 +68,7 @@
 | ID | Решение |
 |---|---|
 | [ADR-028](./ADR-028-policies-registry.md) | Policies Registry — canonical home для P-INIT-1..5 / P-AUDIT-1..4 / P-DESIGN-1 + DECISION-N → ADR cross-ref |
+| [ADR-033](./ADR-033-gsd-methodology-reenablement.md) | GSD re-enablement: L1 gsd-субагенты сейчас, L2 orchestrator-bridge отложен (Phase 01.1) |
 
 ## Шаблон нового ADR
 

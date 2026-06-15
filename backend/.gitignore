@@ -1,0 +1,4 @@
+# AC-W1-20 — single-source role-prompts. Canonical copy lives in
+# .planning/contracts/role-prompts/; this directory is build-populated by
+# scripts/sync_role_prompts.{sh,ps1} (run before docker build). Never commit it.
+/role_prompts/

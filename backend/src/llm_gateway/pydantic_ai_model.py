@@ -38,6 +38,8 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from pydantic_ai.usage import RequestUsage
 
+from src.llm_gateway.services.router_service import resolve_max_tokens
+
 # Pydantic-AI's ModelResponse.finish_reason is typed as a strict Literal.
 _FinishReason = Literal["stop", "length", "content_filter", "tool_call", "error"]
 
@@ -97,12 +99,24 @@ class LLMGatewayModel(Model):
     async def request(
         self,
         messages: list[ModelRequest | ModelResponse],
-        model_settings: ModelSettings | None,  # noqa: ARG002 — reserved, Wave-1+
-        model_request_parameters: ModelRequestParameters,  # noqa: ARG002 — tools/output_mode wire-up Wave 1
+        model_settings: ModelSettings | None,
+        model_request_parameters: ModelRequestParameters,
     ) -> ModelResponse:
         """One-shot completion. Streaming sibling lives in ``request_stream``
-        (inherited default raises until Wave 1 SSE-on-runtime lands)."""
-        openai_messages = _messages_to_openai_shape(messages)
+        (inherited default raises until Wave 1 SSE-on-runtime lands).
+
+        ``prepare_request`` resolves the PromptedOutput schema instructions
+        (AC-W1-16b): for a ``PromptedOutput``-configured Agent (the Coordinator)
+        ``prompted_output_instructions`` is the JSON-schema directive, which we
+        inject as a system message so the provider returns schema-conformant JSON
+        — no function-calling required (works across DeepSeek/Yandex/GigaChat).
+        Leaf agents (``output_type=str``) yield ``None`` here → unchanged path.
+        """
+        _, model_request_parameters = self.prepare_request(model_settings, model_request_parameters)
+        openai_messages = _messages_to_openai_shape(
+            messages,
+            prompted_instructions=model_request_parameters.prompted_output_instructions,
+        )
 
         # acomplete walks the failover chain (DeepSeek → YandexGPT → GigaChat),
         # so a single provider error (e.g. 402 Payment Required) fails over to
@@ -113,6 +127,7 @@ class LLMGatewayModel(Model):
             model_hint=self._model_hint,
             messages=openai_messages,
             metadata={"role_key": self._role_key, "workspace_id": str(self._workspace_id)},
+            max_tokens=resolve_max_tokens(self._role_key),
         )
         self._last_model_name = target_model
 
@@ -142,30 +157,50 @@ class LLMGatewayModel(Model):
 
 def _messages_to_openai_shape(
     messages: list[ModelRequest | ModelResponse],
+    *,
+    prompted_instructions: str | None = None,
 ) -> list[dict[str, str]]:
     """Translate Pydantic-AI ``ModelRequest``/``ModelResponse`` parts → OpenAI-shape.
 
-    Only Text-style parts are handled in Wave 0 (the productivity-core demo
-    flow doesn't surface tool-calls or media yet). Tool-call wiring lands
-    with Commit 5 when ``delegate_task`` ships.
+    Text-style parts only: the productivity-core flow uses plan-then-execute via
+    ``PromptedOutput`` (no native tool-calls; AC-W1-19 native web_search is a later
+    pin). ``prompted_instructions`` (from ``ModelRequestParameters.prompted_output_instructions``)
+    carries the PromptedOutput JSON-schema directive.
+
+    **All system content is merged into a SINGLE system message** (role prompt
+    first, then the schema directive). PromptedOutput would otherwise add a second
+    system message, and some providers in the failover chain reject multiple system
+    roles — a live GigaChat run returned 422 on the two-system-message Coordinator
+    request (ADR-032 multi-system fallback). DeepSeek accepts either, so merging is
+    strictly safer across DeepSeek / YandexGPT / GigaChat.
     """
-    openai_messages: list[dict[str, str]] = []
+    system_parts: list[str] = []
+    rest: list[dict[str, str]] = []
     for msg in messages:
         if isinstance(msg, ModelRequest):
             for req_part in msg.parts:
                 if isinstance(req_part, SystemPromptPart):
-                    openai_messages.append({"role": "system", "content": req_part.content})
+                    system_parts.append(req_part.content)
                 elif isinstance(req_part, UserPromptPart):
                     content = (
                         req_part.content
                         if isinstance(req_part.content, str)
                         else str(req_part.content)
                     )
-                    openai_messages.append({"role": "user", "content": content})
+                    rest.append({"role": "user", "content": content})
         elif isinstance(msg, ModelResponse):
             for resp_part in msg.parts:
                 if isinstance(resp_part, TextPart):
-                    openai_messages.append({"role": "assistant", "content": resp_part.content})
+                    rest.append({"role": "assistant", "content": resp_part.content})
+
+    # Schema directive goes after the role/system context.
+    if prompted_instructions:
+        system_parts.append(prompted_instructions)
+
+    openai_messages: list[dict[str, str]] = []
+    if system_parts:
+        openai_messages.append({"role": "system", "content": "\n\n".join(system_parts)})
+    openai_messages.extend(rest)
     return openai_messages
 
 

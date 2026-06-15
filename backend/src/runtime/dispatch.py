@@ -11,26 +11,25 @@ F-ARC-H2). This module is the wiring layer between the FastAPI handler and
 the already-tested ``runtime.orchestrator.execute_agent_task``.
 
 ────────────────────────────────────────────────────────────────────────────
-Wave-0 deterministic pipeline (NOT LLM-driven delegation)
+Plan-then-execute Coordinator (AC-W1-16b / AC-W1-24)
 ────────────────────────────────────────────────────────────────────────────
-The full LLM-driven Coordinator → ``delegate_task`` tool-call loop requires
-``LLMGatewayModel.request()`` to forward tools + the structured-output schema
-to the provider. Wave-0's adapter intentionally does NOT do that yet (see the
-F-ARC-M1 note in ``llm_gateway/pydantic_ai_model.py`` + the demo-flow test
-docstring — full tool-call path is AC14 Wave-1 hardening).
+``PlanExecutingCoordinator`` runs the REAL LLM-driven Coordinator: it calls
+``build_coordinator_agent`` (Pydantic-AI ``PromptedOutput``) to get a whole
+``delegation_plan`` as one JSON completion — handling arbitrary user prompts,
+not only the market-brief demo — then executes each plan step through
+``deps.runner`` (the orchestrator's SSE + cost-rollup wrapper), re-applying the
+``delegate_task`` depth/slug guards per step. Sub-prompts and artifact types
+come from the plan, not from code-side framing: AC-W1-24 removed the Wave-0
+``_SUB_PROMPT_FRAMING`` / ``DEFAULT_PIPELINE`` / ``_ARTIFACT_KIND`` constants.
 
-So for Wave-0 the dispatch uses a ``ScriptedCoordinator`` that drives a fixed
-researcher → analyst → writer pipeline. Each specialist IS a real LLM call
-(through ``LLMGatewayModel`` + ``LLMRouter`` failover chain), so the demo
-produces real artifacts, real end-to-end latency (AC8), and real cost (AC10).
-What's deterministic is only the *decomposition* — the Coordinator doesn't
-decide the plan via an LLM tool-call, it always runs the canonical 3-step
-brief pipeline.
+``PromptedOutput`` is plain text in/out, so this needs NO tool-forwarding in
+``LLMGatewayModel`` (native tool-calls = AC-W1-19, a later pin). Each specialist
+is still a real LLM call (through ``LLMGatewayModel`` + ``LLMRouter`` failover),
+so the demo produces real artifacts, latency (AC8), and cost (AC10).
 
-**AC-W1-16** pins the swap of ``ScriptedCoordinator`` for the real
-LLM-driven Coordinator (once the adapter forwards tools/output-schema) AND
-the swap of inline-synchronous dispatch for a Dramatiq actor (so the request
-returns 202 immediately instead of blocking for the whole orchestration).
+**Still deferred (AC-W1-16a):** dispatch stays inline-synchronous; the swap to
+a Dramatiq actor (return 202 immediately) + Redis-pubsub SSE (AC-W1-1) is the
+infra-PR follow-up.
 """
 
 from __future__ import annotations
@@ -47,10 +46,17 @@ from src._shared.config import get_settings
 from src.agents.analyst import AnalystDeps, build_analyst_agent
 from src.agents.coordinator import (
     ArtifactRef,
+    CoordinatorDeps,
     CoordinatorOutput,
+    DelegationStep,
+    build_coordinator_agent,
 )
 from src.agents.researcher import ResearcherDeps, build_researcher_agent
-from src.agents.tools.delegate import DelegateInput, DelegateResult
+from src.agents.tools.delegate import (
+    DelegateInput,
+    DelegateResult,
+    assert_delegation_allowed,
+)
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
 from src.mcp.exceptions import MCPError
@@ -75,8 +81,6 @@ if TYPE_CHECKING:
 # provider price table + FX rate).
 CREDIT_PER_INPUT_TOKEN = Decimal("0.000027")
 CREDIT_PER_OUTPUT_TOKEN = Decimal("0.000110")
-
-DEFAULT_PIPELINE: tuple[str, ...] = ("researcher", "analyst", "writer")
 
 # Live web_search (Brave) feeds the Researcher REAL market data instead of
 # LLM memory (founder decision 2026-06-07). Wave-0 wires it as a scripted
@@ -341,97 +345,151 @@ def build_leaf_runner(
     return _run_leaf
 
 
-class ScriptedCoordinator:
-    """Wave-0 deterministic stand-in for the LLM-driven Coordinator.
-
-    Drives the canonical researcher → analyst → writer brief pipeline by
-    calling ``deps.runner`` once per specialist (chaining each output into
-    the next sub-prompt). Returns a ``CoordinatorOutput`` so the orchestrator
-    serializes it identically to the real path.
-
-    AC-W1-16: replace with the real LLM-driven Coordinator once
-    ``LLMGatewayModel`` forwards tools + output-schema to the provider.
-    """
-
-    def __init__(self, *, pipeline: tuple[str, ...] = DEFAULT_PIPELINE) -> None:
-        self._pipeline = pipeline
-
-    async def run(self, user_prompt: str, *, deps: Any) -> _ScriptedRunResult:
-        # NOTE (F-CR-4): this Wave-0 stand-in calls deps.runner(...) directly,
-        # so it intentionally BYPASSES the delegate_task tool guards (depth check
-        # + target_agent_slug ∈ available_agent_slugs). Safe here because the
-        # pipeline is a fixed, in-team 3-step sequence; an unknown slug still
-        # fails fast via build_leaf_runner's KeyError. The real LLM-driven
-        # Coordinator (AC-W1-16) routes through delegate_task and re-enables the
-        # typed guards.
-        artifacts: list[ArtifactRef] = []
-        prior_context = ""
-        for slug in self._pipeline:
-            sub_prompt = self._compose_sub_prompt(slug, user_prompt, prior_context)
-            result = await deps.runner(
-                DelegateInput(target_agent_slug=slug, sub_prompt=sub_prompt),
-                deps,
-            )
-            prior_context = (
-                f"{prior_context}\n\n## {slug} output\n{result.output}"
-                if prior_context
-                else f"## {slug} output\n{result.output}"
-            )
-            artifacts.append(
-                ArtifactRef(
-                    id=str(result.sub_task_id),
-                    type=_ARTIFACT_KIND.get(slug, "analysis"),
-                    # User-facing copy: full normalization. prior_context above
-                    # keeps the un-stripped meta for downstream agents.
-                    path_or_inline=normalize_artifact_markdown(result.output),
-                )
-            )
-        summary = (
-            "Market & content brief produced via the Wave-0 deterministic "
-            f"pipeline ({' → '.join(self._pipeline)})."
-        )
-        return _ScriptedRunResult(output=CoordinatorOutput(summary=summary, artifacts=artifacts))
-
-    @staticmethod
-    def _compose_sub_prompt(slug: str, user_prompt: str, prior_context: str) -> str:
-        framing = _SUB_PROMPT_FRAMING.get(slug, "")
-        if prior_context:
-            return f"{framing}\n\nИсходный запрос:\n{user_prompt}\n\n{prior_context}"
-        return f"{framing}\n\nИсходный запрос:\n{user_prompt}"
-
-
 @dataclass
-class _ScriptedRunResult:
+class _PlanRunResult:
     """Mirror of Pydantic-AI's AgentRunResult.output access used by the orchestrator."""
 
     output: CoordinatorOutput
 
 
-_ARTIFACT_KIND: dict[str, str] = {
-    "researcher": "matrix",
-    "analyst": "analysis",
-    "writer": "brief",
-}
+def _ordered_steps(steps: list[DelegationStep]) -> list[DelegationStep]:
+    """Stable topological order honouring ``depends_on`` (by step number).
 
-_SUB_PROMPT_FRAMING: dict[str, str] = {
-    "researcher": (
-        "Ты Researcher. Собери конкурентный анализ рынка и оформи "
-        "конкурентную матрицу (≥5 строк × ≥4 колонки: Игрок | Сегмент | "
-        "Сильная сторона | Слабая сторона) на основе запроса ниже."
-    ),
-    "analyst": (
-        "Ты Analyst. На основе исследования рынка дай sizing, оценку "
-        "сегментов и позиционные рекомендации (с диапазонами, без "
-        "ложной точности)."
-    ),
-    "writer": (
-        "Ты Writer. Подготовь market brief (≥1500 слов на русском) и "
-        "контент-план ровно на 10 постов на основе исследования и анализа. "
-        "Каждый из 10 постов ОФОРМИ заголовком третьего уровня в формате "
-        "'### Пост N — <канал> — <день>' (N от 1 до 10) — это обязательный "
-        "формат для машинного парсинга (AC9)."
-    ),
-}
+    The market-brief demo plan is linear (1→2→3); arbitrary plans may declare a
+    dependency out of input order. ``visited`` is marked before recursing, so a
+    malformed cyclic plan can't loop forever — it degrades to input order.
+    """
+    by_num = {s.step: s for s in steps}
+    visited: set[int] = set()
+    order: list[DelegationStep] = []
+
+    def _visit(s: DelegationStep) -> None:
+        if s.step in visited:
+            return
+        visited.add(s.step)
+        for dep in s.depends_on:
+            dep_step = by_num.get(dep)
+            if dep_step is not None:
+                _visit(dep_step)
+        order.append(s)
+
+    for s in steps:
+        _visit(s)
+    return order
+
+
+def _compose_sub_prompt(goal: str, prior_context: str) -> str:
+    """Sub-prompt = the Coordinator's self-sufficient step goal + chained context.
+
+    No code-side role framing (AC-W1-24): the ``goal`` carries the instruction
+    the Coordinator itself wrote; ``prior_context`` chains the upstream
+    specialists' (un-normalized) output so e.g. the analyst sees the research.
+    """
+    if prior_context:
+        return f"{goal}\n\n{prior_context}"
+    return goal
+
+
+class PlanExecutingCoordinator:
+    """Real LLM-driven Coordinator (AC-W1-16b / AC-W1-24), plan-then-execute.
+
+    1. Run the Coordinator agent (``PromptedOutput``) → a full ``delegation_plan``.
+    2. Execute each step in dependency order via ``deps.runner`` (the
+       orchestrator's SSE + cost-rollup wrapper), re-applying the delegate_task
+       depth/slug guards (the Coordinator no longer calls the tool itself).
+    3. Materialize one artifact per executed step, typed from ``step.artifact_type``.
+
+    The Coordinator agent is built from ``llm_router`` in production; tests inject
+    a pre-built ``coordinator_agent`` backed by ``FakeLLMGatewayModel``.
+    """
+
+    def __init__(
+        self,
+        *,
+        llm_router: LLMRouter | None = None,
+        workspace_id: UUID | None = None,
+        coordinator_agent: Any = None,
+    ) -> None:
+        self._llm_router = llm_router
+        self._workspace_id = workspace_id
+        self._coordinator_agent = coordinator_agent
+
+    def _build_agent(self) -> Any:
+        if self._coordinator_agent is not None:
+            return self._coordinator_agent
+        if self._llm_router is None:
+            raise ValueError("PlanExecutingCoordinator needs an llm_router or a coordinator_agent.")
+        model = LLMGatewayModel(
+            role_key="coordinator",
+            llm_router=self._llm_router,
+            workspace_id=self._workspace_id,
+        )
+        return build_coordinator_agent(model=model)
+
+    async def run(self, user_prompt: str, *, deps: Any) -> _PlanRunResult:
+        agent = self._build_agent()
+        inner_deps = CoordinatorDeps(
+            cell_id=deps.cell_id,
+            task_id=deps.task_id,
+            user_id=deps.user_id,
+            available_agent_slugs=list(deps.available_agent_slugs),
+        )
+        plan_run = await agent.run(user_prompt, deps=inner_deps)
+        plan = getattr(plan_run, "output", None)
+        if plan is None:
+            plan = getattr(plan_run, "data", None)
+        if not isinstance(plan, CoordinatorOutput):
+            raise TypeError(
+                "Coordinator agent did not return a CoordinatorOutput "
+                f"(got {type(plan).__name__})."
+            )
+
+        available = list(deps.available_agent_slugs)
+        current_depth = int(getattr(deps, "current_depth", 0))
+        max_depth = int(getattr(deps, "max_delegation_depth", 5))
+        artifacts: list[ArtifactRef] = []
+        prior_context = ""
+        for step in _ordered_steps(plan.delegation_plan):
+            # The Coordinator no longer calls delegate_task as a tool, so we
+            # re-apply its in-team + depth guards here (AC-W1-16b).
+            assert_delegation_allowed(
+                step.agent,
+                available=available,
+                current_depth=current_depth,
+                max_depth=max_depth,
+            )
+            sub_prompt = _compose_sub_prompt(step.goal, prior_context)
+            result = await deps.runner(
+                DelegateInput(target_agent_slug=step.agent, sub_prompt=sub_prompt),
+                deps,
+            )
+            step.status = "completed"
+            # prior_context keeps the un-normalized meta for downstream agents;
+            # the user-facing artifact below is fully normalized.
+            prior_context = (
+                f"{prior_context}\n\n## {step.agent} output\n{result.output}"
+                if prior_context
+                else f"## {step.agent} output\n{result.output}"
+            )
+            artifacts.append(
+                ArtifactRef(
+                    id=str(result.sub_task_id),
+                    type=step.artifact_type,
+                    path_or_inline=normalize_artifact_markdown(result.output),
+                )
+            )
+
+        return _PlanRunResult(
+            output=CoordinatorOutput(
+                summary=plan.summary,
+                delegation_plan=plan.delegation_plan,
+                citations=plan.citations,
+                artifacts=artifacts,
+                confidence=plan.confidence,
+                open_questions=plan.open_questions,
+                assumptions=plan.assumptions,
+            )
+        )
 
 
 def _default_web_search_tool() -> WebSearchTool:
@@ -456,7 +514,7 @@ async def dispatch_task(
     llm_router: LLMRouter,
     sse_publisher: SSEPublisher | None = None,
     available_agent_slugs: list[str] | None = None,
-    coordinator: ScriptedCoordinator | None = None,
+    coordinator: PlanExecutingCoordinator | None = None,
     web_search_tool: WebSearchTool | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
@@ -467,8 +525,8 @@ async def dispatch_task(
     with live web_search context (Brave) when a key is configured.
     """
     publisher = sse_publisher or get_sse_publisher()
-    slugs = available_agent_slugs or list(DEFAULT_PIPELINE)
-    coord = coordinator or ScriptedCoordinator()
+    slugs = available_agent_slugs or list(_DEFAULT_LEAF_SPECS)
+    coord = coordinator or PlanExecutingCoordinator(llm_router=llm_router)
     search_tool = web_search_tool or _default_web_search_tool()
 
     user_prompt = ""
@@ -489,7 +547,7 @@ async def dispatch_task(
         task_id=task.id,
         cell_id=task.cell_id,
         user_id=task.initiated_by_user_id,
-        coordinator_agent=coord,  # type: ignore[arg-type]  # ScriptedCoordinator is structurally compatible (.run)
+        coordinator_agent=coord,  # type: ignore[arg-type]  # PlanExecutingCoordinator is structurally compatible (.run)
         user_prompt=user_prompt,
         available_agent_slugs=slugs,
         leaf_runner=leaf_runner,
@@ -501,9 +559,8 @@ async def dispatch_task(
 __all__ = [
     "CREDIT_PER_INPUT_TOKEN",
     "CREDIT_PER_OUTPUT_TOKEN",
-    "DEFAULT_PIPELINE",
     "WEB_SEARCH_MAX_RESULTS",
-    "ScriptedCoordinator",
+    "PlanExecutingCoordinator",
     "build_leaf_runner",
     "dispatch_task",
     "estimate_credits",

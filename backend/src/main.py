@@ -174,20 +174,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # acknowledgement that we've verified the shape matches at the Protocol
     # boundary in tests/llm_gateway/test_provider_*_mock.py.
     providers: dict[str, LLMProvider] = {}
+    provider_timeout = settings.llm_provider_timeout_seconds
     providers["deepseek"] = cast(
         LLMProvider,
-        DeepSeekProvider(api_key=settings.deepseek_api_key.get_secret_value()),
+        DeepSeekProvider(
+            api_key=settings.deepseek_api_key.get_secret_value(),
+            timeout_seconds=provider_timeout,
+        ),
     )
     providers["yandexgpt"] = cast(
         LLMProvider,
         YandexGPTProvider(
-            iam_token=settings.yandex_iam_token.get_secret_value(),
             catalog_id=settings.yandex_catalog_id,
+            # Api-Key scheme preferred (non-expiring); IAM Bearer is the
+            # legacy/failover credential. Empty IAM → None so the provider
+            # treats it as unset.
+            api_key=settings.yandex_api_key,
+            iam_token=settings.yandex_iam_token.get_secret_value() or None,
+            timeout_seconds=provider_timeout,
         ),
     )
     providers["gigachat"] = cast(
         LLMProvider,
-        GigaChatProvider(auth_key=settings.gigachat_auth_key.get_secret_value()),
+        GigaChatProvider(
+            auth_key=settings.gigachat_auth_key.get_secret_value(),
+            timeout_seconds=provider_timeout,
+        ),
     )
     circuits = {slug: ProviderCircuit(provider=slug) for slug in providers}
     llm_router = LLMRouter(providers=providers, circuits=circuits)

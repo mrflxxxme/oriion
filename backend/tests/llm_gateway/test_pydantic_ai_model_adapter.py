@@ -156,6 +156,92 @@ async def test_llm_gateway_model_forwards_model_hint(fake_router, model_request_
     assert call_kwargs["model_hint"] == "byok-openai/gpt-4o"
 
 
+async def test_llm_gateway_model_injects_prompted_output_schema(fake_router):
+    """AC-W1-16b: a PromptedOutput-configured Agent over the gateway model gets its
+    JSON schema injected as a system message, and a fenced-JSON response round-trips
+    into the Pydantic output model — no function-calling, no tool-forwarding."""
+    from pydantic import BaseModel
+    from pydantic_ai import Agent, PromptedOutput
+
+    class _Plan(BaseModel):
+        summary: str
+        steps: list[str]
+
+    fenced = '```json\n{"summary": "ok", "steps": ["research", "write"]}\n```'
+    fake_router.acomplete = AsyncMock(
+        return_value=(
+            LLMResponse(
+                content=fenced,
+                finish_reason="stop",
+                usage=LLMUsage(tokens_input=20, tokens_output=15),
+                raw_provider_metadata={"provider": "deepseek"},
+            ),
+            "deepseek-chat",
+            "deepseek",
+        )
+    )
+    model = LLMGatewayModel(role_key="coordinator", llm_router=fake_router)
+    agent = Agent(model=model, output_type=PromptedOutput(_Plan))
+
+    result = await agent.run("Plan a market brief.")
+
+    # The fenced JSON round-tripped into the typed output.
+    assert isinstance(result.output, _Plan)
+    assert result.output.steps == ["research", "write"]
+    # The schema directive reached the provider as a system message.
+    sent_messages = fake_router.acomplete.await_args.kwargs["messages"]
+    system_blobs = [m["content"] for m in sent_messages if m["role"] == "system"]
+    assert any("JSON" in blob for blob in system_blobs)
+
+
+async def test_llm_gateway_model_merges_system_messages(fake_router):
+    """ADR-032: a base system prompt + the PromptedOutput schema directive are
+    merged into ONE system message (a live GigaChat run 422'd on two system roles)."""
+    from pydantic import BaseModel
+    from pydantic_ai import Agent, PromptedOutput
+
+    class _Plan(BaseModel):
+        summary: str
+
+    fake_router.acomplete = AsyncMock(
+        return_value=(
+            LLMResponse(
+                content='```json\n{"summary": "ok"}\n```',
+                finish_reason="stop",
+                usage=LLMUsage(tokens_input=5, tokens_output=5),
+            ),
+            "deepseek-chat",
+            "deepseek",
+        )
+    )
+    model = LLMGatewayModel(role_key="coordinator", llm_router=fake_router)
+    agent = Agent(model=model, output_type=PromptedOutput(_Plan), system_prompt="Ты Координатор.")
+    await agent.run("Plan it.")
+
+    sent = fake_router.acomplete.await_args.kwargs["messages"]
+    system_msgs = [m for m in sent if m["role"] == "system"]
+    assert len(system_msgs) == 1, f"expected ONE merged system message, got {len(system_msgs)}"
+    assert "Ты Координатор." in system_msgs[0]["content"]
+    assert "JSON" in system_msgs[0]["content"]
+
+
+@pytest.mark.parametrize(
+    ("role", "expected"),
+    [("writer", 8192), ("coordinator", 2048), ("researcher", 4096), ("unknown-role", 4096)],
+)
+async def test_llm_gateway_model_resolves_per_role_max_tokens(
+    fake_router, model_request_params, role, expected
+):
+    """AC-W1-23a: the adapter resolves a per-role output budget and forwards it to acomplete()."""
+    model = LLMGatewayModel(role_key=role, llm_router=fake_router)
+    await model.request(
+        messages=[ModelRequest(parts=[UserPromptPart(content="hi")])],
+        model_settings=None,
+        model_request_parameters=model_request_params,
+    )
+    assert fake_router.acomplete.await_args.kwargs["max_tokens"] == expected
+
+
 def test_llm_gateway_model_name_property(fake_router):
     """model_name + system properties surface the role-key for usage logs."""
     model = LLMGatewayModel(role_key="writer", llm_router=fake_router)
@@ -209,23 +295,18 @@ async def test_fake_model_exhaustion_raises():
 
 
 async def test_fake_model_returns_canned_in_order():
-    """Successive calls walk the registered list in order."""
+    """A request returns the registered canned response for (role, scenario)."""
     model = FakeLLMGatewayModel(role_key="coordinator")
     for (role_key, scenario_id), responses in RESPONSES.items():
         model.set_response(role_key, scenario_id, responses)
     model.set_scenario(SCENARIO_ID)
 
-    resp_1 = await model.request(messages=[], model_settings=None, model_request_parameters=None)  # type: ignore[arg-type]
-    resp_2 = await model.request(messages=[], model_settings=None, model_request_parameters=None)  # type: ignore[arg-type]
+    resp = await model.request(messages=[], model_settings=None, model_request_parameters=None)  # type: ignore[arg-type]
 
-    # Coordinator has 2 canned responses in market_brief_demo — first is
-    # the decompose plan, second is the synthesize summary.
-    assert "План декомпозиции" in resp_1.parts[0].content
-    assert "Финальный синтез" in resp_2.parts[0].content
-    assert model.calls == [
-        ("coordinator", SCENARIO_ID),
-        ("coordinator", SCENARIO_ID),
-    ]
+    # The Coordinator now emits a single fenced-JSON plan (AC-W1-16b) — no more
+    # decompose-then-synthesize two-call shape.
+    assert "delegation_plan" in resp.parts[0].content
+    assert model.calls == [("coordinator", SCENARIO_ID)]
 
 
 def test_pydantic_ai_test_model_fixture_seeded(pydantic_ai_test_model):

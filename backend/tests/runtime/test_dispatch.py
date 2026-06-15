@@ -6,8 +6,9 @@ that closes the PR-A CRITICAL FINDING (POST /tasks queued-but-never-dispatched).
 These tests inject fakes for the LLM layer + DB session so no Pydantic-AI
 provider chain or real PostgreSQL is needed. The orchestrator itself is
 covered by tests/runtime/test_orchestrator.py — here we test dispatch's own
-seams: cost estimate, ScriptedCoordinator pipeline order, and the production
-leaf-runner's child-task persistence + cost roll-in.
+seams: cost estimate, PlanExecutingCoordinator plan execution (order, guards,
+artifact typing from the plan), and the production leaf-runner's child-task
+persistence + cost roll-in.
 """
 
 from __future__ import annotations
@@ -18,14 +19,15 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from src.agents.coordinator import CoordinatorOutput
+from src.agents.coordinator import CoordinatorOutput, DelegationStep
+from src.agents.exceptions import DelegationDepthExceeded, DelegationTargetInvalid
 from src.agents.tools.delegate import DelegateInput, DelegateResult
 from src.mcp.exceptions import WebSearchError
 from src.mcp.tools.web_search import WebSearchResult
 from src.runtime.dispatch import (
     CREDIT_PER_INPUT_TOKEN,
     CREDIT_PER_OUTPUT_TOKEN,
-    ScriptedCoordinator,
+    PlanExecutingCoordinator,
     _extract_output_text,
     _extract_usage,
     _LeafSpec,
@@ -58,7 +60,7 @@ def test_estimate_credits_demo_scale_under_ac10_cap() -> None:
     assert cost < Decimal(30)
 
 
-# ── ScriptedCoordinator ───────────────────────────────────────────────────
+# ── PlanExecutingCoordinator (plan-then-execute) ──────────────────────────
 
 
 @dataclass
@@ -67,57 +69,153 @@ class _FakeDeps:
     available_agent_slugs: list[str] = field(
         default_factory=lambda: ["researcher", "analyst", "writer"]
     )
+    cell_id: UUID = field(default_factory=uuid4)
+    task_id: UUID = field(default_factory=uuid4)
+    user_id: UUID = field(default_factory=uuid4)
+    current_depth: int = 0
+    max_delegation_depth: int = 5
 
 
-@pytest.mark.asyncio
-async def test_scripted_coordinator_drives_pipeline_in_order() -> None:
-    calls: list[str] = []
+@dataclass
+class _PlanResult:
+    output: CoordinatorOutput
 
+
+class _FakeCoordinatorAgent:
+    """Stand-in for the real PromptedOutput Coordinator: returns a canned plan."""
+
+    def __init__(self, plan: CoordinatorOutput) -> None:
+        self._plan = plan
+        self.run_prompts: list[str] = []
+
+    async def run(self, prompt: str, *, deps: Any) -> _PlanResult:
+        self.run_prompts.append(prompt)
+        return _PlanResult(output=self._plan)
+
+
+def _market_brief_plan() -> CoordinatorOutput:
+    """The canonical 3-step plan, with artifact types carried IN the plan."""
+    return CoordinatorOutput(
+        summary="Декомпозиция на research → analyst → writer.",
+        delegation_plan=[
+            DelegationStep(
+                step=1,
+                agent="researcher",
+                goal="research",
+                status="planned",
+                artifact_type="matrix",
+            ),
+            DelegationStep(
+                step=2,
+                agent="analyst",
+                goal="analyze",
+                status="planned",
+                artifact_type="analysis",
+                depends_on=[1],
+            ),
+            DelegationStep(
+                step=3,
+                agent="writer",
+                goal="write",
+                status="planned",
+                artifact_type="brief",
+                depends_on=[2],
+            ),
+        ],
+    )
+
+
+def _ok_runner(calls: list[str] | None = None, outputs: list[str] | None = None):
     async def _runner(inp: DelegateInput, _deps: Any) -> DelegateResult:
-        calls.append(inp.target_agent_slug)
-        return DelegateResult(
-            sub_task_id=uuid4(),
-            target_agent_slug=inp.target_agent_slug,
-            output=f"{inp.target_agent_slug}-body",
-            cost_credits=Decimal("1.0"),
-            tokens_used=10,
-        )
-
-    coord = ScriptedCoordinator()
-    deps = _FakeDeps(runner=_runner)
-    result = await coord.run("market brief please", deps=deps)
-
-    assert calls == ["researcher", "analyst", "writer"]
-    assert isinstance(result.output, CoordinatorOutput)
-    assert len(result.output.artifacts) == 3
-    # Artifact kinds map per specialist.
-    kinds = [a.type for a in result.output.artifacts]
-    assert kinds == ["matrix", "analysis", "brief"]
-
-
-@pytest.mark.asyncio
-async def test_scripted_coordinator_chains_prior_output_into_sub_prompt() -> None:
-    seen_prompts: list[str] = []
-
-    async def _runner(inp: DelegateInput, _deps: Any) -> DelegateResult:
-        seen_prompts.append(inp.sub_prompt)
+        if calls is not None:
+            calls.append(inp.target_agent_slug)
+        if outputs is not None:
+            outputs.append(inp.sub_prompt)
         return DelegateResult(
             sub_task_id=uuid4(),
             target_agent_slug=inp.target_agent_slug,
             output=f"OUT[{inp.target_agent_slug}]",
-            cost_credits=Decimal(0),
-            tokens_used=0,
+            cost_credits=Decimal("1.0"),
+            tokens_used=10,
         )
 
-    coord = ScriptedCoordinator()
-    await coord.run("исходный запрос", deps=_FakeDeps(runner=_runner))
+    return _runner
 
-    # researcher sees only the user prompt; analyst sees researcher output;
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_runs_plan_in_order() -> None:
+    calls: list[str] = []
+    coord = PlanExecutingCoordinator(coordinator_agent=_FakeCoordinatorAgent(_market_brief_plan()))
+    result = await coord.run("market brief please", deps=_FakeDeps(runner=_ok_runner(calls=calls)))
+
+    assert calls == ["researcher", "analyst", "writer"]
+    assert isinstance(result.output, CoordinatorOutput)
+    assert len(result.output.artifacts) == 3
+    # AC-W1-24: artifact types come from the PLAN, not a code-side slug → type map.
+    assert [a.type for a in result.output.artifacts] == ["matrix", "analysis", "brief"]
+
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_orders_by_depends_on() -> None:
+    """Steps given out of order are executed in dependency order."""
+    plan = CoordinatorOutput(
+        summary="s",
+        delegation_plan=[
+            DelegationStep(
+                step=3, agent="writer", goal="w", status="p", artifact_type="brief", depends_on=[2]
+            ),
+            DelegationStep(
+                step=1, agent="researcher", goal="r", status="p", artifact_type="matrix"
+            ),
+            DelegationStep(
+                step=2,
+                agent="analyst",
+                goal="a",
+                status="p",
+                artifact_type="analysis",
+                depends_on=[1],
+            ),
+        ],
+    )
+    calls: list[str] = []
+    coord = PlanExecutingCoordinator(coordinator_agent=_FakeCoordinatorAgent(plan))
+    await coord.run("x", deps=_FakeDeps(runner=_ok_runner(calls=calls)))
+    assert calls == ["researcher", "analyst", "writer"]
+
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_chains_prior_output_into_sub_prompt() -> None:
+    seen_prompts: list[str] = []
+    coord = PlanExecutingCoordinator(coordinator_agent=_FakeCoordinatorAgent(_market_brief_plan()))
+    await coord.run("исходный запрос", deps=_FakeDeps(runner=_ok_runner(outputs=seen_prompts)))
+
+    # researcher sees only its goal; analyst sees researcher output;
     # writer sees both prior outputs.
     assert "OUT[researcher]" not in seen_prompts[0]
     assert "OUT[researcher]" in seen_prompts[1]
     assert "OUT[researcher]" in seen_prompts[2]
     assert "OUT[analyst]" in seen_prompts[2]
+
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_rejects_out_of_team_slug() -> None:
+    """AC-W1-16b: the delegate_task guards re-apply at plan execution."""
+    plan = CoordinatorOutput(
+        summary="s",
+        delegation_plan=[DelegationStep(step=1, agent="hacker", goal="g", status="p")],
+    )
+    coord = PlanExecutingCoordinator(coordinator_agent=_FakeCoordinatorAgent(plan))
+    with pytest.raises(DelegationTargetInvalid):
+        await coord.run("x", deps=_FakeDeps(runner=_ok_runner()))
+
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_rejects_over_depth() -> None:
+    coord = PlanExecutingCoordinator(coordinator_agent=_FakeCoordinatorAgent(_market_brief_plan()))
+    with pytest.raises(DelegationDepthExceeded):
+        await coord.run(
+            "x", deps=_FakeDeps(runner=_ok_runner(), current_depth=5, max_delegation_depth=5)
+        )
 
 
 # ── build_leaf_runner ─────────────────────────────────────────────────────
@@ -450,7 +548,7 @@ def test_normalize_artifact_markdown_keeps_non_summary_trailing_fence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_scripted_coordinator_artifact_clean_but_context_keeps_meta() -> None:
+async def test_plan_executing_coordinator_artifact_clean_but_context_keeps_meta() -> None:
     """prior_context keeps the role-contract meta; the user-facing artifact doesn't."""
     seen_prompts: list[str] = []
     meta_doc = (
@@ -468,7 +566,7 @@ async def test_scripted_coordinator_artifact_clean_but_context_keeps_meta() -> N
             tokens_used=0,
         )
 
-    coord = ScriptedCoordinator()
+    coord = PlanExecutingCoordinator(coordinator_agent=_FakeCoordinatorAgent(_market_brief_plan()))
     result = await coord.run("запрос", deps=_FakeDeps(runner=_runner))
 
     # Downstream agents still see the frontmatter + summary block…

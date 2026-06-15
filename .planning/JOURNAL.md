@@ -1,5 +1,40 @@
 # Development Journal
 
+## 2026-06-15 · goofy-darwin-194c68 (continued) · @claude-opus (Track A — funded-DeepSeek live validation + 2 fixes)
+
+- Scope: актуализировать LLM-ключи и **закрыть market-brief golden на funded DeepSeek** (тот самый pending-блокер из предыдущей записи), дополнить PR #44.
+- Keys (live-verified):
+  * **DeepSeek ✅** — старый ключ `sk-feca…905` всё ещё **402** ($0.00). Founder выдал funded `sk-69fe…358ab` (USD **$6.93**, `is_available:true`) → прописан в `backend/.env`; live HTTP 200 для `deepseek-chat`/`reasoner`/`v4-flash` (все маппятся в `deepseek-v4-flash`).
+  * **YandexGPT ⚠️** — баланс founder починил, но `.env` IAM-токен **time-expired** (2026-05-26) И локальный `yc` CLI OAuth тоже протух → mint невозможен без `yc init` (browser). Failover-only, golden не блокирует.
+  * **GigaChat ✅** OAuth 200 (но RU-CA не в контейнерном certifi — последний failover).
+- **Live-валидация на полном стеке** (docker `teamly-dev` off goofy `.env`, backend :8001, alembic `upgrade heads`, register→login→`/tasks/{id}/run`): market-brief `--runs 3` на funded DeepSeek → **AC9 ✅ 3/3** (brief 2067/1917/1954w; matrix 7×5/7×5/7×6; content-plan **10/10/10**), **AC10 ✅ 3/3** ($0.026/run), **AC8 ❌** cohort p95 **163s > 120s** (analyst ~45s + writer ~46s long-gen на v4-flash доминируют).
+- **2 фикса, surfaced live (committed → PR #44):**
+  * `fix(llm-gateway)` — per-provider httpx timeout **30→120s** (config-driven `llm_provider_timeout_seconds`, wired в 3 провайдера). Корень 1-й попытки: writer >30s → `httpx.ReadTimeout` (пустой `str(exc)`) → ложный failover DeepSeek→Yandex(401)→GigaChat(SSL) → 500.
+  * `fix(demo)` — `_count_content_plan_posts`: H3-идиом приоритетен над numbered-bold fallback (раньше складывал оба по всему brief-артефакту → 10 постов + 15 numbered-bold prose = ложные 25 → AC9 fail).
+- Verification: CI-deterministic re-green с фиксами — `ruff`(src tests) ✓, `ruff format --check` ✓, `mypy --strict`(145) ✓, `pytest` **568 passed**.
+- Next: founder — (1) `yc init` → mint YANDEX_IAM_TOKEN (failover); (2) **AC8-решение** (faster model / pipeline-parallel = infra-PR, либо принять latency-latitude); (3) merge PR #44 (CI ✅ + golden AC9/AC10 ✅).
+- Refs: PR #44; commits `901da5f` (timeout) + `b817b73` (counter); `01.1-retro.md` AC8/AC-W1-21.
+
+## 2026-06-15 · goofy-darwin-194c68 · @claude-opus (Phase 01.1-retro Track A — Coordinator generalization)
+
+- Scope: **Phase 01.1 Track A — генерализация Координатора** (связный срез «AI-команда становится универсальной»). 9 атомарных коммитов (C1–C9) off post-merge main `d86b3ba`. Реализует AC-W1-16b + 24 + 25 + 20 + 22 + 23a; AC-W1-16a/19/1 + observability-пины отложены в infra-PR (по плану).
+- Workflow: bootstrap-4 + 01.1-retro → `/grill-me` (8 развилок, все через AskUserQuestion) → Plan-агент (де-рискнул PromptedOutput живым round-trip: pydantic-ai **1.102**, `prepare_request`) → execute → `gsd-verifier` (GSD L1) → exit ritual.
+- **Ключевое архитектурное решение ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md)):** Координатор решает декомпозицию **plan-then-execute через PromptedOutput**, не native tool-call (как формулировал AC-W1-16). Причины: `deepseek-reasoner` не умеет tools/JSON; только DeepSeek форвардит tools (Yandex/GigaChat нет → native loop ломает failover). PromptedOutput plain-text → робастно на всех 3 провайдерах, gateway tool-forwarding = 0.
+- Done (код, verified green):
+  * `llm_gateway/pydantic_ai_model.py` — `request()` вызывает `prepare_request` и инжектит `prompted_output_instructions` системным сообщением (C1).
+  * `agents/coordinator.py` — `output_type=PromptedOutput(CoordinatorOutput)`, `tools=[]`, `DelegationStep.artifact_type` (C2/C5).
+  * `llm_gateway/services/router_service.py` — coordinator→`deepseek-chat`; `ROLE_TO_MAX_TOKENS` (C3/C4).
+  * `runtime/dispatch.py` — `PlanExecutingCoordinator` (план→исполнение через orchestrator runner; guard'ы через `assert_delegation_allowed`; artifact_type из плана; web_search гейтится researcher-шагом); удалены `_SUB_PROMPT_FRAMING`/`DEFAULT_PIPELINE`/`_ARTIFACT_KIND`/`ScriptedCoordinator` (C5, AC-W1-24).
+  * `contracts/role-prompts/*` — Координатор §1/§2/§3/§6 → JSON-план output (один блок, без прозы); researcher/analyst/writer +≥2 non-brief §6-примера; все → v1.0.0/stable (C7, AC-W1-25/22).
+  * single-source: `scripts/sync_role_prompts.{sh,ps1}` + `backend/.gitignore` + CI drift-check; удалён committed `backend/role_prompts/` дубль (C8, AC-W1-20).
+  * frontend `TaskSubmitPage` пресет несёт полный deliverable-контракт; backend prompt-agnostic (C9, AC-W1-24).
+- Verification: backend `ruff`+`mypy --strict`(145)+`pytest` **568 passed, cov 87.9%** ✓; role-prompt drift-check ✓; frontend `TaskSubmitPage` 5/5 + prettier/eslint ✓. `gsd-verifier` (GSD L1) → **GOAL ACHIEVED**.
+- **Live-валидация (2026-06-15, локальный `oriion_live` стек, ключи из `great-engelbart` `.env`):** DeepSeek **402** (out-of-balance) + YandexGPT **401** (expired IAM) → failover на **GigaChat**. ✅ PromptedOutput парсится в `CoordinatorOutput` на реальном LLM; ✅ генерализация (тривиальный + «сравни 3 CRM» → direct-action; «перепиши лендинг» → **writer-only** план, `artifact_type="copywriting"` — тип из плана, не из slug); ✅ **fix surfaced live:** multi-system-message 422 у GigaChat → merge в один system-message → **200** (commit `193a1fc`, [ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md) §Validated live). ⚠️ Market-brief AC8/9/10 НЕ закрыт — нужен **funded DeepSeek** (GigaChat ReadTimeout'ит на ≥1500-словном writer при 30s provider-timeout + не уложится в AC8). Founder billing action.
+- Decisions (8, grill/AskUserQuestion): scope=Track A; arch=plan-then-execute; 16a defer; 19 defer; GSD=L1 now+L2 spike; verify=CI+live до merge; venue=local docker; single-source=build-time sync.
+- ADRs: **ADR-032** (plan-then-execute, Accepted) + **ADR-033** (GSD re-enablement L1/L2, Proposed; correction-note к ADR-023 §6).
+- Next: founder live golden + non-brief → закрыть AC-W1-24/25 → merge. Затем infra-PR (16a Dramatiq + AC-W1-1 Redis-SSE + 19 native web_search + observability-пины).
+- Refs: branch `claude/goofy-darwin-194c68`; ADR-032/033; `01.1-retro.md` AC-W1-16/22/23/24/25.
+
 ## 2026-06-13 · upbeat-chaum-aed9b4 · @claude-opus (Phase 00.8 execute)
 
 - Scope: **Phase 00.8 — design restyling (professional cool-blue v0.2).** Полный цикл по founder-процессу: live accent bake-off → UI-SPEC → grill → execute. Token-VALUE restyle only (имена/структура/18-barrel/light-theme/dark-default frozen).

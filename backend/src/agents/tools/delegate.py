@@ -89,6 +89,37 @@ class CoordinatorDepsLike:
     runner: DelegateRunner | None = None
 
 
+# ── shared delegation guard ──────────────────────────────────────────────
+
+
+def assert_delegation_allowed(
+    target_slug: str,
+    *,
+    available: list[str],
+    current_depth: int,
+    max_depth: int = DEFAULT_MAX_DELEGATION_DEPTH,
+) -> None:
+    """Guard a delegation: target must be in-team and depth under the cap.
+
+    Shared by the ``delegate_task`` tool (agentic path) and the plan-execution
+    path (``runtime.dispatch.PlanExecutingCoordinator``, AC-W1-16b/24) so both
+    enforce the same ADR-016 invariants. Raises ``DelegationTargetInvalid`` /
+    ``DelegationDepthExceeded``.
+    """
+    if target_slug not in available:
+        raise DelegationTargetInvalid(
+            f"target_agent_slug={target_slug!r} not in cell team "
+            f"{sorted(available)}. Coordinator can only delegate to provisioned "
+            "specialists."
+        )
+    if current_depth >= max_depth:
+        raise DelegationDepthExceeded(
+            f"delegation depth {current_depth} >= max {max_depth}. ADR-016 "
+            "horizontal preset normally runs at depth 1-2; depth 3+ signals "
+            "an over-decomposed plan."
+        )
+
+
 # ── the tool function ────────────────────────────────────────────────────
 
 
@@ -109,24 +140,13 @@ async def delegate_task(
     delegate»; tasks/runtime owns «how it executes»).
     """
     deps = ctx.deps
-    target_slug = inp.target_agent_slug
 
-    available = list(getattr(deps, "available_agent_slugs", []) or [])
-    if target_slug not in available:
-        raise DelegationTargetInvalid(
-            f"target_agent_slug={target_slug!r} not in cell team "
-            f"{sorted(available)}. Coordinator can only delegate to provisioned "
-            "specialists."
-        )
-
-    current_depth = int(getattr(deps, "current_depth", 0))
-    max_depth = int(getattr(deps, "max_delegation_depth", DEFAULT_MAX_DELEGATION_DEPTH))
-    if current_depth >= max_depth:
-        raise DelegationDepthExceeded(
-            f"delegation depth {current_depth} >= max {max_depth}. ADR-016 "
-            "horizontal preset normally runs at depth 1-2; depth 3+ signals "
-            "an over-decomposed plan."
-        )
+    assert_delegation_allowed(
+        inp.target_agent_slug,
+        available=list(getattr(deps, "available_agent_slugs", []) or []),
+        current_depth=int(getattr(deps, "current_depth", 0)),
+        max_depth=int(getattr(deps, "max_delegation_depth", DEFAULT_MAX_DELEGATION_DEPTH)),
+    )
 
     runner: DelegateRunner | None = getattr(deps, "runner", None)
     if runner is None:
