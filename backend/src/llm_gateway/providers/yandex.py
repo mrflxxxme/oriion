@@ -4,9 +4,13 @@ Uses the Cloud Foundation Models v1 endpoint:
     POST https://llm.api.cloud.yandex.net/foundationModels/v1/completion
     POST https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding
 
-Auth via IAM token (Bearer) — the caller passes a long-lived OAuth token; we
-do not refresh in Wave 0 (Wave 1+ will integrate yc-iam-token rotation). The
-catalog (folder) id is required for the modelUri.
+Auth is hybrid (Api-Key preferred over IAM):
+    * ``YANDEX_API_KEY`` set → ``Authorization: Api-Key <key>`` — a static key
+      that does NOT expire (preferred).
+    * else ``YANDEX_IAM_TOKEN`` set → ``Authorization: Bearer <token>`` — the
+      legacy/failover scheme (~12h TTL, `yc iam create-token` rotation).
+    * else → a clear config error at request time (router then fails over).
+The catalog (folder) id is required for the modelUri.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from typing import Any
 import httpx
 import structlog
 
+from src.llm_gateway.exceptions import LLMProviderUnavailable
 from src.llm_gateway.providers.base import LLMRequest, LLMResponse, LLMUsage
 
 _logger = structlog.get_logger(__name__)
@@ -30,22 +35,45 @@ class YandexGPTProvider:
 
     def __init__(
         self,
-        iam_token: str,
-        catalog_id: str,
         *,
+        catalog_id: str,
+        api_key: str | None = None,
+        iam_token: str | None = None,
         base_url: str = "https://llm.api.cloud.yandex.net",
         timeout_seconds: float = 30.0,
     ) -> None:
+        # Two auth schemes (Api-Key preferred — see _auth_header). Both optional
+        # at construction: per the gateway convention the provider is built
+        # unconditionally and fails at REQUEST time if no credential is set
+        # (router_service then fails over to the next provider).
+        self._api_key = api_key
         self._iam_token = iam_token
         self._catalog_id = catalog_id
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_seconds
 
+    def _auth_header(self) -> str:
+        """Authorization header value — Api-Key preferred over IAM Bearer.
+
+        * ``api_key`` set → ``Api-Key <key>`` (static, non-expiring).
+        * else ``iam_token`` set → ``Bearer <token>`` (legacy, ~12h TTL).
+        * else → ``LLMProviderUnavailable`` (clear config error; the router's
+          failover chain catches it and skips to the next provider).
+        """
+        if self._api_key:
+            return f"Api-Key {self._api_key}"
+        if self._iam_token:
+            return f"Bearer {self._iam_token}"
+        raise LLMProviderUnavailable(
+            "yandexgpt: no credential configured — set YANDEX_API_KEY "
+            "(Api-Key scheme, preferred) or YANDEX_IAM_TOKEN (Bearer)."
+        )
+
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             timeout=self._timeout,
             headers={
-                "Authorization": f"Bearer {self._iam_token}",
+                "Authorization": self._auth_header(),
                 "x-folder-id": self._catalog_id,
                 "Content-Type": "application/json",
             },

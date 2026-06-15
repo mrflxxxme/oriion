@@ -185,8 +185,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     providers["yandexgpt"] = cast(
         LLMProvider,
         YandexGPTProvider(
-            iam_token=settings.yandex_iam_token.get_secret_value(),
             catalog_id=settings.yandex_catalog_id,
+            # Api-Key scheme preferred (non-expiring); IAM Bearer is the
+            # legacy/failover credential. Empty IAM → None so the provider
+            # treats it as unset.
+            api_key=settings.yandex_api_key,
+            iam_token=settings.yandex_iam_token.get_secret_value() or None,
             timeout_seconds=provider_timeout,
         ),
     )
