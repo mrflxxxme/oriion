@@ -69,6 +69,9 @@ class Task(Base):
     )
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'queued'"))
     priority: Mapped[int] = mapped_column(nullable=False, server_default=text("5"))
+    # Set when POST /run enqueues the Dramatiq dispatch actor; status stays
+    # 'queued' until the worker flips it to 'running' (AC-W1-16a, ADR-034).
+    dispatched_at: Mapped[datetime | None] = mapped_column(nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     total_cost_credits: Mapped[Decimal] = mapped_column(

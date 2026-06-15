@@ -25,6 +25,7 @@ CREATE TABLE tasks (
     status                   text NOT NULL DEFAULT 'queued' CHECK (status IN
                                 ('queued','running','waiting_input','succeeded','failed','cancelled','timed_out')),
     priority                 smallint NOT NULL DEFAULT 5,                       -- 1 (highest) .. 9 (lowest)
+    dispatched_at            timestamptz NULL,                                  -- enqueue marker for async Dramatiq dispatch (AC-W1-16a, ADR-034)
     started_at               timestamptz NULL,
     completed_at             timestamptz NULL,
     total_cost_usd           numeric(10,6) NOT NULL DEFAULT 0,                  -- TECHNICAL aggregate; not a budget cap
