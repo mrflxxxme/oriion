@@ -121,6 +121,36 @@ async def test_mock_mode_yes_value(fake_redis: object, monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
+async def test_explicit_mock_mode_overrides_env_on(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC-W1-19 bug fix: an explicit mock_mode=True (Settings-driven) returns
+    canned results EVEN when the WEB_SEARCH_MOCK_MODE env-var is unset — the env
+    is no longer the only source of truth on the dispatch path."""
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(rate_limiter=limiter, mock_mode=True)
+    results = await tool.search("foo", agent_id="agent-1", max_results=2)
+    assert len(results) == 2  # canned, no network
+
+
+@pytest.mark.asyncio
+async def test_explicit_mock_mode_false_overrides_env_on(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Conversely, explicit mock_mode=False must NOT mock even if the env says
+    'true' — Settings wins over the stale env-var."""
+    monkeypatch.setenv("WEB_SEARCH_MOCK_MODE", "true")
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    # No keys configured → with mock disabled, search must hit the no-backend path.
+    tool = WebSearchTool(rate_limiter=limiter, mock_mode=False)
+    from src.mcp.exceptions import WebSearchError
+
+    with pytest.raises(WebSearchError, match="no_search_backend_configured"):
+        await tool.search("foo", agent_id="agent-1")
+
+
+@pytest.mark.asyncio
 async def test_empty_query_rejected(fake_redis: object) -> None:
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
     tool = WebSearchTool(rate_limiter=limiter, brave_api_key="k")

@@ -504,6 +504,10 @@ def _default_web_search_tool() -> WebSearchTool:
         rate_limiter=None,
         brave_api_key=settings.brave_search_api_key.get_secret_value() or None,
         yandex_api_key=settings.yandex_search_api_key.get_secret_value() or None,
+        # Settings is the source of truth — fixes AC-W1-19 bug where the tool read
+        # os.environ directly so the .env WEB_SEARCH_MOCK_MODE flag was ignored
+        # (live Brave 422 in the Track A run).
+        mock_mode=settings.web_search_mock_mode,
     )
 
 
