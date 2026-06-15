@@ -80,11 +80,25 @@ _singleton: SSEPublisher | None = None
 
 
 def get_sse_publisher() -> SSEPublisher:
-    """Process-wide singleton accessor. Tests can monkeypatch by binding
-    a fresh InProcessSSEPublisher to the module attribute."""
+    """Process-wide singleton accessor. Backend is chosen by Settings.sse_backend:
+    'inprocess' (default — deterministic CI + single-worker dev) keeps the
+    asyncio.Queue publisher; 'redis' selects the Redis-Streams publisher so events
+    cross process boundaries (out-of-process Dramatiq worker + gunicorn -w >1).
+    Tests can monkeypatch by binding a fresh publisher to the module attribute."""
     global _singleton
     if _singleton is None:
-        _singleton = InProcessSSEPublisher()
+        from src._shared.config import get_settings
+
+        settings = get_settings()
+        if settings.sse_backend == "redis":
+            from src.runtime.redis_sse_publisher import RedisSSEPublisher
+
+            _singleton = RedisSSEPublisher(
+                redis_url=settings.redis_url,
+                poll_fallback=settings.sse_redis_poll_fallback,
+            )
+        else:
+            _singleton = InProcessSSEPublisher()
     return _singleton
 
 
