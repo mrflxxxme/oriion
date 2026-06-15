@@ -149,6 +149,17 @@ class Settings(BaseSettings):
             "Used by GigaChatProvider to obtain OAuth tokens on demand."
         ),
     )
+    llm_provider_timeout_seconds: float = Field(
+        default=120.0,
+        description=(
+            "Per-call httpx timeout (seconds) shared by all LLM providers "
+            "(DeepSeek / YandexGPT / GigaChat). Raised from the 30s provider "
+            "default because long-form writer generation (≥1500-word brief, "
+            "AC-W1-22) exceeds 30s and tripped a ReadTimeout that cascaded into "
+            "spurious failover. Aligned with AC8 cohort p95 ≤120s. Surfaced by "
+            "Phase 01.1 Track A live validation."
+        ),
+    )
 
     # ── MCP tools (Phase 00.4 — web_search + read_url) ──────────────────
     web_search_mock_mode: bool = Field(
