@@ -18,6 +18,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Russian Trusted Root CA (Минцифры) — signs the *.sberbank.ru chain that
+# GigaChat serves; the stock python:slim trust store lacks it, which broke the
+# GigaChat failover with SSL CERTIFICATE_VERIFY_FAILED in the container (AC-W1-21).
+# httpx/certifi ignores the OS trust store, so we install it system-wide AND point
+# GIGACHAT_CA_BUNDLE at the resulting bundle (the provider passes it to httpx
+# verify=). Done in the shared base so both dev + prod containers verify GigaChat.
+# Tolerant: if the CA host is unreachable at build time the GigaChat leg degrades
+# and GIGACHAT_VERIFY_SSL=false is the documented dev-only escape hatch.
+ARG RU_TRUSTED_CA_URL=https://gu-st.ru/content/Other/doc/russiantrustedca.pem
+RUN curl -fsSL "$RU_TRUSTED_CA_URL" \
+        -o /usr/local/share/ca-certificates/russian-trusted-root-ca.crt \
+    && update-ca-certificates \
+    || echo "WARN: RU Trusted Root CA install failed — GigaChat TLS will fail unless GIGACHAT_VERIFY_SSL=false"
+ENV GIGACHAT_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+
 COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /usr/local/bin/uv
 
 WORKDIR /app
