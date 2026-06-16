@@ -8,7 +8,7 @@ gate evidence (D5), this just proves the measurement logic is correct.
 from __future__ import annotations
 
 from scripts.demo_market_brief import (
-    AC8_P95_LATENCY_SECONDS,
+    AC8_DISPATCH_P95_SECONDS,
     RunResult,
     _build_summary,
     _count_content_plan_posts,
@@ -20,9 +20,11 @@ from scripts.demo_market_brief import (
 )
 
 
-def _passing_run(idx: int, *, duration: float = 50.0) -> RunResult:
+def _passing_run(idx: int, *, dispatch: float = 0.3, generation: float = 50.0) -> RunResult:
     r = RunResult(run_index=idx, started_at="t")
-    r.duration_seconds = duration
+    # AC8 reframed: dispatch latency is the hard gate; generation is an SLI.
+    r.dispatch_seconds = dispatch
+    r.generation_seconds = generation
     r.total_cost_credits = 5.0  # 5 credits × 0.01 = 0.05 USD ≤ 0.30
     r.artifacts = {
         "brief": ("слово " * 1600) + _content_plan_block(),
@@ -139,22 +141,36 @@ def test_evaluate_ac9_pass_and_fail() -> None:
 # ── cohort p95 + summary ──────────────────────────────────────────────────
 
 
-def test_build_summary_cohort_p95_and_aggregates() -> None:
-    runs = [_passing_run(i, duration=float(40 + i)) for i in range(1, 11)]
+def test_build_summary_dispatch_gate_and_aggregates() -> None:
+    runs = [
+        _passing_run(i, dispatch=0.2 + i * 0.01, generation=float(40 + i)) for i in range(1, 11)
+    ]
     summary = _build_summary(runs)
     assert summary["runs"] == 10
-    assert summary["ac8_cohort_p95_seconds"] <= AC8_P95_LATENCY_SECONDS
+    # AC8 hard gate is dispatch latency (≤1s); generation is recorded as an SLI.
+    assert summary["ac8_dispatch_p95_seconds"] <= AC8_DISPATCH_P95_SECONDS
     assert summary["ac8_passed"] is True
+    assert summary["generation_p95_seconds"] > 0
     assert summary["ac9_per_run_all_pass"] is True
     assert summary["ac10_per_run_all_pass"] is True
     assert summary["runs_passed"] == 10
 
 
-def test_build_summary_flags_slow_cohort() -> None:
-    runs = [_passing_run(i, duration=200.0) for i in range(1, 11)]
+def test_build_summary_flags_slow_dispatch() -> None:
+    runs = [_passing_run(i, dispatch=2.0) for i in range(1, 11)]
     summary = _build_summary(runs)
-    assert summary["ac8_cohort_p95_seconds"] > AC8_P95_LATENCY_SECONDS
+    assert summary["ac8_dispatch_p95_seconds"] > AC8_DISPATCH_P95_SECONDS
     assert summary["ac8_passed"] is False
+
+
+def test_slow_generation_does_not_gate() -> None:
+    """AC8 reframe: a slow cohort generation (well past the old 120s gate) must
+    NOT fail AC8 as long as dispatch stayed fast — generation is an SLI."""
+    runs = [_passing_run(i, dispatch=0.3, generation=300.0) for i in range(1, 11)]
+    summary = _build_summary(runs)
+    assert summary["ac8_passed"] is True
+    assert summary["generation_p95_seconds"] >= 120.0
+    assert _decide_exit_code(runs, summary, tolerate_failures=0) == 0
 
 
 # ── exit code policy ──────────────────────────────────────────────────────
@@ -175,8 +191,8 @@ def test_exit_code_transport_error_is_two() -> None:
     assert _decide_exit_code(runs, summary, tolerate_failures=5) == 2
 
 
-def test_exit_code_slow_cohort_is_one() -> None:
-    runs = [_passing_run(i, duration=200.0) for i in range(1, 11)]
+def test_exit_code_slow_dispatch_is_one() -> None:
+    runs = [_passing_run(i, dispatch=2.0) for i in range(1, 11)]
     summary = _build_summary(runs)
     assert _decide_exit_code(runs, summary, tolerate_failures=0) == 1
 
