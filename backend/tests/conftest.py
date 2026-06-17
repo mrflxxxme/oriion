@@ -54,6 +54,11 @@ import os
 from collections.abc import AsyncIterator, Iterator
 from typing import TYPE_CHECKING
 
+# Select the Dramatiq StubBroker (no network) BEFORE any app module — and thus
+# src.runtime.queue.broker / actor — is imported. set at import-time so the
+# @dramatiq.actor decoration binds to the stub, not a RedisBroker. AC-W1-16a.
+os.environ.setdefault("DRAMATIQ_TESTING", "1")
+
 import pytest
 import pytest_asyncio
 

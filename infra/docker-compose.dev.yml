@@ -80,6 +80,9 @@ services:
       MINIO_ACCESS_KEY: oriion
       MINIO_SECRET_KEY: oriion-dev-s3
       PYTHONUNBUFFERED: "1"
+      # AC-W1-1: Redis-Streams SSE so /stream sees events produced by the
+      # out-of-process Dramatiq worker (AC-W1-16a). MUST match the worker.
+      SSE_BACKEND: redis
       # AC-W1-20: read role-prompts from the canonical mount below (the loader's
       # in-container parents-walk can't reach .planning under ../backend:/app).
       ROLE_PROMPTS_DIR: /app/role_prompts
@@ -100,6 +103,41 @@ services:
       timeout: 3s
       retries: 12
       start_period: 60s
+
+  # AC-W1-16a: Dramatiq worker that runs task orchestrations off-request. POST
+  # /run enqueues here and returns 202 <1s; the worker streams its SSE ledger via
+  # Redis (SSE_BACKEND=redis) so the backend's /stream sees it. -p1 -t1 keeps the
+  # workers=1 / single-global-budget invariant (F-ARC-H2). Depends on backend
+  # healthy so the shared venv is already synced (fast no-op sync here).
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@postgres:5432/oriion_dev
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: oriion
+      MINIO_SECRET_KEY: oriion-dev-s3
+      PYTHONUNBUFFERED: "1"
+      SSE_BACKEND: redis
+      ROLE_PROMPTS_DIR: /app/role_prompts
+    volumes:
+      - ../backend:/app
+      - backend_venv:/app/.venv
+      - ../.planning/contracts/role-prompts:/app/role_prompts:ro
+    command:
+      - sh
+      - -c
+      - "uv sync --frozen 2>/dev/null || uv sync; uv run dramatiq src.runtime.queue.worker --processes 1 --threads 1"
 
   frontend:
     build:

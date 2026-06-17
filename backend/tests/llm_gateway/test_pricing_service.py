@@ -30,10 +30,31 @@ def test_calculate_cost_for_deepseek_chat() -> None:
         tokens_out=1000,
         fx_rate=Decimal("100"),
     )
-    # 1k input @ 0.00014 + 1k output @ 0.00028 = 0.00042 USD
-    assert cost_usd == Decimal("0.000420")
-    # 0.00042 * 100 = 0.042 RUB → quantize to (12,4) precision
-    assert cost_rub == Decimal("0.0420")
+    # AC-W1-13 V4 refresh: deepseek-chat (V4-flash tier) — $0.27/1M in, $1.10/1M
+    # out. 1k input @ 0.00027 + 1k output @ 0.00110 = 0.00137 USD.
+    assert cost_usd == Decimal("0.001370")
+    # 0.00137 * 100 = 0.137 RUB → quantize to (12,4) precision.
+    assert cost_rub == Decimal("0.1370")
+
+
+def test_calculate_cost_deepseek_v4_catalog_names_match_aliases() -> None:
+    """The V4 catalog model names price identically to the logical aliases."""
+    flash = calculate_cost_usd_and_rub(
+        "deepseek", "deepseek-v4-flash", tokens_in=1000, tokens_out=1000, fx_rate=Decimal("100")
+    )
+    chat = calculate_cost_usd_and_rub(
+        "deepseek", "deepseek-chat", tokens_in=1000, tokens_out=1000, fx_rate=Decimal("100")
+    )
+    assert flash == chat
+    pro = calculate_cost_usd_and_rub(
+        "deepseek", "deepseek-v4-pro", tokens_in=1000, tokens_out=1000, fx_rate=Decimal("100")
+    )
+    reasoner = calculate_cost_usd_and_rub(
+        "deepseek", "deepseek-reasoner", tokens_in=1000, tokens_out=1000, fx_rate=Decimal("100")
+    )
+    assert pro == reasoner
+    # pro tier (V4-pro) — $0.55/1M in, $2.19/1M out.
+    assert pro[0] == Decimal("0.002740")
 
 
 def test_calculate_cost_for_yandex_pro() -> None:

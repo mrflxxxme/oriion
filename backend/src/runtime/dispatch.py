@@ -59,8 +59,8 @@ from src.agents.tools.delegate import (
 )
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
-from src.mcp.exceptions import MCPError
-from src.mcp.tools.web_search import WebSearchTool
+from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
+from src.mcp.tools.web_search import WebSearchResult, WebSearchTool
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
 from src.tasks.models import Task
@@ -69,6 +69,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from src.llm_gateway.services.router_service import LLMRouter
+    from src.mcp.tools.rate_limit import ToolRateLimiter
 
 # ── Wave-0 cost estimate ──────────────────────────────────────────────────
 # A T-credit ≈ 0.01 USD per ADR-018. DeepSeek-chat list price (2026) is
@@ -236,6 +237,17 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     return int(input_tokens), int(output_tokens)
 
 
+def _format_search_results(results: list[WebSearchResult]) -> str:
+    """Format web_search hits as a citable markdown block (shared by the scripted
+    pre-fetch and the native tool-call path so artifacts stay consistent)."""
+    if not results:
+        return ""
+    lines = ["## Актуальные результаты веб-поиска (используй как источники, цитируй URL):"]
+    for i, r in enumerate(results, start=1):
+        lines.append(f"{i}. {r.title} — {r.url}\n   {r.snippet}")
+    return "\n".join(lines)
+
+
 async def fetch_research_context(
     web_search_tool: WebSearchTool,
     query: str,
@@ -244,9 +256,11 @@ async def fetch_research_context(
 ) -> str:
     """Run a live web_search and format the top hits as a markdown block.
 
-    Degrades gracefully: any web_search failure (no backend key configured,
-    rate-limit, upstream/network error) returns "" so the Researcher falls
-    back to LLM-only synthesis instead of failing the whole task run.
+    Scripted pre-fetch (the YandexGPT/GigaChat failover path — ADR-035): used when
+    the active provider can't forward native tool-calls. Degrades gracefully: any
+    web_search failure (no backend key configured, rate-limit, upstream/network
+    error) returns "" so the Researcher falls back to LLM-only synthesis instead of
+    failing the whole task run.
     """
     if not query.strip():
         return ""
@@ -256,12 +270,44 @@ async def fetch_research_context(
         )
     except MCPError:  # WebSearchError + ToolRateLimitExceeded both subclass MCPError
         return ""
-    if not results:
-        return ""
-    lines = ["## Актуальные результаты веб-поиска (используй как источники, цитируй URL):"]
-    for i, r in enumerate(results, start=1):
-        lines.append(f"{i}. {r.title} — {r.url}\n   {r.snippet}")
-    return "\n".join(lines)
+    return _format_search_results(results)
+
+
+def build_native_web_search(
+    web_search_tool: WebSearchTool,
+    *,
+    agent_id: str = "researcher",
+    max_results: int = WEB_SEARCH_MAX_RESULTS,
+) -> Callable[[str], Awaitable[str]]:
+    """Build the native Pydantic-AI ``web_search`` tool callable (AC-W1-19).
+
+    Bound to a rate-limited ``WebSearchTool`` + the Researcher ``agent_id`` so the
+    Redis ``ToolRateLimiter`` throttles the agent's own search loop. Registered on
+    the Researcher agent only on the DeepSeek path (ADR-035 gating in
+    ``dispatch_task``). The returned coroutine's name + docstring + ``str`` param
+    become the ``ToolDefinition`` forwarded to the provider.
+    """
+
+    async def web_search(query: str) -> str:
+        """Search the web for up-to-date facts, competitors, prices and market data.
+
+        Call this whenever the task needs current information you are unsure about.
+        Pass a focused query in the user's language. Returns titled results with URLs
+        to cite. Returns a short note if the rate limit is hit or no backend is set.
+        """
+        try:
+            results = await web_search_tool.search(
+                query, agent_id=agent_id, max_results=max_results
+            )
+        except ToolRateLimitExceeded:
+            return "Лимит веб-поиска исчерпан — используй уже собранные результаты."
+        except MCPError:
+            # No backend configured / upstream error → let the model proceed
+            # from its own knowledge rather than fail the run.
+            return ""
+        return _format_search_results(results) or "Результаты не найдены."
+
+    return web_search
 
 
 def build_leaf_runner(
@@ -274,13 +320,17 @@ def build_leaf_runner(
     workspace_id: UUID | None = None,
     leaf_specs: dict[str, _LeafSpec] | None = None,
     web_search_tool: WebSearchTool | None = None,
+    native_web_search: Callable[[str], Awaitable[str]] | None = None,
     user_prompt: str = "",
 ) -> Callable[[DelegateInput, OrchestratorContext], Awaitable[DelegateResult]]:
     """Build the production leaf-dispatch callable.
 
     For each delegation the runner:
-        1. (Researcher only) pre-fetches live web_search context and prepends
-           it to the sub-prompt — REAL market data, not LLM memory.
+        1. (Researcher only) wires web_search. On the DeepSeek path
+           (``native_web_search`` supplied — ADR-035) the tool is registered on
+           the agent and the model searches autonomously (AC-W1-19); otherwise the
+           runner pre-fetches live web_search context and prepends it to the
+           sub-prompt (scripted failover path).
         2. Builds the target specialist Agent (real ``LLMGatewayModel``).
         3. Runs it against the (possibly research-augmented) sub_prompt.
         4. Persists a child ``Task`` row (status='succeeded').
@@ -295,19 +345,27 @@ def build_leaf_runner(
                 f"no leaf spec for slug={inp.target_agent_slug!r}; " f"known={sorted(specs)}"
             )
 
-        sub_prompt = inp.sub_prompt
-        # Researcher gets live web_search context prepended (founder 2026-06-07).
-        if inp.target_agent_slug == "researcher" and web_search_tool is not None:
-            context = await fetch_research_context(web_search_tool, user_prompt or inp.sub_prompt)
-            if context:
-                sub_prompt = f"{context}\n\n{inp.sub_prompt}"
-
         model = LLMGatewayModel(
             role_key=inp.target_agent_slug,
             llm_router=llm_router,
             workspace_id=workspace_id,
         )
-        agent = spec.build(model=model)
+
+        sub_prompt = inp.sub_prompt
+        build_kwargs: dict[str, Any] = {"model": model}
+        if inp.target_agent_slug == "researcher":
+            if native_web_search is not None:
+                # DeepSeek path: the model owns the search loop (no pre-fetch).
+                build_kwargs["web_search"] = native_web_search
+            elif web_search_tool is not None:
+                # Failover path: prepend scripted live context (founder 2026-06-07).
+                context = await fetch_research_context(
+                    web_search_tool, user_prompt or inp.sub_prompt
+                )
+                if context:
+                    sub_prompt = f"{context}\n\n{inp.sub_prompt}"
+
+        agent = spec.build(**build_kwargs)
         run_result = await agent.run(sub_prompt, deps=spec.deps_factory())
 
         # Fence-stripping only: prior_context chaining must keep the role-
@@ -492,19 +550,36 @@ class PlanExecutingCoordinator:
         )
 
 
-def _default_web_search_tool() -> WebSearchTool:
-    """Construct a no-rate-limiter WebSearchTool from Settings (Brave key).
+def _default_web_search_tool(
+    *,
+    rate_limiter: ToolRateLimiter | None = None,
+) -> WebSearchTool:
+    """Construct a WebSearchTool from Settings (Brave key).
 
-    Single call per task run → no Redis limiter needed. If no Brave/Yandex key
-    is configured, the tool raises at search-time and the Researcher leaf
-    degrades to LLM-only (see fetch_research_context).
+    ``rate_limiter`` is wired on the native tool-call path (AC-W1-19) so the
+    Researcher's own search loop is throttled via Redis; the scripted pre-fetch
+    path issues a single call per run and can pass ``None``. If no Brave/Yandex
+    key is configured the tool raises at search-time and the Researcher leaf
+    degrades to LLM-only (see fetch_research_context / build_native_web_search).
     """
     settings = get_settings()
     return WebSearchTool(
-        rate_limiter=None,
+        rate_limiter=rate_limiter,
         brave_api_key=settings.brave_search_api_key.get_secret_value() or None,
         yandex_api_key=settings.yandex_search_api_key.get_secret_value() or None,
+        # Settings is the source of truth — fixes AC-W1-19 bug where the tool read
+        # os.environ directly so the .env WEB_SEARCH_MOCK_MODE flag was ignored
+        # (live Brave 422 in the Track A run).
+        mock_mode=settings.web_search_mock_mode,
     )
+
+
+def _router_supports_native_tools(llm_router: Any, role_key: str) -> bool:
+    """Defensively ask the router whether ``role_key`` would run on a tool-capable
+    provider (DeepSeek). Returns False for routers without the predicate (e.g. the
+    ``object()`` stand-in used by no-delegation unit tests)."""
+    predicate = getattr(llm_router, "would_use_native_tools", None)
+    return bool(predicate(role_key)) if callable(predicate) else False
 
 
 async def dispatch_task(
@@ -516,18 +591,29 @@ async def dispatch_task(
     available_agent_slugs: list[str] | None = None,
     coordinator: PlanExecutingCoordinator | None = None,
     web_search_tool: WebSearchTool | None = None,
+    tool_rate_limiter: ToolRateLimiter | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
     Returns the structured CoordinatorOutput dict (the orchestrator also
     emits the SSE ledger to ``sse_publisher`` so ``/stream`` subscribers see
-    the full event log via drain-replay). The Researcher leaf is augmented
-    with live web_search context (Brave) when a key is configured.
+    the full event log via drain-replay).
+
+    Researcher web_search wiring is DeepSeek-gated (ADR-035): when DeepSeek is the
+    active provider the Researcher gets a **native** ``web_search`` tool (rate-
+    limited via ``tool_rate_limiter``) and decides its own searches (AC-W1-19); on
+    YandexGPT/GigaChat failover it falls back to the scripted pre-fetch.
     """
     publisher = sse_publisher or get_sse_publisher()
     slugs = available_agent_slugs or list(_DEFAULT_LEAF_SPECS)
     coord = coordinator or PlanExecutingCoordinator(llm_router=llm_router)
-    search_tool = web_search_tool or _default_web_search_tool()
+
+    # DeepSeek active → native tool-call path (rate-limited); else scripted.
+    native_enabled = _router_supports_native_tools(llm_router, "researcher")
+    search_tool = web_search_tool or _default_web_search_tool(
+        rate_limiter=tool_rate_limiter if native_enabled else None
+    )
+    native_web_search = build_native_web_search(search_tool) if native_enabled else None
 
     user_prompt = ""
     if isinstance(task.input_jsonb, dict):
@@ -540,6 +626,7 @@ async def dispatch_task(
         cell_id=task.cell_id,
         user_id=task.initiated_by_user_id,
         web_search_tool=search_tool,
+        native_web_search=native_web_search,
         user_prompt=user_prompt,
     )
 
@@ -562,6 +649,7 @@ __all__ = [
     "WEB_SEARCH_MAX_RESULTS",
     "PlanExecutingCoordinator",
     "build_leaf_runner",
+    "build_native_web_search",
     "dispatch_task",
     "estimate_credits",
     "fetch_research_context",

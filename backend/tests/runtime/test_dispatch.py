@@ -398,6 +398,86 @@ async def test_build_leaf_runner_prepends_research_context_for_researcher() -> N
 
 
 @pytest.mark.asyncio
+async def test_build_leaf_runner_native_tool_path_skips_prefetch() -> None:
+    """AC-W1-19 (DeepSeek path): when a native web_search callable is supplied the
+    Researcher agent is built WITH the tool and the scripted pre-fetch is skipped
+    (the sub-prompt is passed through unchanged; the model owns the search loop)."""
+    session = _FakeSession()
+    fake_agent = _FakeLeafAgent("матрица", in_tok=100, out_tok=200)
+    seen_build_kwargs: dict[str, Any] = {}
+
+    def _build(*, model: Any, **kwargs: Any) -> Any:
+        seen_build_kwargs.update(kwargs)
+        return fake_agent
+
+    specs = {"researcher": _LeafSpec(build=_build, deps_factory=_FakeDeps2)}
+    scripted_tool = _FakeSearchTool(
+        results=[WebSearchResult(title="X", url="https://x.ru", snippet="s")]
+    )
+
+    async def _native_web_search(query: str) -> str:
+        return "native result"
+
+    runner = build_leaf_runner(
+        llm_router=object(),  # type: ignore[arg-type]
+        session=session,  # type: ignore[arg-type]
+        parent_task_id=uuid4(),
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        leaf_specs=specs,
+        web_search_tool=scripted_tool,  # type: ignore[arg-type]  # present but must be ignored
+        native_web_search=_native_web_search,
+        user_prompt="рынок AI команд РФ",
+    )
+    await runner(DelegateInput(target_agent_slug="researcher", sub_prompt="собери матрицу"), None)  # type: ignore[arg-type]
+
+    # The native tool was registered on the agent…
+    assert seen_build_kwargs.get("web_search") is _native_web_search
+    # …the scripted pre-fetch did NOT run (no queries, prompt unchanged).
+    assert scripted_tool.queries == []
+    assert fake_agent.run_prompts[0] == "собери матрицу"
+
+
+def test_router_supports_native_tools_defensive() -> None:
+    """The gating helper returns False for routers lacking the predicate
+    (the object() stand-in used by no-delegation tests) and honours real ones."""
+    from src.runtime.dispatch import _router_supports_native_tools
+
+    class _Yes:
+        def would_use_native_tools(self, role_key: str) -> bool:
+            return role_key == "researcher"
+
+    class _No:
+        def would_use_native_tools(self, role_key: str) -> bool:
+            return False
+
+    assert _router_supports_native_tools(object(), "researcher") is False
+    assert _router_supports_native_tools(_Yes(), "researcher") is True
+    assert _router_supports_native_tools(_Yes(), "writer") is False
+    assert _router_supports_native_tools(_No(), "researcher") is False
+
+
+@pytest.mark.asyncio
+async def test_build_native_web_search_formats_and_rate_limits() -> None:
+    """The native tool callable formats hits like the scripted path and returns a
+    clear note (not an exception) when the rate limit is hit."""
+    from src.mcp.exceptions import ToolRateLimitExceeded
+    from src.runtime.dispatch import build_native_web_search
+
+    ok_tool = _FakeSearchTool(
+        results=[WebSearchResult(title="Конкурент", url="https://c.ru", snippet="боты")]
+    )
+    fn = build_native_web_search(ok_tool)  # type: ignore[arg-type]
+    out = await fn("AI команды")
+    assert "https://c.ru" in out and "Конкурент" in out
+    assert ok_tool.queries == ["AI команды"]
+
+    limited = _FakeSearchTool(raise_exc=ToolRateLimitExceeded(retry_after=30, detail="x"))
+    note = await build_native_web_search(limited)("q")  # type: ignore[arg-type]
+    assert "Лимит" in note
+
+
+@pytest.mark.asyncio
 async def test_build_leaf_runner_no_search_tool_uses_plain_subprompt() -> None:
     session = _FakeSession()
     fake_agent = _FakeLeafAgent("матрица", in_tok=100, out_tok=200)

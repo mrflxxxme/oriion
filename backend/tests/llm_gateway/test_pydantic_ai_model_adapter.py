@@ -225,6 +225,93 @@ async def test_llm_gateway_model_merges_system_messages(fake_router):
     assert "JSON" in system_msgs[0]["content"]
 
 
+# ── native tool-call loop (AC-W1-19) ────────────────────────────────────
+
+
+async def test_llm_gateway_model_native_tool_loop_round_trips(fake_router):
+    """AC-W1-19: an Agent with a function tool forwards the tool to the provider,
+    parses the returned ``tool_calls`` into a ToolCallPart, runs the tool, and
+    feeds the ToolReturnPart back on the next request (the tool-loop)."""
+    from pydantic_ai import Agent
+
+    # Two-turn provider exchange: first a tool_call, then the final text answer.
+    first = LLMResponse(
+        content="",
+        finish_reason="tool_calls",
+        tool_calls=[
+            {
+                "id": "call_42",
+                "type": "function",
+                "function": {"name": "web_search", "arguments": '{"query": "AI команды РФ"}'},
+            }
+        ],
+        usage=LLMUsage(tokens_input=10, tokens_output=4),
+        raw_provider_metadata={"provider": "deepseek"},
+    )
+    final = LLMResponse(
+        content="Готово: подготовил сводку по источникам.",
+        finish_reason="stop",
+        usage=LLMUsage(tokens_input=30, tokens_output=12),
+        raw_provider_metadata={"provider": "deepseek"},
+    )
+    fake_router.acomplete = AsyncMock(
+        side_effect=[(first, "deepseek-chat", "deepseek"), (final, "deepseek-chat", "deepseek")]
+    )
+
+    searched: list[str] = []
+
+    async def web_search(query: str) -> str:
+        """Search the web and return citable results."""
+        searched.append(query)
+        return "1. Конкурент Альфа — https://a.ru"
+
+    model = LLMGatewayModel(role_key="researcher", llm_router=fake_router)
+    agent = Agent(model=model, output_type=str, tools=[web_search])
+
+    result = await agent.run("Изучи рынок AI-команд в РФ.")
+
+    # The tool actually ran with the model-chosen query.
+    assert searched == ["AI команды РФ"]
+    assert "Готово" in result.output
+
+    # Two provider round-trips: tool request, then continuation.
+    assert fake_router.acomplete.await_count == 2
+
+    # Turn 1 forwarded the OpenAI-shaped tool definition.
+    first_call = fake_router.acomplete.await_args_list[0].kwargs
+    assert first_call["tools"] is not None
+    assert first_call["tools"][0]["function"]["name"] == "web_search"
+
+    # Turn 2 echoed the assistant tool_calls + the tool result (role="tool").
+    second_msgs = fake_router.acomplete.await_args_list[1].kwargs["messages"]
+    assert any(m["role"] == "tool" and m["tool_call_id"] == "call_42" for m in second_msgs)
+    assistant_tool_msg = next(
+        m for m in second_msgs if m["role"] == "assistant" and m.get("tool_calls")
+    )
+    assert assistant_tool_msg["tool_calls"][0]["id"] == "call_42"
+
+
+async def test_llm_gateway_model_no_tools_passes_none(fake_router, model_request_params):
+    """With no function tools, acomplete is called with tools=None (so the
+    provider body omits the key entirely — the Coordinator PromptedOutput path)."""
+    model = LLMGatewayModel(role_key="coordinator", llm_router=fake_router)
+    await model.request(
+        messages=[ModelRequest(parts=[UserPromptPart(content="hi")])],
+        model_settings=None,
+        model_request_parameters=model_request_params,
+    )
+    assert fake_router.acomplete.await_args.kwargs["tools"] is None
+
+
+def test_normalize_finish_reason_maps_tool_calls():
+    """DeepSeek's plural 'tool_calls' maps to Pydantic-AI's singular 'tool_call'."""
+    from src.llm_gateway.pydantic_ai_model import _normalize_finish_reason
+
+    assert _normalize_finish_reason("tool_calls") == "tool_call"
+    assert _normalize_finish_reason("stop") == "stop"
+    assert _normalize_finish_reason("unknown-token") == "stop"
+
+
 @pytest.mark.parametrize(
     ("role", "expected"),
     [("writer", 8192), ("coordinator", 2048), ("researcher", 4096), ("unknown-role", 4096)],

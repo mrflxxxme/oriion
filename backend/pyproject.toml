@@ -28,7 +28,10 @@ dependencies = [
     "structlog>=24.4,<25.0",
     "email-validator>=2.2,<3.0",
     # Phase 00.4 — LLM Gateway + MCP tools
-    "cryptography>=46.0.6,<47.0",     # AES-256-GCM for LocalAESKMS (>=46.0.6 fixes CVE-2026-26007 + CVE-2026-34073)
+    "cryptography>=48.0.1,<49.0",     # AES-256-GCM for LocalAESKMS (>=48.0.1 fixes GHSA-537c-gmf6-5ccf; prior >=46.0.6 fixed CVE-2026-26007 + CVE-2026-34073)
+    # Transitive security floors — CVE drift 2026-06, fixes available (pin direct):
+    "aiohttp>=3.14.1",                # CVE-2026-54273..54280 (8) fixed in 3.14.1
+    "python-multipart>=0.0.31",       # CVE-2026-53538/53539/53540 fixed in 0.0.30/0.0.31 (transitive via starlette)
     "openai>=2.29,<3.0",              # bumped to satisfy pydantic-ai >=1.56 (security)
     "readability-lxml>=0.8,<1.0",     # MCP read_url tool main-content extraction
     "lxml>=6.1,<7.0",                 # readability-lxml dep (>=6.1 fixes CVE-2026-41066)

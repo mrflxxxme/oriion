@@ -4,15 +4,15 @@
 
 ## Last updated
 
-- Date: 2026-06-15 (Phase 01.1-retro **Track A** — funded-DeepSeek live validation + 2 live-surfaced fixes)
-- Session: `goofy-darwin-194c68` (continued)
+- Date: 2026-06-16 (Phase 01.1 **infra-PR** — async Dramatiq dispatch + Redis-SSE + AC8 reframe)
+- Session: `confident-lewin-169788`
 - Agent: @claude-opus
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A code-complete** (C1–C9 + live-fixes). CI-deterministic green (568 passed); **core live-validated** (PromptedOutput + генерализация); **market-brief golden re-run on funded DeepSeek: AC9 ✅ 3/3 + AC10 ✅ 3/3; AC8 ❌ (cohort p95 163s > 120s — DeepSeek v4-flash long-gen latency, infra-PR perf item).**
-- **Phase 01.1 Track A scope:** AC-W1-16b ✅, AC-W1-24 ✅, AC-W1-25 ✅, AC-W1-20 ✅, AC-W1-22 ✅, AC-W1-23a ✅. **AC-W1-16 PARTIAL** — 16b (реальный Координатор) done; **16a (Dramatiq 202<1s) + AC-W1-1 (Redis-SSE) → infra-PR.**
-- **Phase 00.8 (design restyling):** code-complete, e2e:live pending staging (independent, не блокирует 01.1).
+- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A ✅** + **infra-PR code-complete** (этот PR). Async-исполнение готово: `POST /run` → **202 <1s**, оркестрация в Dramatiq worker, SSE через Redis Streams. **AC8 RESOLVED by reframe** (dispatch p95 ≤1s hard-gate + generation SLI).
+- **infra-PR scope (11 атомарных коммитов off `5a0370b`):** AC-W1-16a ✅, AC-W1-1 ✅, AC-W1-21 ✅, AC-W1-11 ✅, AC-W1-12 ✅. **AC-W1-19 PARTIAL** (Settings-bug fixed; native → follow-up). **Deferred:** AC-W1-13 + AC-W1-2/3/4/5/9/10/14/15 → obs/IaC follow-up.
+- **Phase 00.8 (design restyling):** code-complete, e2e:live pending staging (независимо, не блокирует 01.1).
 
 ## Active blockers
 
@@ -21,60 +21,56 @@
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Wave 1) |
 
-## What just happened — Phase 01.1 Track A (2026-06-15)
+## What just happened — Phase 01.1 infra-PR (2026-06-16)
 
-Founder-process: bootstrap-4 → `/grill-me` (8 развилок) → Plan-агент → execute (C1–C9) → `gsd-verifier` (GSD L1) → exit ritual.
+Founder-process: bootstrap → AskUserQuestion (3 развилки) → Plan-агент (async-архитектура) → execute (C1–C11) → verify-bar.
 
-### Ключевое решение ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md))
-Координатор решает декомпозицию **plan-then-execute через Pydantic-AI `PromptedOutput`**, НЕ native tool-call (отклонение от буквы AC-W1-16, зафиксировано). Причина: `deepseek-reasoner` не умеет tools/JSON; только DeepSeek форвардит tools (Yandex/GigaChat — нет → native loop ломает failover). Plain-text in/out → робастно на всех 3 провайдерах; **gateway tool-forwarding = 0**.
+### Ключевое решение ([ADR-034](./decisions/ADR-034-async-dispatch-redis-sse-ac8-reframe.md))
+`POST /run` enqueues a **Dramatiq actor** и возвращает **202 `{status:"dispatched"}` <1s** — result теперь в **`task.completed` SSE-фрейме** (breaking contract). Оркестрация в worker-процессе (`dramatiq src.runtime.queue.worker -p1 -t1`). SSE через **Redis Streams** (не pub/sub — нужен cross-process **drain-replay**: late subscriber XREAD from `0`). `tasks.dispatched_at` idempotency-marker (worker guard на `status=='queued'` → redelivery-safe; нет `'dispatched'` статуса → без CHECK-migration). Worker сам ставит 3-GUC RLS. **AC8 reframe** ([ADR-025](./decisions/ADR-025-acceptance-gate-format.md) amendment): hard-gate = dispatch p95 ≤1s; generation ~163s = SLI.
 
-### Код (9 коммитов, verified green)
-- **C1** `pydantic_ai_model.py` — `request()` → `prepare_request` + инъекция `prompted_output_instructions` системным сообщением.
-- **C2** `agents/coordinator.py` — `PromptedOutput(CoordinatorOutput)`, `tools=[]`.
-- **C3** `router_service.py` — coordinator→`deepseek-chat`. **C4** — `ROLE_TO_MAX_TOKENS` (coord 2048 / r,a 4096 / writer 8192).
-- **C5** `runtime/dispatch.py` — `PlanExecutingCoordinator` (план→исполнение через orchestrator runner; guard'ы через `assert_delegation_allowed`; `DelegationStep.artifact_type`); удалены `_SUB_PROMPT_FRAMING`/`DEFAULT_PIPELINE`/`_ARTIFACT_KIND`/`ScriptedCoordinator`.
-- **C6** canned coordinator fixture → один fenced-JSON план + real-path demo-flow тест.
-- **C7** role-prompts → v1.0.0/stable; Координатор §1/§2/§3/§6 → JSON-план output; r/a/w +≥2 non-brief §6-примера.
-- **C8** single-source: `scripts/sync_role_prompts.{sh,ps1}` + `backend/.gitignore` + CI drift-check; committed `backend/role_prompts/` дубль удалён.
-- **C9** frontend `TaskSubmitPage` пресет несёт полный AC9-контракт; backend prompt-agnostic + `demo_market_brief.py` DEMO_PROMPT синхронизирован.
+### Код (11 коммитов, verified green)
+- **C1** config: `sse_backend` + `gigachat_verify_ssl`/`gigachat_ca_bundle`.
+- **C2** `tasks.dispatched_at` миграция + model + schema.sql parity.
+- **C3** `llm_gateway/factory.py::build_llm_router` (web+worker seam).
+- **C4** `runtime/redis_sse_publisher.py` (Redis Streams; `get_sse_publisher` backend selector; default inprocess → CI детерминирован).
+- **C5** `runtime/queue/{broker,actor,worker}.py` (StubBroker под `DRAMATIQ_TESTING`).
+- **C6** endpoint cutover (`run_task` → 202 + enqueue; commit-then-enqueue).
+- **C7** `web_search` Settings `mock_mode` fix (os.environ-bug → live Brave 422).
+- **C8** Dockerfile RU Trusted Root CA + `GIGACHAT_CA_BUNDLE` + `.env.example`.
+- **C9** thread-safe `setup_otel` (AC-W1-12) + span header-redaction (AC-W1-11).
+- **C10** `demo_market_brief.py` AC8 reframe (dispatch-gate + generation-SLI).
+- **C11** docker-compose `worker` service + `SSE_BACKEND=redis` + ADR-034/035 + README/ADR-025.
 
 ### Доки
-- **ADR-032** (plan-then-execute, Accepted) + **ADR-033** (GSD re-enablement L1/L2, Proposed; correction-note к ADR-023 §6). decisions/README обновлён.
-- STATUS / JOURNAL обновлены.
-
-### GSD (per [ADR-033](./decisions/ADR-033-gsd-methodology-reenablement.md))
-**L1 восстановлен и продемонстрирован:** `gsd-verifier` прогнан goal-backward на Track A → **verdict GOAL ACHIEVED**. **L2** (slash-оркестраторы: ROADMAP.md/STATE.md/config.json/layout-bridge) — отдельный planning-spike, НЕ в этом PR.
+- **ADR-034** (async + Redis-SSE + AC8 reframe, Accepted) + **ADR-035** (DeepSeek-gated web_search, Proposed/deferred). decisions/README + ADR-025 amendment.
+- STATUS / JOURNAL / 01.1-retro обновлены.
 
 ## Verification state
 
-- **CI-deterministic (green):** backend `ruff` + `ruff format --check` ✓; `mypy --strict` (145 files) ✓; `pytest` **568 passed, 23 deselected (@live), cov 87.9%** ✓; role-prompt drift-check ✓; frontend `TaskSubmitPage` 5/5 + prettier + eslint ✓.
-- **gsd-verifier (GSD L1) — GOAL ACHIEVED:** все 6 in-scope AC verified.
-- **Live-валидация (2026-06-15, локальный `oriion_live` стек):** ключи `.env` из `great-engelbart` worktree. DeepSeek **402** (out-of-balance), YandexGPT **401** (IAM-токен 2026-05-25 истёк) → failover на **GigaChat**.
-  - ✅ **PromptedOutput на реальном LLM:** GigaChat вернул schema-conformant JSON → распарсилось в `CoordinatorOutput`. Центральный риск verifier'а (fenced-JSON на реальном провайдере) — снят.
-  - ✅ **Генерализация (AC-W1-24):** тривиальный + «сравни 3 CRM» → **direct-action** (пустой план); «перепиши лендинг» → **writer-only** план, `artifact_type="copywriting"` (НЕ `brief`).
-  - ✅ **Fix surfaced live → commit `193a1fc`:** GigaChat 422 на двух system-message (PromptedOutput добавляет 2-й) → `_messages_to_openai_shape` мёржит в один → **200** ([ADR-032](./decisions/ADR-032-coordinator-plan-then-execute.md) §Validated live).
-  - ⚠️ **Market-brief AC8/9/10 НЕ закрыт:** GigaChat ReadTimeout'ит на ≥1500-словном writer (30s per-call provider timeout) + не уложится в AC8 latency. **Нужен funded DeepSeek** (быстрый primary).
+- **CI-deterministic (green):** `ruff`(src tests scripts) ✓; `ruff format --check`(272) ✓; `mypy --strict` **151 files** ✓; `pytest` **588 passed, 23 deselected (@live/@integration), cov ≥87.9%** ✓.
+- **+20 новых тестов:** Redis-SSE cross-process drain-replay (fakeredis, 2 publishers/1 server), StubBroker actor enqueue + run_task_dispatch guard/commit, web_search Settings-override, span header-redaction + thread-safe setup_otel, demo AC8-reframe (dispatch-gate / slow-dispatch fails / slow-generation does NOT gate).
+- **Live-валидация — НЕ выполнена (founder-action, нужен полный стек + funded ключи).**
 
 ## Next actions
 
-1. **✅ DONE — DeepSeek funded + wired.** New funded key `sk-69fe…358ab` (USD $6.93, `is_available:true`) in `backend/.env`; live-verified HTTP 200 for `deepseek-chat`/`reasoner`/`v4-flash`. Market-brief golden re-run on it (below).
-2. **✅ RESOLVED — Yandex via Api-Key.** Founder выдал статический `YANDEX_API_KEY` (Api-Key схема, не протухает). Провайдер теперь гибридный: Api-Key (приоритет) → Bearer IAM (legacy/failover) → clear config error ([commit `57744ec`](https://github.com/mrflxxxme/oriion/pull/44)). Verified: live curl + gateway-smoke (`YandexGPTProvider.chat` from Settings) → HTTP 200 + контент. Failover-цепочка снова полноценная (DeepSeek primary + Yandex failover). Expired IAM-токен оставлен закомментированным fallback'ом — больше не блокер.
-3. **✅ Market-brief golden re-run (funded DeepSeek, `--runs 3`, 2026-06-15):** **AC9 ✅ 3/3** (brief 2067/1917/1954w; matrix 7×5/7×5/7×6; content-plan 10/10/10), **AC10 ✅ 3/3** ($0.026/run). **AC8 ❌** — cohort p95 **163s > 120s** (analyst ~45s + writer ~46s long-gen on v4-flash dominate). Two live-surfaced fixes committed: provider-timeout 30→120s + demo content-plan counter (H3-preferred). **AC8 decision pending founder** (faster model / pipeline-parallelism = infra-PR, OR accept latency latitude).
-4. **Merge [PR #44](https://github.com/mrflxxxme/oriion/pull/44):** verify-bar = CI ✅ (568) + golden AC9/AC10 ✅; **AC8 latency is the remaining founder call** per ADR-027.
-4. **Infra-PR (следующий):** AC-W1-16a (Dramatiq) + AC-W1-1 (Redis-SSE) + AC-W1-19 (native web_search) + observability/IaC-пины (3/4/5/9/10/11-15/21). **+ live-surfaced:** per-provider httpx-timeout (GigaChat медленный на long-gen — 30s мало) + GigaChat RU-CA в образе (AC-W1-21).
-5. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + `/gsd:health --repair` + layout-bridge.
+1. **Live-валидация на полном стеке** (docker `teamly-dev` up incl. новый `worker`, `SSE_BACKEND=redis`, funded DeepSeek + Yandex Api-Key):
+   - `POST /run` → **202 <1s** (AC8 dispatch-gate);
+   - `/stream` отдаёт `task.started → 3× delegation → task.completed` из **worker-процесса** в web-подписчика (cross-process; идеально проверить с `gunicorn -w 2`);
+   - reframed `demo_market_brief.py --runs 3`: **AC8 dispatch p95 ≤1s ✅**, generation p95 = SLI, **AC9/AC10 ✅ preserved** (из `task.completed` payload);
+   - GigaChat вызов в контейнере → **TLS verifies** (AC-W1-21);
+   - web_search honours `.env WEB_SEARCH_MOCK_MODE`.
+2. **Merge infra-PR** (founder, per ADR-027). Verify-bar = CI ✅ (588) + live golden.
+3. **obs/IaC follow-up PR** (task-chip): AC-W1-13 (worker-process метрики + cost-ledger) + AC-W1-2/3/4/5/9/10/14/15.
+4. **Native web_search follow-up PR** (task-chip, [ADR-035](./decisions/ADR-035-deepseek-gated-web-search-tool-call.md)): DeepSeek-gated tool-call для Researcher.
+5. **GSD L2 spike** (отдельно): ROADMAP.md + config.json + layout-bridge.
 
 ## Exit ritual (this session)
 
-- [x] ADR-032 (plan-then-execute) + ADR-033 (GSD L1/L2) созданы; decisions/README + ADR-023 §6 correction-note
-- [x] JOURNAL.md — 2026-06-15 goofy-darwin entry
-- [x] STATUS.md — Wave 1 in-progress + 01.1 Track A active-phase
+- [x] ADR-034 (async + Redis-SSE + AC8 reframe) + ADR-035 (DeepSeek-gated web_search) созданы; decisions/README + ADR-025 amendment
+- [x] JOURNAL.md — 2026-06-16 confident-lewin entry
+- [x] STATUS.md — Wave 1 + infra-PR active-phase
 - [x] HANDOFF.md rewritten (this file)
-- [x] CI-deterministic green (568) + gsd-verifier GOAL ACHIEVED
-- [x] Live-валидация: PromptedOutput + генерализация на GigaChat ✓; multi-system merge-fix (commit `193a1fc`)
-- [x] market-brief golden on **funded DeepSeek** (`--runs 3`): **AC9 ✅ 3/3 + AC10 ✅ 3/3**; **AC8 ❌** (p95 163s)
-- [x] live-surfaced fixes committed: provider-timeout 30→120s (`config.py`+`main.py`) + demo content-plan counter H3-preferred
-- [x] CI-deterministic re-green with fixes: ruff/mypy(145)/pytest **568 passed**
-- [x] **Yandex auth** — switched to non-expiring **Api-Key** scheme (`YANDEX_API_KEY`), IAM kept as fallback; live + gateway-smoke 200 (commit `57744ec`)
-- [ ] **AC8 latency** decision (founder: faster model / pipeline-parallel = infra-PR, or accept latitude)
+- [x] 01.1-retro.md — infra-PR status note + closed AC pins
+- [x] CI-deterministic green (588) + mypy --strict (151)
+- [ ] **Live-валидация** на полном стеке (founder-action)
 - [ ] PR merge (founder, per ADR-027)

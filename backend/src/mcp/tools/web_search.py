@@ -51,7 +51,12 @@ class WebSearchResult:
     snippet: str
 
 
-def _mock_mode_enabled() -> bool:
+def _mock_mode_enabled_from_env() -> bool:
+    """Legacy fallback: read WEB_SEARCH_MOCK_MODE from the environment directly.
+
+    Used only when no explicit ``mock_mode`` is passed to ``WebSearchTool``.
+    Settings.web_search_mock_mode is the source of truth on the dispatch path.
+    """
     raw = os.environ.get("WEB_SEARCH_MOCK_MODE", "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
 
@@ -80,6 +85,7 @@ class WebSearchTool:
         timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
         brave_api_key: str | None = None,
         yandex_api_key: str | None = None,
+        mock_mode: bool | None = None,
     ) -> None:
         # rate_limiter is optional: the Wave-0 scripted-dispatch path
         # (runtime.dispatch) calls search() once per task run — far under the
@@ -89,6 +95,11 @@ class WebSearchTool:
         self._rate_limiter = rate_limiter
         self._limit_per_min = limit_per_min
         self._timeout_seconds = timeout_seconds
+        # mock_mode is Settings-driven when passed explicitly (the dispatch path
+        # threads settings.web_search_mock_mode → fixes the AC-W1-19 bug where the
+        # .env flag was ignored because the tool only read os.environ). When None
+        # (MCP-tool surface / legacy callers) we fall back to the env-var read.
+        self._mock_mode = mock_mode
         # Read env at construction so per-instance overrides are explicit.
         # Empty string treated as unset (env-var convention).
         self._brave_api_key = brave_api_key or (
@@ -125,7 +136,10 @@ class WebSearchTool:
                 )
 
         # Mock-mode short-circuit -------------------------------------------
-        if _mock_mode_enabled():
+        mock_enabled = (
+            self._mock_mode if self._mock_mode is not None else _mock_mode_enabled_from_env()
+        )
+        if mock_enabled:
             logger.info(
                 "mcp.tools.web_search.mock_mode",
                 query=query,

@@ -1,5 +1,26 @@
 # Development Journal
 
+## 2026-06-16 · confident-lewin-169788 · @claude-opus (Phase 01.1 infra-PR — async dispatch + Redis-SSE + AC8 reframe)
+
+- Scope: связный срез async-исполнения + наблюдаемости (отдельный infra-PR, НЕ дополнение PR #44). 11 атомарных коммитов off post-merge main `5a0370b`. Закрывает AC-W1-16a + AC-W1-1 + AC-W1-21 + AC-W1-11 + AC-W1-12; **AC8 RESOLVED by reframe**; AC-W1-19 — только Settings-баг.
+- Workflow: bootstrap (handbook + HANDOFF/STATUS + 01.1-retro + ADR-032/033) → AskUserQuestion (3 развилки: AC8=async+reframe, scope=focused+coupled-obs, web_search=fix+DeepSeek-gated) → Plan-агент (async-архитектура: StubBroker-тесты, Redis Streams для drain-replay, httpx/certifi CA-gotcha) → execute (C1–C11) → verify-bar.
+- **Ключевое решение ([ADR-034](./decisions/ADR-034-async-dispatch-redis-sse-ac8-reframe.md)):** `POST /run` → enqueue Dramatiq actor → **202 <1s** (result теперь в `task.completed` SSE-фрейме, не в body — breaking). Оркестрация в worker-процессе; SSE через **Redis Streams** (cross-process drain-replay, late-subscriber XREAD from 0). **AC8 reframe:** hard-gate = dispatch p95 ≤1s; generation wall-clock (~163s) = tracked SLI, не gate (per AC-W1-23 + [ADR-025](./decisions/ADR-025-acceptance-gate-format.md) amendment).
+- Done (код, verified green):
+  * `tasks.dispatched_at` миграция + idempotency-marker (нет `'dispatched'` статуса — без CHECK-migration) (C2).
+  * `llm_gateway/factory.py::build_llm_router` — единый seam для web + worker (C3).
+  * `runtime/redis_sse_publisher.py` — RedisSSEPublisher (тот же Protocol; `get_sse_publisher` выбирает по `Settings.sse_backend`, default inprocess → CI детерминирован) (C4).
+  * `runtime/queue/{broker,actor,worker}.py` — StubBroker под `DRAMATIQ_TESTING` (binds at import), worker строит свои deps + сам ставит 3-GUC RLS + guard на `status=='queued'` (redelivery-safe), NullPool engine per asyncio.run (C5).
+  * `tasks/routers/tasks.py` — endpoint cutover: commit-then-enqueue, 202 `{status:dispatched}` (C6).
+  * `mcp/tools/web_search.py` — `mock_mode` explicit param из Settings (фикс os.environ-баг → live Brave 422) (C7).
+  * `Dockerfile` — RU Trusted Root CA (Минцифры) в shared base + `GIGACHAT_CA_BUNDLE` (httpx/certifi игнорит OS-store) (C8).
+  * `observability/otel_setup.py` — thread-safe `setup_otel` (lock) + span-processor редактит Authorization/api-key/cookie заголовки (C9).
+  * `scripts/demo_market_brief.py` — AC8 reframe: dispatch_seconds gate + generation_seconds SLI; result из `task.completed` payload (C10).
+  * `infra/docker-compose.dev+staging.yml` — `worker` сервис + `SSE_BACKEND=redis` на backend+worker (C11).
+- Verification: `ruff`(src tests scripts) ✓, `ruff format --check`(272) ✓, `mypy --strict` **151 files** ✓, `pytest` **588 passed** (было 568; +20 новых тестов: Redis-SSE cross-process, StubBroker actor, web_search Settings-override, span-redaction, demo AC8-reframe). Frontend lint/tests — НЕ трогали (бэкенд-only PR; фронт уже читает результат из SSE).
+- Deferred (documented, не silent): AC-W1-19 native tool-call ([ADR-035](./decisions/ADR-035-deepseek-gated-web-search-tool-call.md), Proposed) + AC-W1-13 (теперь нужна worker-process метрик-экспозиция) + AC-W1-2/3/4/5/9/10/14/15 → obs/IaC follow-up PR. Два task-chip заспаунены.
+- Next: founder — (1) **live-валидация на полном стеке** (docker dev + worker + funded DeepSeek/Yandex Api-Key): 202 <1s, `/stream` cross-process, golden `--runs 3` (AC8 dispatch-gate ✅ + AC9/AC10 preserved), GigaChat TLS in-container; (2) merge infra-PR (per ADR-027); (3) obs/IaC follow-up + native-web_search follow-up.
+- Refs: infra-PR (branch `claude/confident-lewin-169788`); ADR-034 + ADR-035; 01.1-retro AC-W1-16a/1/21/11/12/19/AC8.
+
 ## 2026-06-15 · goofy-darwin-194c68 (continued) · @claude-opus (Track A — funded-DeepSeek live validation + 2 fixes)
 
 - Scope: актуализировать LLM-ключи и **закрыть market-brief golden на funded DeepSeek** (тот самый pending-блокер из предыдущей записи), дополнить PR #44.

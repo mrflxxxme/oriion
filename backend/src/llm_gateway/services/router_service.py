@@ -12,17 +12,76 @@ Wave 0 ROLE_TO_MODEL covers the agent archetypes mentioned in ADR-018.
 
 from __future__ import annotations
 
+import time
+from typing import Any
 from uuid import UUID
 
 import httpx
 import structlog
 
+from src._shared.observability.metrics import (
+    LLM_LATENCY,
+    LLM_REQUEST_TOTAL,
+    LLM_TOKENS_INPUT,
+    LLM_TOKENS_OUTPUT,
+)
 from src.llm_gateway.circuit_breaker import CircuitState, ProviderCircuit
 from src.llm_gateway.exceptions import LLMProviderUnavailable
 from src.llm_gateway.providers.base import LLMProvider, LLMRequest, LLMResponse
 from src.llm_gateway.providers.byok_proxy import parse_byok_model
 
 logger = structlog.get_logger(__name__)
+
+# ── Native tool-calling gate (ADR-035 / ADR-032) ──────────────────────────
+# Only DeepSeek forwards an OpenAI-shaped ``tools`` array and parses the
+# resulting ``tool_calls`` (see providers/deepseek.py::_body). YandexGPT and
+# GigaChat silently ignore tools — a native tool-loop dispatched to them would
+# stall. So the gateway forwards ``tools`` ONLY to DeepSeek; on failover the
+# tools are dropped and the request degrades to plain text, keeping the
+# failover chain robust (the Researcher leaf falls back to the scripted
+# web_search pre-fetch in runtime.dispatch per ADR-032).
+_NATIVE_TOOL_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
+
+
+def provider_forwards_tools(provider_slug: str) -> bool:
+    """True iff ``provider_slug`` forwards native tool-calls (DeepSeek only)."""
+    return provider_slug in _NATIVE_TOOL_PROVIDERS
+
+
+def _record_llm_metrics(
+    *,
+    provider: str,
+    model: str,
+    status: str,
+    latency_seconds: float,
+    response: LLMResponse | None,
+) -> None:
+    """Emit the 4 per-callsite LLM Prometheus metrics for one provider call.
+
+    AC-W1-13: every gateway completion increments ``llm_request_total`` (by
+    outcome) and observes ``llm_request_latency_seconds``; on success the token
+    counters are advanced too. Runs in BOTH the web and Dramatiq-worker process
+    (each has its own /metrics exposition over the global REGISTRY), so an
+    orchestration that runs off-request still publishes non-zero metrics.
+
+    Instrumentation is best-effort: a metrics failure must never fail the gateway
+    call, so the whole body is guarded. (It also keeps unit tests that drive a
+    mock provider — whose ``usage`` tokens aren't real ints — from tripping the
+    Counter's non-negative check.)
+    """
+    try:
+        LLM_REQUEST_TOTAL.labels(provider=provider, model=model, status=status).inc()
+        LLM_LATENCY.labels(provider=provider, model=model).observe(latency_seconds)
+        if response is not None:
+            LLM_TOKENS_INPUT.labels(provider=provider, model=model).inc(
+                int(response.usage.tokens_input)
+            )
+            LLM_TOKENS_OUTPUT.labels(provider=provider, model=model).inc(
+                int(response.usage.tokens_output)
+            )
+    except Exception as exc:
+        logger.debug("llm_gateway.router.metrics_skipped", error=str(exc))
+
 
 # ── ROLE_TO_MODEL — per ADR-018 ───────────────────────────────────────────
 ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
@@ -155,9 +214,10 @@ class LLMRouter:
         workspace_id: UUID,
         role_key: str,
         model_hint: str | None,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         metadata: dict[str, str] | None = None,
         max_tokens: int = 8192,
+        tools: list[dict[str, Any]] | None = None,
     ) -> tuple[LLMResponse, str, str]:
         """Run a completion, failing over across the chain on retryable errors.
 
@@ -167,13 +227,19 @@ class LLMRouter:
         provider — instead of the previous behaviour where a single provider
         error bubbled up and failed the whole task. Returns ``(response, model)``.
 
+        ``tools`` (OpenAI function-calling shape) is forwarded ONLY to providers
+        that parse it (DeepSeek; see ``provider_forwards_tools``). On failover to
+        YandexGPT/GigaChat the tools are dropped so the request still completes as
+        plain text — the native tool-loop is DeepSeek-gated per ADR-035/ADR-032.
+
         BYOK requests (``byok-*`` hint) stay single-provider (per-workspace key,
-        no cross-provider fallback).
+        no cross-provider fallback) and do NOT forward tools (DeepSeek-only gate).
         """
         if model_hint and model_hint.startswith("byok-"):
             provider, model = await self.route(
                 workspace_id=workspace_id, role_key=role_key, model_hint=model_hint
             )
+            t0 = time.perf_counter()
             resp = await provider.chat(
                 LLMRequest(
                     messages=messages,
@@ -182,6 +248,13 @@ class LLMRouter:
                     metadata=metadata or {},
                     max_tokens=max_tokens,
                 )
+            )
+            _record_llm_metrics(
+                provider=provider.name,
+                model=model,
+                status="success",
+                latency_seconds=time.perf_counter() - t0,
+                response=resp,
             )
             return resp, model, provider.name
 
@@ -198,6 +271,7 @@ class LLMRouter:
                 model = model_hint or default_model
             else:
                 model = _provider_default_model(slug)
+            t0 = time.perf_counter()
             try:
                 resp = await candidate.chat(
                     LLMRequest(
@@ -206,12 +280,28 @@ class LLMRouter:
                         stream=False,
                         metadata=metadata or {},
                         max_tokens=max_tokens,
+                        # DeepSeek-gated: drop tools on Yandex/GigaChat failover.
+                        tools=tools if provider_forwards_tools(slug) else None,
                     )
                 )
                 circuit.record_success()
+                _record_llm_metrics(
+                    provider=slug,
+                    model=model,
+                    status="success",
+                    latency_seconds=time.perf_counter() - t0,
+                    response=resp,
+                )
                 return resp, model, slug
             except (httpx.HTTPError, LLMProviderUnavailable) as exc:
                 circuit.record_failure()
+                _record_llm_metrics(
+                    provider=slug,
+                    model=model,
+                    status="error",
+                    latency_seconds=time.perf_counter() - t0,
+                    response=None,
+                )
                 last_exc = exc
                 tried.append(slug)
                 logger.warning(
@@ -226,6 +316,35 @@ class LLMRouter:
         raise LLMProviderUnavailable(
             f"All providers in chain {chain!r} unavailable (none had a CLOSED circuit)."
         )
+
+    def would_use_native_tools(
+        self,
+        role_key: str,
+        *,
+        model_hint: str | None = None,
+    ) -> bool:
+        """True iff the provider that WOULD currently handle ``role_key`` forwards
+        native tool-calls (DeepSeek).
+
+        Mirrors ``acomplete``'s candidate selection (chain reordered to the role's
+        primary, skipping providers whose circuit won't attempt) and reports
+        whether that first-available provider is tool-capable. Callers (the
+        Researcher leaf in ``runtime.dispatch``) use this to choose between the
+        native web_search tool-loop (DeepSeek) and the scripted pre-fetch fallback
+        (YandexGPT/GigaChat) — keeping failover robust per ADR-035/ADR-032.
+
+        BYOK hints return ``False`` (DeepSeek-only gate).
+        """
+        if model_hint and model_hint.startswith("byok-"):
+            return False
+        default_provider, _ = ROLE_TO_MODEL.get(role_key, ROLE_TO_MODEL["default"])
+        for slug in self._chain_starting_at(default_provider):
+            provider = self._providers.get(slug)
+            circuit = self._circuits.get(slug)
+            if provider is None or circuit is None or not circuit.should_attempt:
+                continue
+            return provider_forwards_tools(slug)
+        return False
 
     # -- internals ------------------------------------------------------------
     @staticmethod
