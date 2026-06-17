@@ -316,9 +316,10 @@ def _parse_yandex_xml(xml_text: str, max_results: int) -> list[WebSearchResult]:
         if not url:
             continue
         title = _flatten_xml_text(doc.find("title"))
-        snippet = _flatten_xml_text(doc.find(".//passages/passage")) or (
-            doc.findtext("headline") or ""
-        ).strip()
+        snippet = (
+            _flatten_xml_text(doc.find(".//passages/passage"))
+            or (doc.findtext("headline") or "").strip()
+        )
         out.append(WebSearchResult(title=title, url=url, snippet=snippet))
         if len(out) >= max_results:
             break

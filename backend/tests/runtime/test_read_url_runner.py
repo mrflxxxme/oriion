@@ -13,7 +13,9 @@ from src.runtime.web_search_runner import build_native_read_url
 class _FakeReadURLTool:
     """Stand-in for ReadURLTool.fetch — scripted result or exception."""
 
-    def __init__(self, *, result: ReadURLResult | None = None, exc: Exception | None = None) -> None:
+    def __init__(
+        self, *, result: ReadURLResult | None = None, exc: Exception | None = None
+    ) -> None:
         self._result = result
         self._exc = exc
         self.calls: list[tuple[str, str]] = []
