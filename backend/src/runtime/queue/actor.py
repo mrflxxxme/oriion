@@ -25,10 +25,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from src._shared.config import get_settings
+from src._shared.db.redis import get_redis_client
 from src._shared.db.rls import set_tenant_context
 from src._shared.middleware.tenant_context import _resolve_tenant_ids
 from src.llm_gateway.factory import build_llm_router
 from src.llm_gateway.services.router_service import LLMRouter
+from src.mcp.tools.rate_limit import ToolRateLimiter
 from src.runtime.dispatch import dispatch_task
 from src.runtime.queue import broker  # noqa: F401 — installs the broker before @actor binds
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
@@ -58,6 +60,7 @@ async def run_task_dispatch(
     resolve_tenant: TenantResolver = _resolve_tenant_ids,
     load_task: TaskLoader = _load_task,
     dispatch: DispatchFn = dispatch_task,
+    tool_rate_limiter: ToolRateLimiter | None = None,
 ) -> bool:
     """Run a queued task's orchestration under RLS. Returns True if it ran,
     False if it was skipped as already-dispatched (idempotency / redelivery).
@@ -85,6 +88,10 @@ async def run_task_dispatch(
                 session=session,
                 llm_router=router,
                 sse_publisher=publisher,
+                # AC-W1-19: throttle the Researcher's native web_search loop via
+                # Redis. dispatch_task only uses it on the DeepSeek (native
+                # tool-call) path; the scripted-failover path ignores it.
+                tool_rate_limiter=tool_rate_limiter,
             )
         except Exception:
             logger.exception("runtime.dispatch.actor.failed", task_id=str(task_id))
@@ -103,6 +110,7 @@ async def _run_dispatch(task_id: UUID, user_id: UUID) -> None:
     settings = get_settings()
     bundle = build_llm_router(settings)
     publisher = get_sse_publisher()
+    tool_rate_limiter = ToolRateLimiter(get_redis_client())
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
     try:
         maker = async_sessionmaker(
@@ -115,6 +123,7 @@ async def _run_dispatch(task_id: UUID, user_id: UUID) -> None:
                 user_id=user_id,
                 router=bundle.router,
                 publisher=publisher,
+                tool_rate_limiter=tool_rate_limiter,
             )
     finally:
         await engine.dispose()
