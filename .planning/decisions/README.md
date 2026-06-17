@@ -33,6 +33,8 @@
 | [ADR-019](./ADR-019-vertical-autonomous-mode.md) | Vertical-specific Autonomous Mode + Knowledge Workspace |
 | [ADR-020](./ADR-020-pyodide-code-execution.md) | Pyodide WASM в браузере для code-execution (Analyst роль) |
 | [ADR-032](./ADR-032-coordinator-plan-then-execute.md) | Координатор: plan-then-execute через PromptedOutput (не native tool-calling); failover-робастно (Phase 01.1) |
+| [ADR-034](./ADR-034-async-dispatch-redis-sse-ac8-reframe.md) | Async Dramatiq dispatch (POST /run → 202 <1s) + Redis-Streams SSE + AC8 reframe (dispatch-gate + generation-SLI) (Phase 01.1 infra-PR) |
+| [ADR-035](./ADR-035-deepseek-gated-web-search-tool-call.md) | Native web_search tool-call gated to DeepSeek + scripted failover fallback; Settings mock_mode bug fixed, native deferred (Proposed) |
 
 ## LLM / AI
 

@@ -89,8 +89,20 @@ Gate-файл идёт через PR с reviewer-backend (валидация JSO
 - **Founder accountability:** только founder ставит `status: PASSED/BLOCKED`. AI не может «разблокировать» Wave автоматически даже при достижении метрик — нужен явный founder-sign-off.
 - **Schema enforcement:** JSON-schema в CI ломает PR, если frontmatter не conform'ит — это страховка от drift в формате.
 
+## Amendment 2026-06-16 — AC8 reframed (per ADR-034)
+
+Phase 01.1 infra-PR reframes the AC8 latency gate after async dispatch landed: the
+hard gate is now **cohort p95 dispatch latency ≤ 1s** (POST /run returns 202 <1s), and
+the end-to-end **generation wall-clock (~163s) is a tracked SLI, not a pass/fail gate**.
+Sanctioned by AC-W1-23 («latency decoupled from generation length via the Dramatiq
+actor + streaming»); recorded here so the gate-format registry stays the single home
+for «what AC8 means». Founder-perceived latency is <1s + live SSE progress; absolute
+generation time is a model-speed property tracked for trend. See
+[ADR-034](./ADR-034-async-dispatch-redis-sse-ac8-reframe.md).
+
 ## Links
 
+- [ADR-034 async dispatch + AC8 reframe](./ADR-034-async-dispatch-redis-sse-ac8-reframe.md)
 - [ADR-028 policies registry](./ADR-028-policies-registry.md) — DECISION-9
 - [ADR-023](./ADR-023-ai-team-runtime.md) — memory-curator роль (auto-fills frontmatter)
 - Roadmap waves: [.planning/roadmap/](../roadmap/)
