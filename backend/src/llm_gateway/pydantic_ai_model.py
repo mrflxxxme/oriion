@@ -25,14 +25,18 @@ agent integration tests instantiate; the real adapter is exercised by
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import UUID
 
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
+    ModelResponsePart,
+    RetryPromptPart,
     SystemPromptPart,
     TextPart,
+    ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 from pydantic_ai.models import Model
@@ -46,6 +50,7 @@ _FinishReason = Literal["stop", "length", "content_filter", "tool_call", "error"
 if TYPE_CHECKING:
     from pydantic_ai.models import ModelRequestParameters
     from pydantic_ai.settings import ModelSettings
+    from pydantic_ai.tools import ToolDefinition
 
     from src.llm_gateway.services.router_service import LLMRouter
 
@@ -111,12 +116,20 @@ class LLMGatewayModel(Model):
         inject as a system message so the provider returns schema-conformant JSON
         — no function-calling required (works across DeepSeek/Yandex/GigaChat).
         Leaf agents (``output_type=str``) yield ``None`` here → unchanged path.
+
+        Native tool-calling (AC-W1-19): an Agent built with function tools (the
+        Researcher's ``web_search``) surfaces them as ``function_tools`` here. We
+        translate them to the OpenAI ``tools`` shape and forward via ``acomplete``,
+        which gates the forwarding to DeepSeek (ADR-035). Any ``tool_calls`` in the
+        response are parsed back into ``ToolCallPart``s so Pydantic-AI runs the
+        tool and re-enters ``request`` with the ``ToolReturnPart`` (the tool-loop).
         """
         _, model_request_parameters = self.prepare_request(model_settings, model_request_parameters)
         openai_messages = _messages_to_openai_shape(
             messages,
             prompted_instructions=model_request_parameters.prompted_output_instructions,
         )
+        tools = _tool_defs_to_openai(model_request_parameters.function_tools)
 
         # acomplete walks the failover chain (DeepSeek → YandexGPT → GigaChat),
         # so a single provider error (e.g. 402 Payment Required) fails over to
@@ -128,11 +141,21 @@ class LLMGatewayModel(Model):
             messages=openai_messages,
             metadata={"role_key": self._role_key, "workspace_id": str(self._workspace_id)},
             max_tokens=resolve_max_tokens(self._role_key),
+            tools=tools,
         )
         self._last_model_name = target_model
 
+        parts: list[ModelResponsePart] = []
+        if resp.content:
+            parts.append(TextPart(content=resp.content))
+        parts.extend(_tool_calls_to_parts(resp.tool_calls))
+        if not parts:
+            # An empty completion (no text, no tool calls) — keep parts non-empty
+            # so the Pydantic-AI graph has a stable TextPart to consume.
+            parts.append(TextPart(content=""))
+
         return ModelResponse(
-            parts=[TextPart(content=resp.content)],
+            parts=parts,
             usage=RequestUsage(
                 input_tokens=resp.usage.tokens_input,
                 output_tokens=resp.usage.tokens_output,
@@ -159,12 +182,20 @@ def _messages_to_openai_shape(
     messages: list[ModelRequest | ModelResponse],
     *,
     prompted_instructions: str | None = None,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Translate Pydantic-AI ``ModelRequest``/``ModelResponse`` parts → OpenAI-shape.
 
-    Text-style parts only: the productivity-core flow uses plan-then-execute via
-    ``PromptedOutput`` (no native tool-calls; AC-W1-19 native web_search is a later
-    pin). ``prompted_instructions`` (from ``ModelRequestParameters.prompted_output_instructions``)
+    Handles the plan-then-execute text path (Coordinator ``PromptedOutput``) AND
+    the native tool-loop (Researcher ``web_search``, AC-W1-19):
+
+    * ``SystemPromptPart`` / ``UserPromptPart`` → system/user messages.
+    * ``TextPart`` (assistant) → assistant message content.
+    * ``ToolCallPart`` → an assistant message carrying the OpenAI ``tool_calls``
+      array (so the next request echoes back the model's prior tool request).
+    * ``ToolReturnPart`` / ``RetryPromptPart`` → ``role="tool"`` messages keyed by
+      ``tool_call_id`` (the tool result the model needs to continue the loop).
+
+    ``prompted_instructions`` (from ``ModelRequestParameters.prompted_output_instructions``)
     carries the PromptedOutput JSON-schema directive.
 
     **All system content is merged into a SINGLE system message** (role prompt
@@ -175,7 +206,7 @@ def _messages_to_openai_shape(
     strictly safer across DeepSeek / YandexGPT / GigaChat.
     """
     system_parts: list[str] = []
-    rest: list[dict[str, str]] = []
+    rest: list[dict[str, Any]] = []
     for msg in messages:
         if isinstance(msg, ModelRequest):
             for req_part in msg.parts:
@@ -188,20 +219,106 @@ def _messages_to_openai_shape(
                         else str(req_part.content)
                     )
                     rest.append({"role": "user", "content": content})
+                elif isinstance(req_part, ToolReturnPart):
+                    rest.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": req_part.tool_call_id,
+                            "content": req_part.model_response_str(),
+                        }
+                    )
+                elif isinstance(req_part, RetryPromptPart):
+                    # Tool-arg validation failure → feed the error back as the
+                    # tool result so the model can correct its next tool call.
+                    rest.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": req_part.tool_call_id,
+                            "content": req_part.model_response(),
+                        }
+                    )
         elif isinstance(msg, ModelResponse):
+            text_chunks: list[str] = []
+            tool_calls: list[dict[str, Any]] = []
             for resp_part in msg.parts:
                 if isinstance(resp_part, TextPart):
-                    rest.append({"role": "assistant", "content": resp_part.content})
+                    text_chunks.append(resp_part.content)
+                elif isinstance(resp_part, ToolCallPart):
+                    tool_calls.append(
+                        {
+                            "id": resp_part.tool_call_id,
+                            "type": "function",
+                            "function": {
+                                "name": resp_part.tool_name,
+                                "arguments": resp_part.args_as_json_str(),
+                            },
+                        }
+                    )
+            assistant_msg: dict[str, Any] = {
+                "role": "assistant",
+                "content": "\n".join(text_chunks),
+            }
+            if tool_calls:
+                assistant_msg["tool_calls"] = tool_calls
+            rest.append(assistant_msg)
 
     # Schema directive goes after the role/system context.
     if prompted_instructions:
         system_parts.append(prompted_instructions)
 
-    openai_messages: list[dict[str, str]] = []
+    openai_messages: list[dict[str, Any]] = []
     if system_parts:
         openai_messages.append({"role": "system", "content": "\n\n".join(system_parts)})
     openai_messages.extend(rest)
     return openai_messages
+
+
+def _tool_defs_to_openai(
+    tool_defs: list[ToolDefinition],
+) -> list[dict[str, Any]] | None:
+    """Translate Pydantic-AI ``ToolDefinition``s → OpenAI ``tools`` array.
+
+    Returns ``None`` when there are no tools so the provider body omits the key
+    entirely (an empty ``tools: []`` confuses some OpenAI-compatible backends).
+    """
+    if not tool_defs:
+        return None
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": td.name,
+                "description": td.description or "",
+                "parameters": td.parameters_json_schema,
+            },
+        }
+        for td in tool_defs
+    ]
+
+
+def _tool_calls_to_parts(
+    tool_calls: list[dict[str, Any]] | None,
+) -> list[ToolCallPart]:
+    """Parse provider ``tool_calls`` (OpenAI shape) → Pydantic-AI ``ToolCallPart``s.
+
+    DeepSeek returns ``{"id", "type": "function", "function": {"name", "arguments"}}``;
+    ``arguments`` is a JSON string, which ``ToolCallPart`` accepts verbatim (it
+    parses it when the tool runs).
+    """
+    parts: list[ToolCallPart] = []
+    for call in tool_calls or []:
+        fn = call.get("function") or {}
+        name = fn.get("name")
+        if not name:
+            continue
+        parts.append(
+            ToolCallPart(
+                tool_name=str(name),
+                args=fn.get("arguments") or "{}",
+                tool_call_id=str(call.get("id") or ""),
+            )
+        )
+    return parts
 
 
 _VALID_FINISH_REASONS: frozenset[str] = frozenset(
@@ -218,8 +335,12 @@ def _normalize_finish_reason(raw: str | None) -> _FinishReason | None:
     """
     if raw is None or raw == "stop":
         return "stop"
+    # DeepSeek returns the plural 'tool_calls' when the turn ended on a native
+    # tool request (AC-W1-19) — map to Pydantic-AI's singular 'tool_call'.
+    if raw == "tool_calls":
+        return "tool_call"
     if raw in _VALID_FINISH_REASONS:
         return cast(_FinishReason, raw)
-    # Unknown / provider-specific tokens (e.g. DeepSeek 'tool_calls' plural)
-    # map to 'stop' so the Pydantic-AI Literal contract holds.
+    # Unknown / provider-specific tokens map to 'stop' so the Pydantic-AI Literal
+    # contract holds.
     return "stop"
