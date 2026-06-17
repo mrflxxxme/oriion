@@ -26,15 +26,30 @@ import os
 from decimal import Decimal
 
 PROVIDER_PRICING_USD_PER_1K_TOKENS: dict[str, dict[str, dict[str, Decimal]]] = {
-    # DeepSeek — published USD pricing 2026-Q1 (deepseek.com/pricing).
+    # DeepSeek — **V4 generation** rates (ADR-018 amendment 2026-05-26 "DeepSeek
+    # V4 generation drift"; AC-W1-13 cost-instrumentation refresh). The V4 catalog
+    # (`deepseek-v4-flash` / `deepseek-v4-pro`) replaces V3/R1; the logical aliases
+    # (`deepseek-chat` / `deepseek-reasoner`) stay in router_service.ROLE_TO_MODEL
+    # and price at the SAME generation tier, so both name forms are tabled here:
+    #   flash (general / leaf specialists / Coordinator) — $0.27/1M in, $1.10/1M out
+    #   pro   (reasoning-heavy)                          — $0.55/1M in, $2.19/1M out
+    # Figures per ADR-018 §"Технические характеристики" (V3→flash, R1→pro mapping).
     "deepseek": {
         "deepseek-chat": {
-            "input": Decimal("0.00014"),
-            "output": Decimal("0.00028"),
+            "input": Decimal("0.00027"),
+            "output": Decimal("0.00110"),
+        },
+        "deepseek-v4-flash": {
+            "input": Decimal("0.00027"),
+            "output": Decimal("0.00110"),
         },
         "deepseek-reasoner": {
             "input": Decimal("0.00055"),
-            "output": Decimal("0.00220"),
+            "output": Decimal("0.00219"),
+        },
+        "deepseek-v4-pro": {
+            "input": Decimal("0.00055"),
+            "output": Decimal("0.00219"),
         },
     },
     # YandexGPT — RUB-native; effective USD price assumes ~100 RUB/USD baseline.

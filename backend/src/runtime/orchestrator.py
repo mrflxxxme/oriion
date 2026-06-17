@@ -26,6 +26,11 @@ from uuid import UUID
 from pydantic_ai import Agent
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src._shared.observability.metrics import (
+    TASK_DURATION,
+    TASK_QUEUE_DEPTH,
+    TASK_TOTAL,
+)
 from src.agents.tools.delegate import CoordinatorDepsLike, DelegateInput, DelegateResult
 from src.runtime.budget_guard import (
     DEFAULT_TASK_CAP_TCREDITS,
@@ -40,6 +45,26 @@ from src.tasks.models import Task
 
 LeafRunner = Callable[[DelegateInput, "OrchestratorContext"], Awaitable[DelegateResult]]
 """Signature an orchestrator's leaf-dispatch callable must follow."""
+
+# The top-level task IS the Coordinator run; its duration is labelled accordingly
+# (per-leaf durations are a Wave-1+ task_steps concern, see AC-W1-2).
+_TASK_ROLE_KEY = "coordinator"
+
+
+def _record_terminal_task_metrics(
+    *, cell_label: str, outcome: str, started_at: datetime, completed_at: datetime
+) -> None:
+    """Observe task_duration_seconds + inc task_total + release the queue gauge.
+
+    AC-W1-13: called once per task from each terminal branch (succeeded /
+    failed / budget_exceeded). Pairs with the ``TASK_QUEUE_DEPTH.inc()`` at
+    task-start so the gauge nets back. Process-global metrics, so this is the
+    same exposition the worker's /metrics serves under async dispatch.
+    """
+    duration_seconds = (completed_at - started_at).total_seconds()
+    TASK_DURATION.labels(role_key=_TASK_ROLE_KEY, outcome=outcome).observe(duration_seconds)
+    TASK_TOTAL.labels(cell_id=cell_label, outcome=outcome).inc()
+    TASK_QUEUE_DEPTH.labels(cell_id=cell_label).dec()
 
 
 class OrchestratorContext:
@@ -102,6 +127,13 @@ async def execute_agent_task(
         )
     )
     await tasks_events.emit_task_started(task_id=task_id, started_at=started_at)
+
+    # AC-W1-13: a task enters the running pool — bump the per-cell gauge. The
+    # matching decrement runs in BOTH terminal branches (success + failure) so
+    # the gauge nets back to its pre-task level. Runs in the Dramatiq worker
+    # process under async dispatch (ADR-034).
+    cell_label = str(cell_id)
+    TASK_QUEUE_DEPTH.labels(cell_id=cell_label).inc()
 
     # Flip task to running.
     task = await session.get(Task, task_id)
@@ -172,6 +204,15 @@ async def execute_agent_task(
             task.total_cost_credits = ctx.accumulated_cost
         refund_unused(ctx.accumulated_cost, reserved)
         error_code = getattr(exc, "code", exc.__class__.__name__)
+        outcome = (
+            "budget_exceeded" if str(error_code) == "llm_gateway.budget_exceeded" else "failed"
+        )
+        _record_terminal_task_metrics(
+            cell_label=cell_label,
+            outcome=outcome,
+            started_at=started_at,
+            completed_at=completed_at,
+        )
         await sse_publisher.publish(
             TaskStreamEvent(
                 event_type="task.failed",
@@ -207,6 +248,12 @@ async def execute_agent_task(
         task.total_input_tokens = 0
         task.total_output_tokens = sum(r.tokens_used for r in ctx.leaf_outputs)
     refund_unused(ctx.accumulated_cost, reserved)
+    _record_terminal_task_metrics(
+        cell_label=cell_label,
+        outcome="succeeded",
+        started_at=started_at,
+        completed_at=completed_at,
+    )
 
     if output is None:
         output_dict: dict[str, Any] = {"summary": "(no output)"}

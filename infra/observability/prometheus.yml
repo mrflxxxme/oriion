@@ -33,6 +33,19 @@ scrape_configs:
           service: backend
     metrics_path: /metrics
 
+  # Dramatiq dispatch worker (AC-W1-13). Under async dispatch (ADR-034) the task
+  # orchestration runs in the worker process, so its llm_*/task_* metrics live in
+  # a registry SEPARATE from the web tier — scraped here at worker:9191. The
+  # worker exposes the same metric families; Prometheus aggregates web + worker
+  # via the metric name (the `service` label distinguishes origin).
+  - job_name: oriion-worker
+    static_configs:
+      - targets: ["worker:9191"]
+        labels:
+          env: staging
+          service: worker
+    metrics_path: /metrics
+
   - job_name: caddy
     static_configs:
       - targets: ["caddy:2019"]

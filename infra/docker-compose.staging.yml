@@ -68,6 +68,8 @@ services:
   # AC-W1-16a: Dramatiq worker — runs task orchestrations off-request. Same image
   # + secrets as backend; SSE_BACKEND=redis so its ledger reaches the web /stream.
   # -p1 -t1 enforces the workers=1 / single-global-budget invariant (F-ARC-H2).
+  # :9191 exposes its Prometheus metrics (AC-W1-13), scraped via the oriion-worker
+  # job in prometheus.yml — under async dispatch the orchestration runs here.
   worker:
     image: ${YC_CR_REGISTRY:-oriion-staging}/oriion-backend:${IMAGE_TAG:-latest}
     build:
@@ -85,6 +87,9 @@ services:
       BRAVE_SEARCH_API_KEY: ${LOCKBOX_BRAVE_SEARCH_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}
       YANDEX_SEARCH_API_KEY: ${LOCKBOX_YANDEX_SEARCH_API_KEY:-${YANDEX_SEARCH_API_KEY:-}}
       BYOK_MASTER_KEY_B64: ${LOCKBOX_BYOK_MASTER_KEY_B64:-${BYOK_MASTER_KEY_B64}}
+      # Real LLM cost (AC-W1-13) prices via pricing_service × FX; the worker runs
+      # the orchestration so it needs the FX rate in its env.
+      FX_RATE_USD_TO_RUB: ${FX_RATE_USD_TO_RUB:-100.0}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: oriion-worker
       OTEL_TRACES_ENABLED: "true"
@@ -92,10 +97,13 @@ services:
       LOG_LEVEL: INFO
       APP_ENV: staging
       SSE_BACKEND: redis
+      WORKER_METRICS_PORT: "9191"
     command: >
       dramatiq src.runtime.queue.worker
       --processes 1
       --threads 1
+    expose:
+      - "9191" # Prometheus /metrics (scraped by the oriion-worker job)
     depends_on:
       otel-collector:
         condition: service_started
