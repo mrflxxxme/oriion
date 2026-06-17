@@ -12,6 +12,7 @@ Wave 0 ROLE_TO_MODEL covers the agent archetypes mentioned in ADR-018.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -23,6 +24,22 @@ from src.llm_gateway.providers.base import LLMProvider, LLMRequest, LLMResponse
 from src.llm_gateway.providers.byok_proxy import parse_byok_model
 
 logger = structlog.get_logger(__name__)
+
+# ── Native tool-calling gate (ADR-035 / ADR-032) ──────────────────────────
+# Only DeepSeek forwards an OpenAI-shaped ``tools`` array and parses the
+# resulting ``tool_calls`` (see providers/deepseek.py::_body). YandexGPT and
+# GigaChat silently ignore tools — a native tool-loop dispatched to them would
+# stall. So the gateway forwards ``tools`` ONLY to DeepSeek; on failover the
+# tools are dropped and the request degrades to plain text, keeping the
+# failover chain robust (the Researcher leaf falls back to the scripted
+# web_search pre-fetch in runtime.dispatch per ADR-032).
+_NATIVE_TOOL_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
+
+
+def provider_forwards_tools(provider_slug: str) -> bool:
+    """True iff ``provider_slug`` forwards native tool-calls (DeepSeek only)."""
+    return provider_slug in _NATIVE_TOOL_PROVIDERS
+
 
 # ── ROLE_TO_MODEL — per ADR-018 ───────────────────────────────────────────
 ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
@@ -155,9 +172,10 @@ class LLMRouter:
         workspace_id: UUID,
         role_key: str,
         model_hint: str | None,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         metadata: dict[str, str] | None = None,
         max_tokens: int = 8192,
+        tools: list[dict[str, Any]] | None = None,
     ) -> tuple[LLMResponse, str, str]:
         """Run a completion, failing over across the chain on retryable errors.
 
@@ -167,8 +185,13 @@ class LLMRouter:
         provider — instead of the previous behaviour where a single provider
         error bubbled up and failed the whole task. Returns ``(response, model)``.
 
+        ``tools`` (OpenAI function-calling shape) is forwarded ONLY to providers
+        that parse it (DeepSeek; see ``provider_forwards_tools``). On failover to
+        YandexGPT/GigaChat the tools are dropped so the request still completes as
+        plain text — the native tool-loop is DeepSeek-gated per ADR-035/ADR-032.
+
         BYOK requests (``byok-*`` hint) stay single-provider (per-workspace key,
-        no cross-provider fallback).
+        no cross-provider fallback) and do NOT forward tools (DeepSeek-only gate).
         """
         if model_hint and model_hint.startswith("byok-"):
             provider, model = await self.route(
@@ -206,6 +229,8 @@ class LLMRouter:
                         stream=False,
                         metadata=metadata or {},
                         max_tokens=max_tokens,
+                        # DeepSeek-gated: drop tools on Yandex/GigaChat failover.
+                        tools=tools if provider_forwards_tools(slug) else None,
                     )
                 )
                 circuit.record_success()
@@ -226,6 +251,35 @@ class LLMRouter:
         raise LLMProviderUnavailable(
             f"All providers in chain {chain!r} unavailable (none had a CLOSED circuit)."
         )
+
+    def would_use_native_tools(
+        self,
+        role_key: str,
+        *,
+        model_hint: str | None = None,
+    ) -> bool:
+        """True iff the provider that WOULD currently handle ``role_key`` forwards
+        native tool-calls (DeepSeek).
+
+        Mirrors ``acomplete``'s candidate selection (chain reordered to the role's
+        primary, skipping providers whose circuit won't attempt) and reports
+        whether that first-available provider is tool-capable. Callers (the
+        Researcher leaf in ``runtime.dispatch``) use this to choose between the
+        native web_search tool-loop (DeepSeek) and the scripted pre-fetch fallback
+        (YandexGPT/GigaChat) — keeping failover robust per ADR-035/ADR-032.
+
+        BYOK hints return ``False`` (DeepSeek-only gate).
+        """
+        if model_hint and model_hint.startswith("byok-"):
+            return False
+        default_provider, _ = ROLE_TO_MODEL.get(role_key, ROLE_TO_MODEL["default"])
+        for slug in self._chain_starting_at(default_provider):
+            provider = self._providers.get(slug)
+            circuit = self._circuits.get(slug)
+            if provider is None or circuit is None or not circuit.should_attempt:
+                continue
+            return provider_forwards_tools(slug)
+        return False
 
     # -- internals ------------------------------------------------------------
     @staticmethod
