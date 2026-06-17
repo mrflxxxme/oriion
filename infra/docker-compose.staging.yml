@@ -22,6 +22,10 @@ services:
       context: ../backend
       target: prod
     restart: always
+    # Container hardening (ADR-014-security): block privilege escalation and drop
+    # all Linux capabilities — the web tier binds :8000 (>1024) so needs none.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
     environment:
       DATABASE_URL: ${LOCKBOX_DATABASE_URL:-${DATABASE_URL}}
       REDIS_URL: ${LOCKBOX_REDIS_URL:-${REDIS_URL}}
@@ -76,6 +80,10 @@ services:
       context: ../backend
       target: prod
     restart: always
+    # Container hardening (ADR-014-security): same posture as the web tier — the
+    # Dramatiq worker needs no extra privileges or capabilities.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
     environment:
       DATABASE_URL: ${LOCKBOX_DATABASE_URL:-${DATABASE_URL}}
       REDIS_URL: ${LOCKBOX_REDIS_URL:-${REDIS_URL}}
@@ -174,7 +182,8 @@ services:
     restart: always
     environment:
       GF_SECURITY_ADMIN_USER: ${LOCKBOX_GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${LOCKBOX_GRAFANA_ADMIN_PASSWORD:-admin-dev-only-replace}
+      # ADR-014-security: no weak default — a missing secret fails the deploy.
+      GF_SECURITY_ADMIN_PASSWORD: ${LOCKBOX_GRAFANA_ADMIN_PASSWORD:?LOCKBOX_GRAFANA_ADMIN_PASSWORD must be set}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
