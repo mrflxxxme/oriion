@@ -52,16 +52,42 @@ async def test_yandex_search_used_when_brave_unset(
     assert "yandex.ru" in str(captured["url"])
 
 
+_YANDEX_XML_PAYLOAD = b"""<?xml version="1.0" encoding="utf-8"?>
+<yandexsearch version="1.0">
+  <response>
+    <results>
+      <grouping>
+        <group>
+          <doc>
+            <url>https://example.test/y1</url>
+            <title>\xd0\x97\xd0\xb0\xd0\xb3\xd0\xbe\xd0\xbb\xd0\xbe\xd0\xb2\xd0\xbe\xd0\xba <hlword>\xd0\xbe\xd0\xb4\xd0\xb8\xd0\xbd</hlword></title>
+            <passages><passage>\xd0\xa2\xd0\xb5\xd0\xba\xd1\x81\xd1\x82 <hlword>\xd1\x81\xd0\xbd\xd0\xb8\xd0\xbf\xd0\xbf\xd0\xb5\xd1\x82\xd0\xb0</hlword></passage></passages>
+          </doc>
+        </group>
+        <group>
+          <doc>
+            <url>https://example.test/y2</url>
+            <title>Second</title>
+            <headline>Headline two</headline>
+          </doc>
+        </group>
+      </grouping>
+    </results>
+  </response>
+</yandexsearch>
+"""
+
+
 @pytest.mark.asyncio
-async def test_yandex_xml_response_returns_empty_wave0(
+async def test_yandex_xml_response_parsed(
     fake_redis: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Yandex returns XML body; Wave 0 doesn't parse it → returns []."""
+    """AC-W1-18: live Yandex XML is parsed (url + flattened title + passage)."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            content=b"<?xml version='1.0'?><response/>",
+            content=_YANDEX_XML_PAYLOAD,
             headers={"content-type": "application/xml"},
         )
 
@@ -70,15 +96,42 @@ async def test_yandex_xml_response_returns_empty_wave0(
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    # Suppress the "Wave 1+ adds XML parsing" warning so filterwarnings=error
-    # doesn't escalate it. We expect the warning — it's part of the contract.
-    import warnings
+    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    results = await tool.search("q", agent_id="a", max_results=5)
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
-        results = await tool.search("q", agent_id="a", max_results=5)
-    assert results == []
+    assert len(results) == 2
+    assert results[0].url == "https://example.test/y1"
+    # <hlword> highlight markup flattened into the title text.
+    assert results[0].title == "Заголовок один"
+    assert results[0].snippet == "Текст сниппета"
+    # Second doc has no passage → falls back to <headline>.
+    assert results[1].url == "https://example.test/y2"
+    assert results[1].snippet == "Headline two"
+
+
+@pytest.mark.asyncio
+async def test_yandex_xml_error_returns_empty(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Yandex <error> element degrades to [] (Researcher falls back to LLM)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=(
+                b'<?xml version="1.0"?><yandexsearch><response>'
+                b'<error code="55">no rights</error></response></yandexsearch>'
+            ),
+            headers={"content-type": "application/xml"},
+        )
+
+    transport = httpx.MockTransport(handler)
+    _install_transport(monkeypatch, transport)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    assert await tool.search("q", agent_id="a", max_results=5) == []
 
 
 @pytest.mark.asyncio

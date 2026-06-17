@@ -57,6 +57,7 @@ from src.agents.tools.delegate import (
 )
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
+from src.mcp.tools.read_url import ReadURLTool
 from src.mcp.tools.web_search import WebSearchTool
 from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
@@ -64,6 +65,7 @@ from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
 from src.runtime.web_search_runner import (
     WEB_SEARCH_MAX_RESULTS,
     _default_web_search_tool,
+    build_native_read_url,
     build_native_web_search,
     fetch_research_context,
 )
@@ -157,6 +159,7 @@ def build_leaf_runner(
     leaf_specs: dict[str, _LeafSpec] | None = None,
     web_search_tool: WebSearchTool | None = None,
     native_web_search: Callable[[str], Awaitable[str]] | None = None,
+    native_read_url: Callable[[str], Awaitable[str]] | None = None,
     user_prompt: str = "",
 ) -> Callable[[DelegateInput, OrchestratorContext], Awaitable[DelegateResult]]:
     """Build the production leaf-dispatch callable.
@@ -193,6 +196,10 @@ def build_leaf_runner(
             if native_web_search is not None:
                 # DeepSeek path: the model owns the search loop (no pre-fetch).
                 build_kwargs["web_search"] = native_web_search
+                # AC-W1-18: pair read_url with web_search on the native path so
+                # the model can deep-read a source beyond snippets.
+                if native_read_url is not None:
+                    build_kwargs["read_url"] = native_read_url
             elif web_search_tool is not None:
                 # Failover path: prepend scripted live context (founder 2026-06-07).
                 context = await fetch_research_context(
@@ -426,6 +433,14 @@ async def dispatch_task(
         rate_limiter=tool_rate_limiter if native_enabled else None
     )
     native_web_search = build_native_web_search(search_tool) if native_enabled else None
+    # AC-W1-18: deep-read tool, DeepSeek-gated like web_search. ReadURLTool
+    # requires a rate limiter (10/min, SSRF-guarded), so it's wired only when one
+    # is supplied; without it the Researcher keeps web_search-only behaviour.
+    native_read_url = (
+        build_native_read_url(ReadURLTool(tool_rate_limiter))
+        if native_enabled and tool_rate_limiter is not None
+        else None
+    )
 
     user_prompt = ""
     if isinstance(task.input_jsonb, dict):
@@ -439,6 +454,7 @@ async def dispatch_task(
         user_id=task.initiated_by_user_id,
         web_search_tool=search_tool,
         native_web_search=native_web_search,
+        native_read_url=native_read_url,
         user_prompt=user_prompt,
     )
 

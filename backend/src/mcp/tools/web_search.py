@@ -184,10 +184,11 @@ class WebSearchTool:
         return _parse_brave(payload, max_results)
 
     async def _search_yandex(self, query: str, max_results: int) -> list[WebSearchResult]:
-        """Yandex Search XML API — JSON-mode subset.
+        """Yandex Search XML API (yandex.ru/search/xml).
 
-        Real Yandex Search XML returns XML; Wave 0 we accept either JSON
-        (test mocks) or treat XML as opaque text. Wave 1+ adds lxml parsing.
+        Real Yandex Search returns XML; test mocks send a normalised JSON shape.
+        We try ``.json()`` first (mocks) and fall back to the XML parser
+        (AC-W1-18) for the live RU-sovereign path.
         """
         # Type-narrow without bandit B101 — caller guarantees this by gating
         # on self._yandex_api_key truthiness before dispatch.
@@ -208,13 +209,8 @@ class WebSearchTool:
                 try:
                     payload = response.json()
                 except ValueError:
-                    # XML path — Wave 1+ proper parsing. Wave 0 returns empty
-                    # rather than guessing.
-                    logger.warning(
-                        "mcp.tools.web_search.yandex.xml_unparsed",
-                        note="Wave 1+ adds XML parsing",
-                    )
-                    return []
+                    # XML path (AC-W1-18): parse the live Yandex Search XML.
+                    return _parse_yandex_xml(response.text, max_results)
         except httpx.RequestError as exc:
             raise WebSearchError(f"yandex network error: {exc!s}") from exc
         except httpx.HTTPStatusError as exc:
@@ -258,4 +254,72 @@ def _parse_yandex(payload: dict[str, Any], max_results: int) -> list[WebSearchRe
                 snippet=str(item.get("snippet") or ""),
             )
         )
+    return out
+
+
+def _flatten_xml_text(el: Any) -> str:
+    """Flatten an element's inline text (incl. ``<hlword>`` highlight markup)
+    to whitespace-normalised plain text. Returns "" for a missing element."""
+    if el is None:
+        return ""
+    return " ".join("".join(el.itertext()).split())
+
+
+def _parse_yandex_xml(xml_text: str, max_results: int) -> list[WebSearchResult]:
+    """Parse a live Yandex Search XML response → list[WebSearchResult] (AC-W1-18).
+
+    Yandex Search XML (yandex.ru/search/xml) nests hits as
+    ``response/results/grouping/group/doc`` with a ``<url>``, a ``<title>``
+    carrying inline ``<hlword>`` highlight tags, and ``<passages>/<passage>``
+    snippets (falling back to ``<headline>``). We flatten the highlight markup
+    and prefer passage text.
+
+    Degrades gracefully: a malformed body or a Yandex ``<error>`` element logs a
+    warning and returns ``[]`` (matching the rest of the search path, which lets
+    the Researcher fall back to LLM-only synthesis rather than failing the run).
+
+    Hardened against XXE / entity-expansion (defence-in-depth even though the
+    Yandex endpoint is trusted): the parser resolves no entities, loads no DTD
+    and makes no network calls.
+    """
+    from lxml import etree
+
+    parser = etree.XMLParser(
+        resolve_entities=False,
+        no_network=True,
+        load_dtd=False,
+        recover=True,
+    )
+    try:
+        # S320 suppressed: the parser above is hardened against the XML attacks
+        # bandit warns about (no entity resolution, no DTD load, no network) — the
+        # modern lxml mitigation, since defusedxml.lxml is itself deprecated.
+        root = etree.fromstring(xml_text.encode("utf-8"), parser=parser)  # noqa: S320
+    except etree.XMLSyntaxError as exc:
+        logger.warning("mcp.tools.web_search.yandex.xml_parse_error", error=str(exc))
+        return []
+    if root is None:
+        return []
+
+    error_el = root.find(".//error")
+    if error_el is not None:
+        logger.warning(
+            "mcp.tools.web_search.yandex.api_error",
+            code=error_el.get("code"),
+            message=(error_el.text or "").strip(),
+        )
+        return []
+
+    out: list[WebSearchResult] = []
+    for doc in root.iterfind(".//doc"):
+        url = (doc.findtext("url") or "").strip()
+        if not url:
+            continue
+        title = _flatten_xml_text(doc.find("title"))
+        snippet = _flatten_xml_text(doc.find(".//passages/passage")) or (
+            doc.findtext("headline") or ""
+        ).strip()
+        out.append(WebSearchResult(title=title, url=url, snippet=snippet))
+        if len(out) >= max_results:
+            break
     return out

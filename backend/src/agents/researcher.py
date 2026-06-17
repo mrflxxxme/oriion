@@ -1,12 +1,15 @@
 """Researcher — leaf specialist, web_search + read_url tools.
 
-Phase 00.5b Commit 5 / AC-W1-19. The Researcher can search the web via a
-**native** Pydantic-AI tool: when DeepSeek is the active provider (it forwards
-tool-calls — ADR-035), ``runtime.dispatch`` builds the agent with a ``web_search``
-callable and the model autonomously decides when/what to search. On
-YandexGPT/GigaChat failover (no tool forwarding) the agent is built tool-less and
-the runtime falls back to the scripted ``fetch_research_context`` pre-fetch. The
-``read_url`` deep-read tool remains a Wave-1 pin (AC-W1-18).
+Phase 00.5b Commit 5 / AC-W1-19 / AC-W1-18. The Researcher can search the web
+via a **native** Pydantic-AI tool: when DeepSeek is the active provider (it
+forwards tool-calls — ADR-035), ``runtime.dispatch`` builds the agent with a
+``web_search`` callable and the model autonomously decides when/what to search.
+On YandexGPT/GigaChat failover (no tool forwarding) the agent is built tool-less
+and the runtime falls back to the scripted ``fetch_research_context`` pre-fetch.
+
+AC-W1-18: on the same DeepSeek path the Researcher also gets a ``read_url`` tool
+so it can deep-read a promising source page (rate-limited, content-capped) after
+a search — beyond snippets — within the AC10 cost cap.
 """
 
 from __future__ import annotations
@@ -21,13 +24,17 @@ from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
 
 ROLE_KEY = "researcher"
 
-WebSearchTool = Callable[[str], Awaitable[str]]
-"""Native web_search tool signature: ``async def web_search(query: str) -> str``.
+NativeTool = Callable[[str], Awaitable[str]]
+"""Native Researcher tool signature: ``async def tool(arg: str) -> str``.
 
-The concrete callable is built in ``runtime.dispatch`` (bound to the rate-limited
-``WebSearchTool`` + Researcher ``agent_id``). Its name, docstring and ``str``
-parameter become the Pydantic-AI ``ToolDefinition`` forwarded to the provider.
+The concrete callables (``web_search`` / ``read_url``) are built in
+``runtime.dispatch`` (bound to the rate-limited MCP tools + Researcher
+``agent_id``). Each callable's name, docstring and ``str`` parameter become the
+Pydantic-AI ``ToolDefinition`` forwarded to the provider.
 """
+
+# Backwards-compatible alias — ``web_search``'s historical type name.
+WebSearchTool = NativeTool
 
 
 class ResearcherDeps(BaseModel):
@@ -49,7 +56,8 @@ def build_researcher_agent(
     *,
     model: LLMGatewayModel,
     role_prompt: RolePrompt | None = None,
-    web_search: WebSearchTool | None = None,
+    web_search: NativeTool | None = None,
+    read_url: NativeTool | None = None,
 ) -> Agent[ResearcherDeps, str]:
     # Wave-0: plain-text output. The structured ResearcherOutput requires the
     # LLMGatewayModel structured-output / tool-call bridge (AC14/AC-W1-16) which
@@ -58,12 +66,17 @@ def build_researcher_agent(
     # markdown; the demo/runtime consume it as text. ResearcherOutput is kept
     # for the Wave-1 structured path.
     #
-    # AC-W1-19: ``web_search`` (when supplied) is registered as a native tool so
-    # the model decides when/what to search. It is only passed on the DeepSeek
-    # path (ADR-035 gating in runtime.dispatch); on failover it stays None and
-    # the runtime pre-fetches search context instead.
+    # AC-W1-19 / AC-W1-18: ``web_search`` + ``read_url`` (when supplied) are
+    # registered as native tools so the model decides when/what to search and
+    # which source to deep-read. They are only passed on the DeepSeek path
+    # (ADR-035 gating in runtime.dispatch); on failover they stay None and the
+    # runtime pre-fetches search context instead.
     prompt = (role_prompt or get_role_prompt()).composed_system_prompt()
-    tools: list[WebSearchTool] = [web_search] if web_search is not None else []
+    tools: list[NativeTool] = []
+    if web_search is not None:
+        tools.append(web_search)
+    if read_url is not None:
+        tools.append(read_url)
     return Agent(
         model=model,
         deps_type=ResearcherDeps,
@@ -75,6 +88,7 @@ def build_researcher_agent(
 
 __all__ = [
     "ROLE_KEY",
+    "NativeTool",
     "ResearcherDeps",
     "ResearcherOutput",
     "WebSearchTool",
