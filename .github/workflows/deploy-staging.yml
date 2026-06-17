@@ -75,7 +75,10 @@ jobs:
           username: deploy
           key: ${{ secrets.STAGING_SSH_KEY }}
           command_timeout: 8m
-          envs: IMAGE_TAG
+          # IMAGE_TAG is materialized inside the script below via GitHub
+          # template interpolation (steps.tag.outputs.tag) — there is no runner
+          # env var to forward, so the dead/misleading `envs: IMAGE_TAG` was
+          # removed (it forwarded an undefined var).
           script: |
             set -euo pipefail
             cd /opt/oriion
