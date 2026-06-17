@@ -4,7 +4,10 @@
 # когда `infra/caddy/Caddyfile.prod` materialized + правильный build context
 # scope установлен (потребует подъёма build context на repo root level).
 
-FROM node:20-alpine AS base
+# Digest-pinned for reproducible/supply-chain-safe builds (ADR-014-security).
+# Tag for humans: node:20-alpine. Re-pin via:
+#   docker manifest inspect node:20-alpine --verbose | grep -m1 digest
+FROM node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb AS base
 WORKDIR /app
 ENV CI=true \
     npm_config_audit=false \

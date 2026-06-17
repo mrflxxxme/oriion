@@ -32,6 +32,7 @@ from src._shared.observability.metrics import (
     TASK_TOTAL,
 )
 from src.agents.tools.delegate import CoordinatorDepsLike, DelegateInput, DelegateResult
+from src.llm_gateway.services.router_service import resolve_max_tokens
 from src.runtime.budget_guard import (
     DEFAULT_TASK_CAP_TCREDITS,
     check_budget,
@@ -41,10 +42,47 @@ from src.runtime.budget_guard import (
 from src.runtime.sse_events import TaskStreamEvent
 from src.runtime.sse_publisher import SSEPublisher
 from src.tasks import events as tasks_events
+from src.tasks.exceptions import TaskCancelled
 from src.tasks.models import Task
 
 LeafRunner = Callable[[DelegateInput, "OrchestratorContext"], Awaitable[DelegateResult]]
 """Signature an orchestrator's leaf-dispatch callable must follow."""
+
+# P1-D forward-estimate constants. Mirror runtime.dispatch.estimate_credits's
+# DeepSeek per-token T-credit rates (kept local to avoid the dispatch→
+# orchestrator import cycle). The PRE-call check is intentionally conservative:
+# it bills the step's full output budget (resolve_max_tokens) so an over-budget
+# step is rejected before the paid LLM call.
+_CREDIT_PER_OUTPUT_TOKEN = Decimal("0.000110")
+
+
+def estimate_step_cost(target_agent_slug: str) -> Decimal:
+    """Conservative forward cost estimate for one delegation step.
+
+    Prices the step at its full per-role output-token budget so the pre-call
+    ``check_budget`` rejects a step that *would* blow the cap before it runs
+    (e.g. the writer's max_tokens=8192). Real per-callsite cost is reconciled
+    afterward via ``accumulated_cost`` (AC-W1-13 swaps both for live billing).
+    """
+    return Decimal(resolve_max_tokens(target_agent_slug)) * _CREDIT_PER_OUTPUT_TOKEN
+
+
+async def _read_persisted_status(session: AsyncSession, task: Task | None) -> str | None:
+    """Re-read the task's status from the DB so a concurrently-committed
+    ``cancel_task`` (P1-C) is visible mid-run.
+
+    ``cancel_task`` commits ``status='cancelled'`` on a *different* session; with
+    ``expire_on_commit=False`` the orchestrator's identity-mapped row is stale,
+    so we ``refresh`` (re-SELECT) before reading. Returns None when there is no
+    row to refresh (purged-task race) or the session shim has no ``refresh``.
+    """
+    if task is None:
+        return None
+    refresh = getattr(session, "refresh", None)
+    if callable(refresh):
+        await refresh(task, attribute_names=["status"])
+    return task.status
+
 
 # The top-level task IS the Coordinator run; its duration is labelled accordingly
 # (per-leaf durations are a Wave-1+ task_steps concern, see AC-W1-2).
@@ -145,6 +183,14 @@ async def execute_agent_task(
     # `delegate_task` tool can dispatch through us. Each dispatch pushes
     # accumulated cost + emits SSE delegation events.
     async def runner_with_orchestration(inp: DelegateInput, _deps: Any) -> DelegateResult:
+        # P1-C fix: honour a mid-run cancel. cancel_task commits
+        # status='cancelled' on another session; re-read the persisted status
+        # before each delegation step and abort (no further paid steps) so the
+        # cancel actually stops the orchestration instead of running to
+        # completion. The TaskCancelled handler below stamps the terminal
+        # 'cancelled' outcome (never overwritten to 'succeeded').
+        if await _read_persisted_status(session, task) == "cancelled":
+            raise TaskCancelled(f"task {task_id} cancelled mid-run")
         await sse_publisher.publish(
             TaskStreamEvent(
                 event_type="task.delegation_started",
@@ -152,7 +198,16 @@ async def execute_agent_task(
                 payload={"target_agent_slug": inp.target_agent_slug},
             )
         )
-        check_budget(accumulated_cost=ctx.accumulated_cost, cap=ctx.budget_cap)
+        # P1-D fix: enforce the cap BEFORE the paid call by passing a forward
+        # cost estimate as pending_cost. A single expensive step (e.g. the
+        # writer at max_tokens=8192) is rejected up-front instead of running in
+        # full and only tripping the AFTER-check (honours budget_guard's
+        # pre-call contract — see check_budget docstring).
+        check_budget(
+            accumulated_cost=ctx.accumulated_cost,
+            pending_cost=estimate_step_cost(inp.target_agent_slug),
+            cap=ctx.budget_cap,
+        )
         result = await leaf_runner(inp, ctx)
         ctx.accumulated_cost += result.cost_credits
         ctx.leaf_outputs.append(result)
@@ -196,6 +251,33 @@ async def execute_agent_task(
         # NullTeamProvisioningService.
         run_result = await coordinator_agent.run(user_prompt, deps=deps)  # type: ignore[call-overload]
         output = getattr(run_result, "output", None) or getattr(run_result, "data", None)
+    except TaskCancelled:
+        # P1-C fix: a mid-run cancel aborts the orchestration with a terminal
+        # 'cancelled' outcome. Do NOT overwrite task.status — cancel_task
+        # already committed 'cancelled'; the orchestrator only stamps
+        # completion + emits the cancelled SSE/CloudEvent so subscribers exit
+        # cleanly. Reserved budget is refunded; status is never resurrected to
+        # 'succeeded' (the bug this fix closes).
+        completed_at = datetime.now(UTC)
+        if task is not None:
+            task.completed_at = completed_at
+            task.total_cost_credits = ctx.accumulated_cost
+        refund_unused(ctx.accumulated_cost, reserved)
+        _record_terminal_task_metrics(
+            cell_label=cell_label,
+            outcome="cancelled",
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        await sse_publisher.publish(
+            TaskStreamEvent(
+                event_type="task.cancelled",
+                task_id=task_id,
+                payload={"total_cost_credits": str(ctx.accumulated_cost)},
+            )
+        )
+        await tasks_events.emit_task_cancelled(task_id=task_id, cascaded_to=[])
+        return {"summary": "(cancelled)", "total_cost_credits": str(ctx.accumulated_cost)}
     except Exception as exc:
         completed_at = datetime.now(UTC)
         if task is not None:
@@ -231,6 +313,33 @@ async def execute_agent_task(
             retry_possible=False,
         )
         raise
+
+    # P1-C fix: re-read persisted status before the success write so a cancel
+    # that landed during the final Coordinator turn (after the last delegation
+    # step) is not clobbered. If the row is already terminal-cancelled, abort
+    # the success write and emit the cancelled outcome instead of resurrecting
+    # it to 'succeeded'.
+    if await _read_persisted_status(session, task) == "cancelled":
+        completed_at = datetime.now(UTC)
+        if task is not None:
+            task.completed_at = completed_at
+            task.total_cost_credits = ctx.accumulated_cost
+        refund_unused(ctx.accumulated_cost, reserved)
+        _record_terminal_task_metrics(
+            cell_label=cell_label,
+            outcome="cancelled",
+            started_at=started_at,
+            completed_at=completed_at,
+        )
+        await sse_publisher.publish(
+            TaskStreamEvent(
+                event_type="task.cancelled",
+                task_id=task_id,
+                payload={"total_cost_credits": str(ctx.accumulated_cost)},
+            )
+        )
+        await tasks_events.emit_task_cancelled(task_id=task_id, cascaded_to=[])
+        return {"summary": "(cancelled)", "total_cost_credits": str(ctx.accumulated_cost)}
 
     # Cost rollup + completion stamp.
     completed_at = datetime.now(UTC)

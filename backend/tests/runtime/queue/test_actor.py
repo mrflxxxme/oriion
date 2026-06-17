@@ -73,7 +73,9 @@ async def test_runs_and_commits_when_queued() -> None:
 
     assert ran is True
     assert calls == ["dispatch"]
-    assert session.commits == 1
+    # P1-B: a committed 'running' claim BEFORE dispatch + the post-dispatch
+    # commit = 2 commits total.
+    assert session.commits == 2
 
 
 # ── run_task_dispatch: non-queued → idempotent skip ───────────────────────
@@ -104,6 +106,47 @@ async def test_skips_when_not_queued() -> None:
     assert session.commits == 0
 
 
+# ── run_task_dispatch: redelivery short-circuits after committed claim (P1-B) ──
+
+
+@pytest.mark.asyncio
+async def test_redelivery_runs_dispatch_only_once() -> None:
+    """P1-B: a worker crash/time_limit/redelivery must NOT re-run the paid
+    orchestration. The committed 'running' claim before dispatch means the
+    second (redelivered) invocation sees a non-queued row and short-circuits,
+    so the dispatch body fires exactly once.
+
+    The shared ``task`` object models the persisted row: the first call commits
+    status='running' on it, the second call (same row) reads 'running' and skips.
+    """
+    session = _FakeSession()
+    task = _task("queued")  # shared row — claim persists across redeliveries
+    calls: list[str] = []
+
+    async def fake_dispatch(**kwargs: Any) -> dict[str, Any]:
+        calls.append("dispatch")
+        return {}
+
+    common = {
+        "session": session,
+        "task_id": task.id,
+        "user_id": uuid4(),
+        "router": object(),
+        "publisher": object(),
+        "resolve_tenant": _resolve_fixed,
+        "load_task": lambda _s, _t: _ready(task),
+        "dispatch": fake_dispatch,
+    }
+
+    first = await run_task_dispatch(**common)  # type: ignore[arg-type]
+    assert task.status == "running"  # claim committed out of 'queued'
+    second = await run_task_dispatch(**common)  # type: ignore[arg-type]  # redelivery
+
+    assert first is True
+    assert second is False  # redelivery is a no-op
+    assert calls == ["dispatch"]  # orchestration body ran exactly ONCE
+
+
 # ── run_task_dispatch: failure commits failed-state + re-raises ────────────
 
 
@@ -125,7 +168,9 @@ async def test_commits_failed_state_and_reraises() -> None:
             load_task=lambda _s, _t: _ready(_task("queued")),
             dispatch=boom,
         )
-    assert session.commits == 1  # failed-state persisted before re-raise
+    # P1-B: 'running' claim committed before dispatch (1) + failed-state
+    # persisted before re-raise (1) = 2.
+    assert session.commits == 2
 
 
 async def _ready(value: Any) -> Any:

@@ -190,6 +190,30 @@ def test_stream_endpoint_mounted_in_app(app: FastAPI) -> None:
     assert "/api/v1/cells/{cell_id}/tasks/{task_id}/stream" in routes
 
 
+def test_stream_foreign_task_returns_404_without_subscribe(
+    app: FastAPI, fake_service: _FakeTaskService
+) -> None:
+    """SSE IDOR fix: a task_id not visible to the caller's tenant (RLS filters
+    it → get_task raises TaskNotFound) yields 404 and the publisher is NEVER
+    subscribed — the caller can't read another tenant's SSE ledger
+    (task.completed carries the full CoordinatorOutput)."""
+
+    async def _raise_not_found(_task_id: Any) -> Task:
+        raise TaskNotFound("foreign/unknown task")
+
+    fake_service.get_task = _raise_not_found  # type: ignore[method-assign]
+
+    with patch("src.tasks.routers.stream.get_sse_publisher") as mock_pub:
+        client = TestClient(app)
+        cell_id, task_id = uuid4(), uuid4()
+        r = client.get(f"/api/v1/cells/{cell_id}/tasks/{task_id}/stream")
+
+    assert r.status_code == 404
+    assert r.json()["code"] == "tasks.not_found"
+    # The ownership check ran before any publisher access → no subscription.
+    mock_pub.assert_not_called()
+
+
 # ── POST /run — async Dramatiq dispatch (AC-W1-16a, ADR-034) ───────────────
 
 

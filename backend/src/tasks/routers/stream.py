@@ -17,6 +17,8 @@ from fastapi.responses import StreamingResponse
 
 from src.iam.middleware import AuthenticatedUser, get_current_user
 from src.runtime.sse_publisher import get_sse_publisher
+from src.tasks.routers.tasks import get_task_service
+from src.tasks.services.task_service import TaskService
 
 router = APIRouter(prefix="/cells/{cell_id}/tasks/{task_id}/stream", tags=["tasks"])
 
@@ -31,9 +33,19 @@ async def stream_task(
     cell_id: UUID,
     task_id: UUID,
     auth: AuthenticatedUser = Depends(get_current_user),  # noqa: ARG001 — auth required
+    service: TaskService = Depends(get_task_service),
 ) -> StreamingResponse:
-    """SSE endpoint — yields per-step events as the orchestrator runs."""
+    """SSE endpoint — yields per-step events as the orchestrator runs.
+
+    F-SEC IDOR fix: confirm the task is visible to the caller's tenant BEFORE
+    subscribing. ``get_task_service`` depends on ``get_tenant_db_session`` (the
+    same 3-GUC RLS path the sibling GET /tasks/{id} endpoint uses), so a
+    foreign/unknown task_id is filtered by RLS → ``get_task`` raises
+    ``TaskNotFound`` → 404, and the caller never reaches another tenant's
+    ledger (``task.completed`` carries the full CoordinatorOutput).
+    """
     _ = cell_id
+    await service.get_task(task_id)  # raises TaskNotFound → 404 when RLS hides it
     publisher = get_sse_publisher()
 
     async def gen() -> AsyncIterator[str]:

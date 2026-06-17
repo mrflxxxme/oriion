@@ -74,7 +74,7 @@ Wave 0 deliverables full: `iam`, `multitenancy`, `rbac`, `llm-gateway`, `agents`
 ### 4. Alembic migrations layout
 
 ```
-backend/alembic/versions/
+backend/migrations/versions/
 ├── iam/
 │   ├── 0001_users.py
 │   └── 0002_refresh_tokens.py
@@ -104,7 +104,7 @@ Phase-spec **не дублирует** DDL/OpenAPI. Если phase добавл�
 - **Изоляция на уровне файлов:** изменение one bounded context не зацепляет другие через diff-noise. Reviewer-backend ловит cross-context coupling.
 - **Naming drift устранён:** `agent_archetypes` / `agent_archetype_id` / `system_roles` фиксируются раз и навсегда. ADR-001 (revised), ADR-021 (revised), ADR-010 (revised) cross-ref сюда.
 - **Bounded-context coupling explicit:** если backend service A читает таблицу из context B — это видно в `contracts/<A>/README.md` секции «External dependencies». RBAC и cross-cutting concerns не размазываются.
-- **Migration ownership:** каждый `alembic/versions/<context>/` — domain-specific. При extract-to-microservice (Wave 5+) контекст переезжает целиком.
+- **Migration ownership:** каждый `migrations/versions/<context>/` — domain-specific. При extract-to-microservice (Wave 5+) контекст переезжает целиком.
 
 ## Sanctioned cross-context exceptions (amendment 2026-05-19)
 
@@ -152,6 +152,7 @@ PR #30 architecture audit:
   - `backend/src/runtime/orchestrator.py`: `from src.tasks import events as tasks_events`
   - `backend/src/runtime/orchestrator.py`: `from src.tasks.exceptions import BudgetExceeded` (via budget_guard)
   - `backend/src/runtime/dispatch.py`: `from src.tasks.models import Task` (Phase 00.6 PR-B — inline-dispatch leaf-runner creates child `Task` rows; same blessed edge as orchestrator.py, no new justification needed — recorded per the §3 file:line rule, F-ARC-1)
+  - `backend/src/runtime/queue/actor.py`: `from src.tasks.models import Task` (Phase 01.1 infra-PR / ADR-034 — Dramatiq worker loads the Task; same blessed runtime→tasks edge, no new justification)
 - **Reverse edge (sanctioned-by-default, recorded for transparency):**
   `tasks/routers/tasks.py` → `runtime.dispatch` + `runtime.sse_publisher`
   (function/factory imports, not model imports) — the `/tasks/{id}/run`

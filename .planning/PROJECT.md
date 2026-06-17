@@ -52,9 +52,7 @@ R-29 закрыт через founder personal vertical expertise (см. [`risks/
 
 ## Текущая phase
 
-**Wave 0 (Foundation)** — Phase 00.1 / 00.2 / 00.3 / 00.4 / 00.2.5 (integration) all ✅ Complete (merged 2026-05-17 → 2026-05-19 via PRs #25, #28, #30, #32). **Phase 00.5** (multi-agent tools + verticals scaffolding) — next. **Phase 00.6** (deploy + KMS + live-LLM tests) — последняя фаза Wave 0. OQ-04 submitted (dev unblocked).
-
-Rolling status + AC verification + блокеры — [`STATUS.md`](./STATUS.md) (canonical source of truth for current state).
+См. [`STATUS.md`](./STATUS.md) — canonical source of truth текущей фазы (на 2026-06-17: Wave 1 Core MVP, Phase 01.1 in progress).
 
 ## Стартовые team-presets (1 horizontal + 5 vertical)
 

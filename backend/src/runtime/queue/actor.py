@@ -82,6 +82,16 @@ async def run_task_dispatch(
                 status=task.status,
             )
             return False
+        # P1-B fix: claim the task with a COMMITTED transition out of 'queued'
+        # BEFORE the long LLM orchestration. The orchestrator flips status to
+        # 'running' in-memory but never commits until the work finishes, so a
+        # worker crash / time_limit / redelivery mid-run rolls the uncommitted
+        # 'running' back to 'queued' and the queued-guard above passes again —
+        # re-running the whole paid researcher→analyst→writer chain (and
+        # duplicating child Task rows). Committing 'running' here means a
+        # redelivered message sees a non-queued row and short-circuits.
+        task.status = "running"
+        await session.commit()
         try:
             await dispatch(
                 task=task,

@@ -29,6 +29,12 @@
 | Tier 4 (architecture, security, billing, migrations) | Rebase merge + ADR-link обязателен |
 | Tier 5 (hotfix) | Fast-forward после verifier full-acceptance |
 
+### 3a. Post-merge branch teardown
+
+- **Head-ветки удаляются автоматически при merge** (repo-setting `deleteBranchOnMerge=true`). После merge PR'а ветка-источник на `origin` исчезает — это норма, не аномалия.
+- **Prune-audit gate ОБЯЗАН использовать `gh pr` state==MERGED, а НЕ `git branch -r --merged origin/main`.** Squash/rebase merge переписывают SHA → tip merged-ветки **не является ancestor** `main`, поэтому эвристика `--merged` возвращает пустоту и даёт ложный «nothing to prune». Канонический источник «что уже влито» — состояние PR через `gh`, не git-ancestry.
+- **Периодическая гигиена:** прогонять `git fetch --prune` + удалять worktree'ы/ветки, чей upstream показывает `: gone]` (в `git branch -vv`). Это снимает локально-висящие ветки, чей remote-tracking уже удалён auto-teardown'ом.
+
 ### 4. AI commit format
 
 Каждый commit от AI-агента:

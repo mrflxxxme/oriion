@@ -56,7 +56,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Trivy filesystem scan (vulnerabilities + misconfigs + secrets)
-        uses: aquasecurity/trivy-action@master
+        # pinned by commit SHA (was @master) — supply-chain + reproducibility.
+        # ed142fd = tag v0.36.0; bump deliberately via the SHA.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: fs
           scan-ref: .
@@ -71,7 +73,7 @@ jobs:
 
       - name: Upload Trivy SARIF to GitHub Security tab
         if: ${{ !cancelled() }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
 
@@ -102,6 +104,6 @@ jobs:
 
       - name: Upload Grype SARIF to GitHub Security tab
         if: ${{ !cancelled() }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif

@@ -35,7 +35,6 @@ from src.iam.exceptions import (
     EmailNotVerified,
     InvalidCredentials,
     RateLimitExceeded,
-    TokenNotFound,
     TokenRotationError,
 )
 from src.iam.repositories.consent_repository import ConsentRepository
@@ -53,6 +52,7 @@ from src.iam.schemas import (
     TokenPair,
     UserResponse,
 )
+from src.iam.services.account_recovery_service import AccountRecoveryService
 from src.iam.services.consent_service import ConsentService
 from src.iam.services.email_service import EmailSender
 from src.iam.services.password_service import PasswordService
@@ -60,9 +60,10 @@ from src.iam.services.rate_limit_service import RateLimitService
 from src.iam.services.token_service import TokenService
 from src.multitenancy.services.workspace_service import provision_initial_workspace
 
-# Token TTLs per contract README invariants 7+8
+# Token TTL per contract README invariant 7 (used by register's inline
+# email-verification token; the recovery-flow TTLs live in
+# account_recovery_service.py).
 EMAIL_VERIFICATION_TTL_SECONDS = 24 * 3600  # 24h
-PASSWORD_RESET_TTL_SECONDS = 3600  # 1h
 
 
 def _hash_token_plaintext(plaintext: str) -> str:
@@ -118,6 +119,20 @@ class AuthService:
         self._require_email_verification = require_email_verification
         self._refresh_ttl_seconds = refresh_ttl_seconds
         self._access_ttl_seconds = access_ttl_seconds
+        # Account-recovery flows (email-verification + password-reset) live in a
+        # focused collaborator (file-size canon split). AuthService stays a
+        # facade: the four recovery methods below delegate here, sharing the
+        # request's session so audit inserts keep landing in the outer TX.
+        self._account_recovery = AccountRecoveryService(
+            session=session,
+            user_repo=user_repo,
+            session_repo=session_repo,
+            email_verif_repo=email_verif_repo,
+            password_reset_repo=password_reset_repo,
+            password_service=password_service,
+            rate_limit_service=rate_limit_service,
+            email_sender=email_sender,
+        )
 
     # ── register ────────────────────────────────────────────────────────
 
@@ -410,138 +425,24 @@ class AuthService:
             expires_in=access.expires_in,
         )
 
-    # ── verify-email ────────────────────────────────────────────────────
+    # ── account-recovery (delegated to AccountRecoveryService) ──────────
+    # Facade delegators preserve the public AuthService surface (routers +
+    # tests keep calling these on the auth service); the flows themselves
+    # live in ``account_recovery_service.py``.
 
     async def verify_email(self, plaintext_token: str) -> None:
-        token_hash = _hash_token_plaintext(plaintext_token)
-        row = await self._email_verif_repo.find_active_by_hash(token_hash)
-        if row is None or row.expires_at < datetime.now(UTC):
-            raise TokenNotFound()
-        await self._email_verif_repo.mark_used(row.id)
-        await self._user_repo.mark_email_verified(row.user_id)
-        verified_at = datetime.now(UTC)
-        await events.emit_email_verified(user_id=row.user_id, verified_at=verified_at)
-        await emit_audit_event(
-            actor_type="user",
-            actor_id=row.user_id,
-            action="iam.user.email_verified",
-            resource_type="user",
-            resource_id=row.user_id,
-            payload=None,
-            session=self._session,
-        )
-
-    # ── resend-verification (anti-enum 202) ─────────────────────────────
+        await self._account_recovery.verify_email(plaintext_token)
 
     async def resend_verification(
         self, email: str, *, ip: str | None, user_agent: str | None
     ) -> None:
-        if ip:
-            verdict = await self._rate_limit_service.check_and_increment(
-                scope="resend", ip=ip, email=email
-            )
-            if not verdict.allowed:
-                raise RateLimitExceeded(retry_after=verdict.retry_after)
-
-        user = await self._user_repo.find_by_email(email)
-        if user is None or user.email_verified_at is not None:
-            return  # anti-enum: do not signal existence
-
-        await self._email_verif_repo.revoke_unused_for_user(user.id)
-        plaintext = _new_token_plaintext()
-        expires_at = datetime.now(UTC) + timedelta(seconds=EMAIL_VERIFICATION_TTL_SECONDS)
-        row = await self._email_verif_repo.create(
-            user_id=user.id,
-            token_hash=_hash_token_plaintext(plaintext),
-            expires_at=expires_at,
-        )
-        await self._email_sender.send_verification_email(
-            to=user.email, token=plaintext, expires_at=expires_at
-        )
-        await events.emit_email_verification_requested(
-            user_id=user.id,
-            email=user.email,
-            token_id=row.id,
-            expires_at=expires_at,
-        )
-
-    # ── forgot-password (anti-enum 202) ─────────────────────────────────
+        await self._account_recovery.resend_verification(email, ip=ip, user_agent=user_agent)
 
     async def forgot_password(self, email: str, *, ip: str | None, user_agent: str | None) -> None:
-        if ip:
-            verdict = await self._rate_limit_service.check_and_increment(
-                scope="forgot", ip=ip, email=email
-            )
-            if not verdict.allowed:
-                raise RateLimitExceeded(retry_after=verdict.retry_after)
-
-        user = await self._user_repo.find_by_email(email)
-        if user is None:
-            return  # anti-enum
-
-        await self._password_reset_repo.revoke_unused_for_user(user.id)
-        plaintext = _new_token_plaintext()
-        expires_at = datetime.now(UTC) + timedelta(seconds=PASSWORD_RESET_TTL_SECONDS)
-        chain_id = uuid4()
-        row = await self._password_reset_repo.create(
-            user_id=user.id,
-            token_hash=_hash_token_plaintext(plaintext),
-            reset_chain_id=chain_id,
-            expires_at=expires_at,
-        )
-        await self._email_sender.send_password_reset_email(
-            to=user.email, token=plaintext, expires_at=expires_at
-        )
-        await events.emit_password_reset_requested(
-            user_id=user.id,
-            token_id=row.id,
-            reset_chain_id=chain_id,
-            expires_at=expires_at,
-        )
-
-    # ── reset-password ──────────────────────────────────────────────────
+        await self._account_recovery.forgot_password(email, ip=ip, user_agent=user_agent)
 
     async def reset_password(self, plaintext_token: str, new_password: str) -> None:
-        token_hash = _hash_token_plaintext(plaintext_token)
-        row = await self._password_reset_repo.find_by_hash(token_hash)
-        if row is None or row.revoked_at is not None or row.expires_at < datetime.now(UTC):
-            raise TokenNotFound()
-
-        # Reuse detection: a consumed token presented again → chain-revoke
-        if row.used_at is not None:
-            await self._password_reset_repo.revoke_chain(row.reset_chain_id)
-            await self._session_repo.revoke_all_for_user(row.user_id)
-            await emit_audit_event(
-                actor_type="system",
-                actor_id=row.user_id,
-                action="iam.auth.reset_reuse_detected",
-                resource_type="user",
-                resource_id=row.user_id,
-                payload={"reset_chain_id": str(row.reset_chain_id)},
-                session=self._session,
-            )
-            raise TokenNotFound()
-
-        new_hash = self._password_service.hash(new_password)
-        await self._user_repo.update_password_hash(row.user_id, new_hash)
-        await self._password_reset_repo.mark_used(row.id)
-        # Per invariant 8: revoke every active session for the user
-        await self._session_repo.revoke_all_for_user(row.user_id)
-        completed_at = datetime.now(UTC)
-        await events.emit_password_reset_completed(
-            user_id=row.user_id,
-            reset_chain_id=row.reset_chain_id,
-            completed_at=completed_at,
-        )
-        await emit_audit_event(
-            actor_type="user",
-            actor_id=row.user_id,
-            action="iam.user.password_reset",
-            resource_type="user",
-            resource_id=row.user_id,
-            payload=None,
-            session=self._session,
-        )
+        await self._account_recovery.reset_password(plaintext_token, new_password)
 
     # ── /users/me helpers (kept here so router stays thin) ──────────────
 
