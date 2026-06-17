@@ -86,16 +86,25 @@ def configure_structlog() -> None:
         _inject_otel_context,
         _drop_color_message_key,
         structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
     ]
 
     if use_json:
-        renderer: Processor = structlog.processors.JSONRenderer()
+        # format_exc_info renders exc_info into a string field for the JSON log.
+        # ConsoleRenderer does its OWN (prettier) exception formatting, and having
+        # format_exc_info ahead of it makes structlog warn ("Remove format_exc_info
+        # from your processor chain…") the moment an exception is rendered — which
+        # under pytest's filterwarnings=error is a hard failure. So it belongs in
+        # the JSON branch only.
+        processors: list[Processor] = [
+            *shared_processors,
+            structlog.processors.format_exc_info,
+            structlog.processors.JSONRenderer(),
+        ]
     else:
-        renderer = structlog.dev.ConsoleRenderer(colors=True)
+        processors = [*shared_processors, structlog.dev.ConsoleRenderer(colors=True)]
 
     structlog.configure(
-        processors=[*shared_processors, renderer],
+        processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
