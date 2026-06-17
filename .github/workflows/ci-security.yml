@@ -33,7 +33,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # On push to main, BASE (default branch) == HEAD → trufflehog-action
+      # guard aborts with exit 1. Gitleaks is the canonical secrets gate (AC4)
+      # and runs on both push and PR; TruffleHog (--only-verified) is a
+      # supplementary diff scan that already runs on the PR before merge.
+      # So restrict it to pull_request to keep main green without weakening
+      # the canonical gate. See ci-security.yml header (AC4).
       - name: TruffleHog (verified secrets only)
+        if: ${{ github.event_name == 'pull_request' }}
         uses: trufflesecurity/trufflehog@v3.84.2
         with:
           path: ./
