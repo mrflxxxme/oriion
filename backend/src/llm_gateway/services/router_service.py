@@ -12,12 +12,19 @@ Wave 0 ROLE_TO_MODEL covers the agent archetypes mentioned in ADR-018.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 from uuid import UUID
 
 import httpx
 import structlog
 
+from src._shared.observability.metrics import (
+    LLM_LATENCY,
+    LLM_REQUEST_TOTAL,
+    LLM_TOKENS_INPUT,
+    LLM_TOKENS_OUTPUT,
+)
 from src.llm_gateway.circuit_breaker import CircuitState, ProviderCircuit
 from src.llm_gateway.exceptions import LLMProviderUnavailable
 from src.llm_gateway.providers.base import LLMProvider, LLMRequest, LLMResponse
@@ -39,6 +46,41 @@ _NATIVE_TOOL_PROVIDERS: frozenset[str] = frozenset({"deepseek"})
 def provider_forwards_tools(provider_slug: str) -> bool:
     """True iff ``provider_slug`` forwards native tool-calls (DeepSeek only)."""
     return provider_slug in _NATIVE_TOOL_PROVIDERS
+
+
+def _record_llm_metrics(
+    *,
+    provider: str,
+    model: str,
+    status: str,
+    latency_seconds: float,
+    response: LLMResponse | None,
+) -> None:
+    """Emit the 4 per-callsite LLM Prometheus metrics for one provider call.
+
+    AC-W1-13: every gateway completion increments ``llm_request_total`` (by
+    outcome) and observes ``llm_request_latency_seconds``; on success the token
+    counters are advanced too. Runs in BOTH the web and Dramatiq-worker process
+    (each has its own /metrics exposition over the global REGISTRY), so an
+    orchestration that runs off-request still publishes non-zero metrics.
+
+    Instrumentation is best-effort: a metrics failure must never fail the gateway
+    call, so the whole body is guarded. (It also keeps unit tests that drive a
+    mock provider — whose ``usage`` tokens aren't real ints — from tripping the
+    Counter's non-negative check.)
+    """
+    try:
+        LLM_REQUEST_TOTAL.labels(provider=provider, model=model, status=status).inc()
+        LLM_LATENCY.labels(provider=provider, model=model).observe(latency_seconds)
+        if response is not None:
+            LLM_TOKENS_INPUT.labels(provider=provider, model=model).inc(
+                int(response.usage.tokens_input)
+            )
+            LLM_TOKENS_OUTPUT.labels(provider=provider, model=model).inc(
+                int(response.usage.tokens_output)
+            )
+    except Exception as exc:  # noqa: BLE001 — observability is non-fatal
+        logger.debug("llm_gateway.router.metrics_skipped", error=str(exc))
 
 
 # ── ROLE_TO_MODEL — per ADR-018 ───────────────────────────────────────────
@@ -197,6 +239,7 @@ class LLMRouter:
             provider, model = await self.route(
                 workspace_id=workspace_id, role_key=role_key, model_hint=model_hint
             )
+            t0 = time.perf_counter()
             resp = await provider.chat(
                 LLMRequest(
                     messages=messages,
@@ -205,6 +248,13 @@ class LLMRouter:
                     metadata=metadata or {},
                     max_tokens=max_tokens,
                 )
+            )
+            _record_llm_metrics(
+                provider=provider.name,
+                model=model,
+                status="success",
+                latency_seconds=time.perf_counter() - t0,
+                response=resp,
             )
             return resp, model, provider.name
 
@@ -221,6 +271,7 @@ class LLMRouter:
                 model = model_hint or default_model
             else:
                 model = _provider_default_model(slug)
+            t0 = time.perf_counter()
             try:
                 resp = await candidate.chat(
                     LLMRequest(
@@ -234,9 +285,23 @@ class LLMRouter:
                     )
                 )
                 circuit.record_success()
+                _record_llm_metrics(
+                    provider=slug,
+                    model=model,
+                    status="success",
+                    latency_seconds=time.perf_counter() - t0,
+                    response=resp,
+                )
                 return resp, model, slug
             except (httpx.HTTPError, LLMProviderUnavailable) as exc:
                 circuit.record_failure()
+                _record_llm_metrics(
+                    provider=slug,
+                    model=model,
+                    status="error",
+                    latency_seconds=time.perf_counter() - t0,
+                    response=None,
+                )
                 last_exc = exc
                 tried.append(slug)
                 logger.warning(

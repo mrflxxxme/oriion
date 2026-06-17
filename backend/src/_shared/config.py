@@ -248,6 +248,17 @@ class Settings(BaseSettings):
             "don't need an exporter and want fastest startup."
         ),
     )
+    worker_metrics_port: int = Field(
+        default=9191,
+        description=(
+            "TCP port the Dramatiq dispatch worker exposes Prometheus /metrics on "
+            "(AC-W1-13). Under async dispatch the orchestration runs in the worker "
+            "process, so its llm_*/task_* counters live in a SEPARATE registry from "
+            "the web tier — Prometheus scrapes worker:9191 in addition to "
+            "backend:8000/metrics. Set to 0 to disable the worker exporter (e.g. "
+            "a constrained dev box); the actor still runs, just unscraped."
+        ),
+    )
     log_format: Literal["auto", "json", "console"] = Field(
         default="auto",
         description=(
