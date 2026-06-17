@@ -40,7 +40,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
+
+from sqlalchemy import select
 
 from src._shared.config import get_settings
 from src.agents.analyst import AnalystDeps, build_analyst_agent
@@ -57,13 +59,15 @@ from src.agents.tools.delegate import (
     DelegateResult,
     assert_delegation_allowed,
 )
+from src.agents.models import AgentArchetype
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
+from src.llm_gateway.services.billing_service import record_llm_cost
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
 from src.mcp.tools.web_search import WebSearchResult, WebSearchTool
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
-from src.tasks.models import Task
+from src.tasks.models import Task, TaskStep
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -310,6 +314,23 @@ def build_native_web_search(
     return web_search
 
 
+async def _resolve_archetype(session: AsyncSession, slug: str) -> AgentArchetype | None:
+    """Latest active archetype for a leaf slug.
+
+    Source of the ``agent_archetypes`` FK for the per-step row (AC-W1-2) and a
+    pricing fallback (provider/model) when the runtime model name is unavailable
+    (AC-W1-13). Returns None when no archetype is seeded — the runner then keeps
+    the coarse cost estimate and skips the step row instead of failing.
+    """
+    stmt = (
+        select(AgentArchetype)
+        .where(AgentArchetype.slug == slug, AgentArchetype.is_active.is_(True))
+        .order_by(AgentArchetype.prompt_version.desc())
+        .limit(1)
+    )
+    return (await session.execute(stmt)).scalars().first()
+
+
 def build_leaf_runner(
     *,
     llm_router: LLMRouter,
@@ -333,8 +354,12 @@ def build_leaf_runner(
            sub-prompt (scripted failover path).
         2. Builds the target specialist Agent (real ``LLMGatewayModel``).
         3. Runs it against the (possibly research-augmented) sub_prompt.
-        4. Persists a child ``Task`` row (status='succeeded').
-        5. Returns a ``DelegateResult`` with estimated cost + token usage.
+        4. Derives REAL cost from ``record_llm_cost`` (the billing ledger) when a
+           ``workspace_id`` + seeded archetype are present (AC-W1-13); else keeps
+           the coarse ``estimate_credits`` (the unit-test path).
+        5. Persists a child ``Task`` row + a per-delegation ``task_steps`` row
+           with the token + cost split (AC-W1-2).
+        6. Returns a ``DelegateResult`` carrying that cost + token usage.
     """
     specs = leaf_specs or _DEFAULT_LEAF_SPECS
 
@@ -372,9 +397,37 @@ def build_leaf_runner(
         # contract meta (frontmatter, structured summary) for downstream agents.
         output_text = strip_wrapping_fence(_extract_output_text(run_result))
         input_tokens, output_tokens = _extract_usage(run_result)
-        cost = estimate_credits(input_tokens=input_tokens, output_tokens=output_tokens)
+
+        # Cost: production (workspace_id + seeded archetype) derives REAL cost from
+        # the billing ledger via record_llm_cost (AC-W1-13) — which also writes the
+        # llm_usage_log + credit_transactions rows. The unit-test path keeps the
+        # coarse estimate. The provider/model come from the actual (post-failover)
+        # runtime call when available, falling back to the archetype's defaults.
+        archetype: AgentArchetype | None = None
+        if workspace_id is not None:
+            archetype = await _resolve_archetype(session, inp.target_agent_slug)
 
         now = datetime.now(UTC)
+        if workspace_id is not None and archetype is not None:
+            provider_slug = model.last_provider_slug or archetype.model_provider_slug
+            model_name = model.last_model_name or archetype.model_name
+            _, cost = await record_llm_cost(
+                session,
+                workspace_id=workspace_id,
+                cell_id=cell_id,
+                user_id=user_id,
+                task_id=parent_task_id,
+                provider=provider_slug,
+                model=model_name,
+                tokens_in=input_tokens,
+                tokens_out=output_tokens,
+                latency_ms=0,
+                status="success",
+                request_id=str(uuid4()),
+            )
+        else:
+            cost = estimate_credits(input_tokens=input_tokens, output_tokens=output_tokens)
+
         child = Task(
             cell_id=cell_id,
             initiated_by_user_id=user_id,
@@ -391,6 +444,29 @@ def build_leaf_runner(
         child.total_output_tokens = output_tokens
         session.add(child)
         await session.flush()  # materialize child.id
+
+        # AC-W1-2: one task_steps row per delegation (the leaf LLM call), on the
+        # PARENT task, carrying the token + cost split. Gated on the same
+        # production path (the agent_archetype_id FK needs a seeded archetype).
+        # step_index = count of already-completed delegations — the orchestrator
+        # appends to ctx.leaf_outputs only AFTER we return, so this is unique per
+        # parent. SUM(task_steps.cost_credits) == task.total_cost_credits because
+        # the orchestrator accumulates this same per-delegation cost.
+        if workspace_id is not None and archetype is not None:
+            step = TaskStep(
+                task_id=parent_task_id,
+                step_index=len(_ctx.leaf_outputs),
+                agent_archetype_id=archetype.id,
+                step_type="llm_call",
+                input_jsonb={"sub_prompt": inp.sub_prompt[:2000], "tokens_input": input_tokens},
+                output_jsonb={"sub_task_id": str(child.id), "tokens_output": output_tokens},
+                status="succeeded",
+                cost_credits=cost,
+            )
+            step.started_at = now
+            step.completed_at = now
+            session.add(step)
+            await session.flush()
 
         return DelegateResult(
             sub_task_id=child.id,
@@ -592,6 +668,7 @@ async def dispatch_task(
     coordinator: PlanExecutingCoordinator | None = None,
     web_search_tool: WebSearchTool | None = None,
     tool_rate_limiter: ToolRateLimiter | None = None,
+    workspace_id: UUID | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
@@ -603,10 +680,17 @@ async def dispatch_task(
     active provider the Researcher gets a **native** ``web_search`` tool (rate-
     limited via ``tool_rate_limiter``) and decides its own searches (AC-W1-19); on
     YandexGPT/GigaChat failover it falls back to the scripted pre-fetch.
+
+    ``workspace_id`` (resolved by the Dramatiq worker from cell membership)
+    switches the leaf runner onto the real billing-ledger cost path + per-step
+    persistence (AC-W1-13 / AC-W1-2). Left None — e.g. the legacy inline path or
+    a unit test — the runner keeps the coarse estimate and skips step rows.
     """
     publisher = sse_publisher or get_sse_publisher()
     slugs = available_agent_slugs or list(_DEFAULT_LEAF_SPECS)
-    coord = coordinator or PlanExecutingCoordinator(llm_router=llm_router)
+    coord = coordinator or PlanExecutingCoordinator(
+        llm_router=llm_router, workspace_id=workspace_id
+    )
 
     # DeepSeek active → native tool-call path (rate-limited); else scripted.
     native_enabled = _router_supports_native_tools(llm_router, "researcher")
@@ -625,6 +709,7 @@ async def dispatch_task(
         parent_task_id=task.id,
         cell_id=task.cell_id,
         user_id=task.initiated_by_user_id,
+        workspace_id=workspace_id,
         web_search_tool=search_tool,
         native_web_search=native_web_search,
         user_prompt=user_prompt,

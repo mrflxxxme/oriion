@@ -92,6 +92,8 @@ async def run_task_dispatch(
                 # Redis. dispatch_task only uses it on the DeepSeek (native
                 # tool-call) path; the scripted-failover path ignores it.
                 tool_rate_limiter=tool_rate_limiter,
+                # AC-W1-13/AC-W1-2: real billing-ledger cost + per-step persistence.
+                workspace_id=workspace_id,
             )
         except Exception:
             logger.exception("runtime.dispatch.actor.failed", task_id=str(task_id))
