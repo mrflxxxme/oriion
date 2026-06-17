@@ -17,8 +17,13 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import BaseModel
 from src.agents.tools.delegate import DelegateInput, DelegateResult
-from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
+from src.runtime.orchestrator import (
+    OrchestratorContext,
+    estimate_step_cost,
+    execute_agent_task,
+)
 from src.runtime.sse_publisher import InProcessSSEPublisher
+from src.tasks.exceptions import BudgetExceeded
 from src.tasks.models import Task
 
 # ── Test doubles ────────────────────────────────────────────────────────
@@ -326,3 +331,140 @@ async def test_task_missing_in_session_still_completes(mock_emit: Any) -> None:
     assert result["summary"] == "demo output"
     drained = publisher._drain.get(task_id, [])
     assert [ev.event_type for ev in drained] == ["task.started", "task.completed"]
+
+
+# ── P1-D: per-step pre-call budget enforcement ────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_step_rejected_before_call_when_projected_cost_exceeds_cap(
+    mock_emit: Any,
+) -> None:
+    """P1-D fix: a step whose forward cost estimate would blow the per-task cap
+    is rejected (BudgetExceeded) BEFORE the paid leaf call — the leaf_runner
+    never fires. Previously check_budget ran with pending_cost=0 so the
+    expensive step always ran in full and only tripped the AFTER-check.
+
+    The writer's forward estimate is max_tokens(8192) * 0.000110 ≈ 0.901
+    credits; a 0.5-credit cap must reject it up-front.
+    """
+    task_id = uuid4()
+    task = _build_fake_task(task_id)
+    session = _StubSession(task=task)
+    publisher = InProcessSSEPublisher()
+
+    # Sanity: writer's projected step cost exceeds the tiny cap below.
+    assert estimate_step_cost("writer") > Decimal("0.5")
+
+    leaf_fired = False
+
+    async def _leaf_runner(_inp: DelegateInput, _ctx: OrchestratorContext) -> DelegateResult:
+        nonlocal leaf_fired
+        leaf_fired = True
+        raise AssertionError("leaf_runner must NOT fire — step is over-budget pre-call")
+
+    class _DelegatingAgent:
+        async def run(self, _prompt: str, *, deps: Any) -> _FakeRunResult:
+            await deps.runner(
+                DelegateInput(target_agent_slug="writer", sub_prompt="w"),
+                deps,
+            )
+            return _FakeRunResult()
+
+    with pytest.raises(BudgetExceeded):
+        await execute_agent_task(
+            task_id=task_id,
+            cell_id=uuid4(),
+            user_id=uuid4(),
+            coordinator_agent=_DelegatingAgent(),  # type: ignore[arg-type]
+            user_prompt="p",
+            available_agent_slugs=["writer"],
+            leaf_runner=_leaf_runner,
+            sse_publisher=publisher,
+            session=session,  # type: ignore[arg-type]
+            budget_cap=Decimal("0.5"),
+        )
+
+    assert leaf_fired is False  # rejected BEFORE the paid call
+    assert task.status == "failed"  # budget breach is a terminal failure
+    drained = publisher._drain.get(task_id, [])
+    failed = next(ev for ev in drained if ev.event_type == "task.failed")
+    assert failed.payload["error_code"] == "tasks.budget_exceeded"
+
+
+# ── P1-C: mid-run cancel stops orchestration, no success-write resurrection ──
+
+
+class _CancelOnRefreshSession:
+    """Session shim that flips the row to 'cancelled' on the first refresh —
+    models a concurrent cancel_task commit landing mid-run."""
+
+    def __init__(self, task: Task) -> None:
+        self.task = task
+        self.refreshes = 0
+
+    async def get(self, _model: Any, _task_id: UUID) -> Task | None:
+        return self.task
+
+    async def refresh(self, obj: Any, attribute_names: Any = None) -> None:
+        self.refreshes += 1
+        obj.status = "cancelled"  # cancel landed (committed on another session)
+
+
+@pytest.mark.asyncio
+async def test_cancel_mid_run_ends_cancelled_and_stops_further_steps(
+    mock_emit: Any,
+) -> None:
+    """P1-C fix: a task cancelled mid-run ends terminal 'cancelled' (NOT
+    'succeeded') and issues no further delegation steps after the cancel.
+
+    The Coordinator tries to delegate twice; the first runner call re-reads the
+    persisted status (now 'cancelled') and raises TaskCancelled, so the second
+    step never runs and the success-write never resurrects the row.
+    """
+    task_id = uuid4()
+    task = _build_fake_task(task_id)
+    session = _CancelOnRefreshSession(task)
+    publisher = InProcessSSEPublisher()
+
+    leaf_calls: list[DelegateInput] = []
+
+    async def _leaf_runner(inp: DelegateInput, _ctx: OrchestratorContext) -> DelegateResult:
+        leaf_calls.append(inp)
+        return DelegateResult(
+            sub_task_id=uuid4(),
+            target_agent_slug=inp.target_agent_slug,
+            output="x",
+            cost_credits=Decimal("1"),
+            tokens_used=10,
+        )
+
+    class _TwoStepAgent:
+        async def run(self, _prompt: str, *, deps: Any) -> _FakeRunResult:
+            await deps.runner(DelegateInput(target_agent_slug="researcher", sub_prompt="r"), deps)
+            await deps.runner(DelegateInput(target_agent_slug="writer", sub_prompt="w"), deps)
+            return _FakeRunResult()
+
+    mock_emit.emit_task_cancelled = AsyncMock()
+    result = await execute_agent_task(
+        task_id=task_id,
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        coordinator_agent=_TwoStepAgent(),  # type: ignore[arg-type]
+        user_prompt="p",
+        available_agent_slugs=["researcher", "writer"],
+        leaf_runner=_leaf_runner,
+        sse_publisher=publisher,
+        session=session,  # type: ignore[arg-type]
+    )
+
+    # Terminal 'cancelled', NOT resurrected to 'succeeded'.
+    assert task.status == "cancelled"
+    assert result["summary"] == "(cancelled)"
+    # No delegation step ran (cancel detected before the first leaf call).
+    assert leaf_calls == []
+    # SSE ledger ends on task.cancelled, never task.completed.
+    types = [ev.event_type for ev in publisher._drain.get(task_id, [])]
+    assert "task.cancelled" in types
+    assert "task.completed" not in types
+    mock_emit.emit_task_cancelled.assert_awaited_once()
