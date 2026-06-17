@@ -1,27 +1,72 @@
-# Alertmanager config — Phase 00.6 Stage A.
+# Alertmanager config — Phase 01.1 infra-PR (AC-W1-15).
 #
-# Wave-0 SHIP: log-only receiver (alerts surfaced в alertmanager UI +
-# Prometheus alerts panel). Telegram + PagerDuty webhooks = Wave-1
-# hardening pin (AC-W1-x).
+# Replaces the Wave-0 log-only mock receiver with REAL paging:
+#   * Telegram  — all firing alerts (warning + critical) → ops chat.
+#   * PagerDuty — critical only (e.g. R-04 cost runaway) → on-call rotation.
+#
+# Secrets are NEVER inlined. They are read at runtime from files the deploy
+# materializes from YC Lockbox into /etc/alertmanager/secrets/ (mounted in
+# docker-compose.staging.yml):
+#   * telegram_bot_token   — BotFather token (LOCKBOX_ALERT_TELEGRAM_BOT_TOKEN)
+#   * pagerduty_routing_key — PD Events API v2 integration key
+#                             (LOCKBOX_ALERT_PAGERDUTY_ROUTING_KEY)
+# The non-secret chat id is a structural value; replace the TBD per
+# .planning/PLACEHOLDERS.md before staging cutover.
 
 global:
   resolve_timeout: 5m
+  # PagerDuty Events API v2 endpoint (default; pinned for clarity).
+  pagerduty_url: https://events.pagerduty.com/v2/enqueue
 
 route:
   group_by: ["alertname", "severity", "service"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
-  receiver: log-only-receiver
+  # Default: every alert notifies Telegram.
+  receiver: telegram-notifications
+  routes:
+    # Critical alerts ALSO page PagerDuty (the receiver fans out to both
+    # Telegram + PD so a critical never silently skips the chat).
+    - matchers:
+        - severity = critical
+      receiver: critical-telegram-pagerduty
+      # No `continue` needed — critical-telegram-pagerduty already includes the
+      # Telegram config, so the alert reaches both channels from one receiver.
 
 receivers:
-  - name: log-only-receiver
-    # Wave-0 mock-receiver. Webhook к /dev/null. Founder reads alerts
-    # via alertmanager UI (http://localhost:9093 — gated by Caddy basic-
-    # auth or local-override port-publish per C8).
-    webhook_configs:
-      - url: http://otel-collector:4318/v1/logs
-        send_resolved: true
+  - name: telegram-notifications
+    telegram_configs:
+      - send_resolved: true
+        bot_token_file: /etc/alertmanager/secrets/telegram_bot_token
+        # TBD_ALERT_TELEGRAM_CHAT_ID — ops chat/channel id (negative for groups).
+        chat_id: 0
+        parse_mode: HTML
+        message: |
+          <b>{{ .Status | toUpper }}</b> {{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }}
+          {{ range .Alerts }}<b>{{ .Labels.alertname }}</b> ({{ .Labels.severity }}) — {{ .Labels.service }}
+          {{ .Annotations.summary }}
+          {{ end }}
+
+  - name: critical-telegram-pagerduty
+    telegram_configs:
+      - send_resolved: true
+        bot_token_file: /etc/alertmanager/secrets/telegram_bot_token
+        chat_id: 0  # TBD_ALERT_TELEGRAM_CHAT_ID (same ops chat)
+        parse_mode: HTML
+        message: |
+          <b>🚨 CRITICAL {{ .Status | toUpper }}</b>
+          {{ range .Alerts }}<b>{{ .Labels.alertname }}</b> — {{ .Labels.service }}
+          {{ .Annotations.summary }}
+          {{ end }}
+    pagerduty_configs:
+      - send_resolved: true
+        routing_key_file: /etc/alertmanager/secrets/pagerduty_routing_key
+        severity: critical
+        description: '{{ .CommonLabels.alertname }} on {{ .CommonLabels.service }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          summary: '{{ .CommonAnnotations.summary }}'
 
 inhibit_rules:
   - source_matchers:

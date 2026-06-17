@@ -19,18 +19,14 @@ def _settings_with_port(port: int) -> Settings:
 
 def test_exporter_noop_when_port_disabled(monkeypatch: Any) -> None:
     calls: list[int] = []
-    monkeypatch.setattr(
-        "prometheus_client.start_http_server", lambda port: calls.append(port)
-    )
+    monkeypatch.setattr("prometheus_client.start_http_server", lambda port: calls.append(port))
     worker_mod.start_worker_metrics_exporter(_settings_with_port(0))
     assert calls == []
 
 
 def test_exporter_binds_configured_port(monkeypatch: Any) -> None:
     calls: list[int] = []
-    monkeypatch.setattr(
-        "prometheus_client.start_http_server", lambda port: calls.append(port)
-    )
+    monkeypatch.setattr("prometheus_client.start_http_server", lambda port: calls.append(port))
     worker_mod.start_worker_metrics_exporter(_settings_with_port(9191))
     assert calls == [9191]
 

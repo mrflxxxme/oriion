@@ -53,13 +53,13 @@ from src.agents.coordinator import (
     DelegationStep,
     build_coordinator_agent,
 )
+from src.agents.models import AgentArchetype
 from src.agents.researcher import ResearcherDeps, build_researcher_agent
 from src.agents.tools.delegate import (
     DelegateInput,
     DelegateResult,
     assert_delegation_allowed,
 )
-from src.agents.models import AgentArchetype
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
 from src.llm_gateway.services.billing_service import record_llm_cost

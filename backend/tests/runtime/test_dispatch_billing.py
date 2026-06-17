@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 import src.runtime.dispatch as dispatch_mod
 from src.agents.tools.delegate import DelegateInput
-from src.runtime.dispatch import _LeafSpec, build_leaf_runner
+from src.runtime.dispatch import _LeafSpec, _resolve_archetype, build_leaf_runner
 from src.runtime.orchestrator import OrchestratorContext
 from src.runtime.sse_publisher import InProcessSSEPublisher
 from src.tasks.models import Task, TaskStep
@@ -53,7 +53,7 @@ class _FakeLeafAgent:
     def __init__(self, body: str, in_tok: int, out_tok: int) -> None:
         self._body, self._in, self._out = body, in_tok, out_tok
 
-    async def run(self, prompt: str, *, deps: Any) -> _FakeRunResult:  # noqa: ARG002
+    async def run(self, prompt: str, *, deps: Any) -> _FakeRunResult:
         return _FakeRunResult(
             _output=_FakeLeafOutput(body_markdown=self._body),
             _usage=_FakeUsage(input_tokens=self._in, output_tokens=self._out),
@@ -102,7 +102,9 @@ async def test_leaf_runner_real_cost_and_persists_task_step(monkeypatch: Any) ->
     session = _FakeSession()
     parent_id, cell_id, user_id, workspace_id = uuid4(), uuid4(), uuid4(), uuid4()
     specs = {
-        "researcher": _LeafSpec(build=lambda *, model: _FakeLeafAgent("м", 1000, 2000), deps_factory=dict)
+        "researcher": _LeafSpec(
+            build=lambda *, model: _FakeLeafAgent("м", 1000, 2000), deps_factory=dict
+        )
     }
     runner = build_leaf_runner(
         llm_router=object(),  # type: ignore[arg-type]
@@ -141,6 +143,41 @@ async def test_leaf_runner_real_cost_and_persists_task_step(monkeypatch: Any) ->
     assert step.cost_credits == Decimal("0.1234")  # non-zero (AC-W1-2)
     assert step.input_jsonb["tokens_input"] == 1000
     assert step.output_jsonb["tokens_output"] == 2000
+
+
+@pytest.mark.asyncio
+async def test_resolve_archetype_returns_first_scalar() -> None:
+    """_resolve_archetype issues a select and returns the first scalar (or None)."""
+    sentinel = SimpleNamespace(id=uuid4(), slug="researcher")
+
+    class _Scalars:
+        def __init__(self, value: Any) -> None:
+            self._value = value
+
+        def first(self) -> Any:
+            return self._value
+
+    class _Result:
+        def __init__(self, value: Any) -> None:
+            self._value = value
+
+        def scalars(self) -> _Scalars:
+            return _Scalars(self._value)
+
+    class _Session:
+        def __init__(self, value: Any) -> None:
+            self._value = value
+            self.stmts: list[Any] = []
+
+        async def execute(self, stmt: Any) -> _Result:
+            self.stmts.append(stmt)
+            return _Result(self._value)
+
+    found = _Session(sentinel)
+    assert await _resolve_archetype(found, "researcher") is sentinel  # type: ignore[arg-type]
+    assert len(found.stmts) == 1
+    missing = _Session(None)
+    assert await _resolve_archetype(missing, "ghost") is None  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
