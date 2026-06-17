@@ -10,7 +10,7 @@
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A ✅** + **infra-PR code-complete** (этот PR). Async-исполнение готово: `POST /run` → **202 <1s**, оркестрация в Dramatiq worker, SSE через Redis Streams. **AC8 RESOLVED by reframe** (dispatch p95 ≤1s hard-gate + generation SLI).
+- **Wave:** Wave 1 (Core MVP) — **in progress**. Phase 01.1 **Track A ✅** + **infra-PR MERGED** ([PR #51](https://github.com/mrflxxxme/oriion/pull/51), `fd02473`, 2026-06-17). Async-исполнение готово: `POST /run` → **202 <1s**, оркестрация в Dramatiq worker, SSE через Redis Streams. **AC8 RESOLVED by reframe** (dispatch p95 ≤1s hard-gate + generation SLI). Post-merge ci-security/TruffleHog (base==head) исправлен в PR #52 (`a7736a1`) — main снова зелёный.
 - **infra-PR scope (11 атомарных коммитов off `5a0370b`):** AC-W1-16a ✅, AC-W1-1 ✅, AC-W1-21 ✅, AC-W1-11 ✅, AC-W1-12 ✅. **AC-W1-19 PARTIAL** (Settings-bug fixed; native → follow-up). **Deferred:** AC-W1-13 + AC-W1-2/3/4/5/9/10/14/15 → obs/IaC follow-up.
 - **Phase 00.8 (design restyling):** code-complete, e2e:live pending staging (независимо, не блокирует 01.1).
 
@@ -21,9 +21,9 @@
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
 | OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Wave 1) |
 
-## What just happened — Phase 01.1 infra-PR (2026-06-16)
+## What just happened — Phase 01.1 infra-PR MERGED ([PR #51](https://github.com/mrflxxxme/oriion/pull/51), `fd02473`, 2026-06-17)
 
-Founder-process: bootstrap → AskUserQuestion (3 развилки) → Plan-агент (async-архитектура) → execute (C1–C11) → verify-bar.
+Founder-process: bootstrap → AskUserQuestion (3 развилки) → Plan-агент (async-архитектура) → execute (C1–C11) → verify-bar → merge (PR #51). Post-merge hotfix PR #52 (`a7736a1`) — gate TruffleHog к pull_request (push-to-main base==head fail).
 
 ### Ключевое решение ([ADR-034](./decisions/ADR-034-async-dispatch-redis-sse-ac8-reframe.md))
 `POST /run` enqueues a **Dramatiq actor** и возвращает **202 `{status:"dispatched"}` <1s** — result теперь в **`task.completed` SSE-фрейме** (breaking contract). Оркестрация в worker-процессе (`dramatiq src.runtime.queue.worker -p1 -t1`). SSE через **Redis Streams** (не pub/sub — нужен cross-process **drain-replay**: late subscriber XREAD from `0`). `tasks.dispatched_at` idempotency-marker (worker guard на `status=='queued'` → redelivery-safe; нет `'dispatched'` статуса → без CHECK-migration). Worker сам ставит 3-GUC RLS. **AC8 reframe** ([ADR-025](./decisions/ADR-025-acceptance-gate-format.md) amendment): hard-gate = dispatch p95 ≤1s; generation ~163s = SLI.

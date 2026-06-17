@@ -1,5 +1,7 @@
 # 00-START-HERE — AI-agent workflow protocol
 
+> ⚠️ **DUAL-TREE GUARD:** канонический `.planning/` живёт в **АКТИВНОМ** git-worktree. Репо-рут `TEAMLY_RU/.planning/` может быть устаревшей расходящейся копией — **НЕ читать его**. Всегда резолвить `.planning/` внутри активного worktree (проверка: `git rev-parse --show-toplevel`).
+
 Этот файл — единственный source-of-truth для того, как AI-агент работает в проекте TEAMLY_RU. Здесь только «как работать», не «что за проект» (это в [`../README.md`](../README.md)).
 
 ## Bootstrap (обязательный для любой не-lookup задачи)

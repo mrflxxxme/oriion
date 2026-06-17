@@ -13,7 +13,7 @@
 
 ## Команда
 
-> **Status: all 4 closed `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home)** — team model = solo founder + 11 persistent Opus AI-agents (see [ADR-023](../decisions/ADR-023-ai-team-runtime.md), [DECISION-3](./decisions/ADR-028-policies-registry.md#decision-3)). R-29 closed via founder vertical expertise.
+> **Status: all 4 closed `N/A` per [P-INIT-5](./decisions/ADR-028-policies-registry.md#policies-canonical-home)** — team model = solo founder + 11 persistent Opus AI-agents (see [ADR-023](./decisions/ADR-023-ai-team-runtime.md), [DECISION-3](./decisions/ADR-028-policies-registry.md#decision-3)). R-29 closed via founder vertical expertise.
 
 | # | Вопрос | Resolution | Closed-by | Owner |
 |---|---|---|---|---|

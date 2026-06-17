@@ -1,5 +1,9 @@
 # Development Journal
 
+## 2026-06-17 · adoring-snyder-13a6a3 · @claude-opus (Промежуточный аудит-сессия — post-merge fix + read-only аудит + remediation)
+
+- Промежуточный аудит-сессия: (1) ci-security TruffleHog push base==head баг → fix PR #52 (`a7736a1`), main снова зелёный; (2) полная локальная верификация зелёная (FE 156/156 + build, BE ruff/mypy --strict/unit cov≥70/integration 23); (3) 14-агентный read-only аудит (4 линзы, adversarial-verified) → 30 находок (6 P1: SSE-IDOR, double-charge-on-redelivery, cancel-no-stop, agents-coverage-ungated, trivy-action@master, budget-cap-overrun); (4) remediation PR (canon-sync + CI hardening + P1 fixes). Выявлен dual-tree drift: repo-root `.planning` расходится с worktree.
+
 ## 2026-06-16 · confident-lewin-169788 · @claude-opus (Phase 01.1 infra-PR — async dispatch + Redis-SSE + AC8 reframe)
 
 - Scope: связный срез async-исполнения + наблюдаемости (отдельный infra-PR, НЕ дополнение PR #44). 11 атомарных коммитов off post-merge main `5a0370b`. Закрывает AC-W1-16a + AC-W1-1 + AC-W1-21 + AC-W1-11 + AC-W1-12; **AC8 RESOLVED by reframe**; AC-W1-19 — только Settings-баг.
