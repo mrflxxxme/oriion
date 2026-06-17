@@ -504,11 +504,15 @@ async def test_build_leaf_runner_unknown_slug_raises() -> None:
         parent_task_id=uuid4(),
         cell_id=uuid4(),
         user_id=uuid4(),
-        leaf_specs={},  # empty → any slug unknown
     )
+    # 'coordinator' is a valid AgentSlug (AC-W1-8) so it passes schema
+    # validation, but it is NOT a leaf spec (only researcher/analyst/writer
+    # are), so the runner's spec lookup must raise KeyError. A truly bogus
+    # slug can no longer even construct a DelegateInput (see
+    # tests/agents/test_delegate_tool.py::test_delegate_input_rejects_unknown_slug).
     with pytest.raises(KeyError):
         await runner(
-            DelegateInput(target_agent_slug="nonexistent", sub_prompt="x"),
+            DelegateInput(target_agent_slug="coordinator", sub_prompt="x"),
             None,  # type: ignore[arg-type]
         )
 

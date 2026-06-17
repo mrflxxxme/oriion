@@ -31,7 +31,7 @@ from src._shared.observability.metrics import (
     TASK_QUEUE_DEPTH,
     TASK_TOTAL,
 )
-from src.agents.tools.delegate import CoordinatorDepsLike, DelegateInput, DelegateResult
+from src.agents.tools.delegate import CoordinatorDeps, DelegateInput, DelegateResult
 from src.llm_gateway.services.router_service import resolve_max_tokens
 from src.runtime.budget_guard import (
     DEFAULT_TASK_CAP_TCREDITS,
@@ -226,7 +226,7 @@ async def execute_agent_task(
         )
         return result
 
-    deps = CoordinatorDepsLike(
+    deps = CoordinatorDeps(
         cell_id=cell_id,
         task_id=task_id,
         user_id=user_id,
@@ -244,11 +244,10 @@ async def execute_agent_task(
         # Pydantic-AI returns an AgentRunResult with .output (or .data,
         # depending on version) — defensive access keeps the bridge
         # version-tolerant.
-        # coordinator_agent is typed Agent[CoordinatorDeps, CoordinatorOutput]
-        # in agents/coordinator.py; here we pass the structurally-compatible
-        # CoordinatorDepsLike shim (the runner-injection seam — see
-        # agents/tools/delegate.py). Wave-1 AC-W1-7 collapses the two via
-        # NullTeamProvisioningService.
+        # coordinator_agent is typed Agent[CoordinatorDeps, CoordinatorOutput].
+        # AC-W1-7: CoordinatorDeps is now the single deps type (the former
+        # CoordinatorDepsLike shim is collapsed into it — see
+        # agents/tools/delegate.py), with the runner-injection seam preserved.
         run_result = await coordinator_agent.run(user_prompt, deps=deps)  # type: ignore[call-overload]
         output = getattr(run_result, "output", None) or getattr(run_result, "data", None)
     except TaskCancelled:

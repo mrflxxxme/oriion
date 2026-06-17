@@ -26,7 +26,10 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src._shared.db.rls import set_tenant_context
-from src.agents.services.team_provisioning_service import TeamProvisioningService
+from src.agents.services.team_provisioning_service import (
+    NULL_TEAM_PROVISIONING,
+    TeamProvisioning,
+)
 from src.audit.services.audit_service import emit_audit_event
 from src.iam import events
 from src.iam.exceptions import (
@@ -95,15 +98,16 @@ class AuthService:
         require_email_verification: bool,
         refresh_ttl_seconds: int,
         access_ttl_seconds: int,
-        team_provisioning_service: TeamProvisioningService | None = None,
+        team_provisioning_service: TeamProvisioning = NULL_TEAM_PROVISIONING,
     ) -> None:
         # Session is passed in so audit_log inserts + provision_initial_workspace
         # share the request's outer TX with the user / refresh-token writes.
         self._session = session
-        # Phase 00.5b Commit 5: optional injection. Production wiring in
-        # iam/deps.py supplies the real TeamProvisioningService so register()
-        # auto-spawns productivity-core team (AC1). Unit tests pass None to
-        # skip the cross-context call.
+        # AC-W1-7: the optional-`None` seam is collapsed via the Null-object
+        # pattern. Production wiring (iam/deps.py) supplies the real
+        # TeamProvisioningService so register() auto-spawns the productivity-core
+        # team (AC1); unit tests inherit the NullTeamProvisioningService default
+        # (a silent no-op), so register() needs no `is not None` branch.
         self._team_provisioning_service = team_provisioning_service
         self._user_repo = user_repo
         self._session_repo = session_repo
@@ -191,21 +195,21 @@ class AuthService:
         # repeating inline `SELECT set_config()` plumbing (closes F-CR-M2 +
         # F-ARC-M4 from Phase 00.5b audit). GUCs auto-reset at TX end so no
         # state leaks across requests; SAME-TX semantics preserved — a
-        # failed team provisioning rolls back the workspace. Skipped when
-        # team_provisioning_service is None (unit-test mode); production
-        # wiring in iam/deps.py always supplies it.
-        if self._team_provisioning_service is not None:
-            async with set_tenant_context(
-                self._session,
-                workspace_id=provision.workspace_id,
+        # failed team provisioning rolls back the workspace. AC-W1-7: no
+        # `is not None` branch — the NullTeamProvisioningService default makes
+        # this a no-op in unit-test mode; production wiring (iam/deps.py)
+        # supplies the real service.
+        async with set_tenant_context(
+            self._session,
+            workspace_id=provision.workspace_id,
+            cell_id=provision.cell_id,
+            user_id=user.id,
+        ):
+            await self._team_provisioning_service.provision_team(
+                preset_slug="productivity-core",
                 cell_id=provision.cell_id,
                 user_id=user.id,
-            ):
-                await self._team_provisioning_service.provision_team(
-                    preset_slug="productivity-core",
-                    cell_id=provision.cell_id,
-                    user_id=user.id,
-                )
+            )
 
         # Issue email-verification token
         plaintext = _new_token_plaintext()

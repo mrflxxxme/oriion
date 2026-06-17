@@ -18,14 +18,13 @@ horizontal preset) + ADR-023/024 plan-then-execute amendment.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, PromptedOutput
 
 from src.agents.services.role_prompt_loader import RolePrompt, load_role_prompt
 from src.agents.tools.delegate import (
+    CoordinatorDeps,
     DelegateInput,
     DelegateResult,
 )
@@ -34,25 +33,11 @@ from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
 ROLE_KEY = "coordinator"
 
 
-# ── deps + output schema (structured Pydantic-AI output) ────────────────
-
-
-class CoordinatorDeps(BaseModel):
-    """Per-run dependency injection container."""
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    cell_id: UUID
-    task_id: UUID
-    user_id: UUID
-    available_agent_slugs: list[str] = Field(
-        default_factory=lambda: ["researcher", "writer", "analyst"]
-    )
-    current_depth: int = 0
-    max_delegation_depth: int = 5
-    # in-process runner for demo-flow tests; runtime orchestrator (Commit 6)
-    # injects the real DB-backed runner.
-    runner: Any = None
+# ── output schema (structured Pydantic-AI output) ───────────────────────
+#
+# AC-W1-7: the per-run deps container ``CoordinatorDeps`` is now defined once
+# in ``agents/tools/delegate.py`` (the low-level module, to avoid an import
+# cycle) and re-exported here for backwards-compatible imports.
 
 
 class Citation(BaseModel):
