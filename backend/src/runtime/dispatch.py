@@ -34,7 +34,6 @@ infra-PR follow-up.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -42,7 +41,6 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from src._shared.config import get_settings
 from src.agents.analyst import AnalystDeps, build_analyst_agent
 from src.agents.coordinator import (
     ArtifactRef,
@@ -59,10 +57,16 @@ from src.agents.tools.delegate import (
 )
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
-from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
-from src.mcp.tools.web_search import WebSearchResult, WebSearchTool
+from src.mcp.tools.web_search import WebSearchTool
+from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
+from src.runtime.web_search_runner import (
+    WEB_SEARCH_MAX_RESULTS,
+    _default_web_search_tool,
+    build_native_web_search,
+    fetch_research_context,
+)
 from src.tasks.models import Task
 
 if TYPE_CHECKING:
@@ -82,13 +86,6 @@ if TYPE_CHECKING:
 # provider price table + FX rate).
 CREDIT_PER_INPUT_TOKEN = Decimal("0.000027")
 CREDIT_PER_OUTPUT_TOKEN = Decimal("0.000110")
-
-# Live web_search (Brave) feeds the Researcher REAL market data instead of
-# LLM memory (founder decision 2026-06-07). Wave-0 wires it as a scripted
-# pre-fetch (the LLMGatewayModel tool-call path is AC14/AC-W1-16), so we call
-# web_search deterministically before the Researcher LLM and inject the
-# snippets into its sub-prompt. read_url + Yandex-XML backend are Wave-1 pins.
-WEB_SEARCH_MAX_RESULTS = 6
 
 # Per-specialist builder + deps-class map. Injectable so unit tests can
 # substitute fakes that don't construct a real Pydantic-AI Agent.
@@ -129,94 +126,6 @@ def _extract_output_text(run_result: Any) -> str:
     return str(output)
 
 
-# ── Artifact markdown normalization (founder session 2026-06-11) ──────────
-# Role-prompt contracts (v0.1.x §3) make leaf agents emit machine-oriented
-# wrappers around the human document: a YAML frontmatter block, sometimes a
-# whole-output ```-fence, and a trailing "structured summary" block. Those
-# wrappers must keep flowing BETWEEN agents (prior_context), but they must
-# never reach the user-facing artifact — react-markdown renders a wrapping
-# fence as a literal code block (raw ###/** symbols on screen).
-
-_FENCE_OPEN_RE = re.compile(r"^```[a-zA-Z0-9_-]*\s*$")
-
-# Keys that identify the trailing structured-summary block defined in the
-# role-prompt output contracts (writer/analyst flat block, researcher JSON).
-_SUMMARY_BLOCK_HINTS = (
-    "artifact_path",
-    '"summary"',
-    "key_messages",
-    "key_findings",
-    "recommended_next",
-    "critical_assumptions",
-)
-
-
-def strip_wrapping_fence(text: str) -> str:
-    """Unwrap a single code fence enclosing the ENTIRE text, if present.
-
-    Unwraps when the first and last lines are the sole fence lines, OR when
-    the opening fence declares ``markdown``/``md`` — that info string is an
-    unambiguous LLM wrap-the-whole-doc marker even when the document contains
-    its own interior fenced blocks (e.g. the structured-summary block the
-    role contracts mandate). Idempotent.
-    """
-    stripped = text.strip()
-    lines = stripped.splitlines()
-    if len(lines) < 2 or lines[-1].strip() != "```":
-        return stripped
-    opening = re.match(r"^```([a-zA-Z0-9_-]*)\s*$", lines[0])
-    if opening is None:
-        return stripped
-    inner = lines[1:-1]
-    has_inner_fence = any(line.lstrip().startswith("```") for line in inner)
-    if has_inner_fence and opening.group(1).lower() not in ("markdown", "md"):
-        return stripped
-    return "\n".join(inner).strip()
-
-
-def _strip_leading_frontmatter(text: str) -> str:
-    """Drop a leading YAML frontmatter block (``---`` ... ``---``/``...``)."""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return text
-    for i in range(1, len(lines)):
-        if lines[i].strip() in ("---", "..."):
-            return "\n".join(lines[i + 1 :]).lstrip("\n")
-    return text  # unterminated frontmatter — leave untouched
-
-
-def _strip_trailing_summary_block(text: str) -> str:
-    """Drop a trailing fenced structured-summary block (+ its label line)."""
-    lines = text.rstrip().splitlines()
-    if not lines or lines[-1].strip() != "```":
-        return text
-    for i in range(len(lines) - 2, -1, -1):
-        if _FENCE_OPEN_RE.match(lines[i].strip()):
-            content = "\n".join(lines[i + 1 : -1])
-            if not any(hint in content for hint in _SUMMARY_BLOCK_HINTS):
-                return text
-            head = lines[:i]
-            while head and not head[-1].strip():
-                head.pop()
-            if head and re.search(r"structured\s+summary", head[-1], re.IGNORECASE):
-                head.pop()
-            return "\n".join(head).rstrip()
-    return text
-
-
-def normalize_artifact_markdown(text: str) -> str:
-    """Full user-facing normalization: fence + frontmatter + summary block.
-
-    Applied ONLY at artifact materialization (``ArtifactRef.path_or_inline``).
-    The inter-agent ``prior_context`` keeps the meta (see ``_run_leaf``, which
-    applies ``strip_wrapping_fence`` alone).
-    """
-    out = strip_wrapping_fence(text)
-    out = _strip_leading_frontmatter(out)
-    out = _strip_trailing_summary_block(out)
-    return out.strip()
-
-
 def _extract_usage(run_result: Any) -> tuple[int, int]:
     """Return ``(input_tokens, output_tokens)`` from an AgentRunResult.
 
@@ -235,79 +144,6 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
         getattr(usage, "output_tokens", None) or getattr(usage, "response_tokens", None) or 0
     )
     return int(input_tokens), int(output_tokens)
-
-
-def _format_search_results(results: list[WebSearchResult]) -> str:
-    """Format web_search hits as a citable markdown block (shared by the scripted
-    pre-fetch and the native tool-call path so artifacts stay consistent)."""
-    if not results:
-        return ""
-    lines = ["## Актуальные результаты веб-поиска (используй как источники, цитируй URL):"]
-    for i, r in enumerate(results, start=1):
-        lines.append(f"{i}. {r.title} — {r.url}\n   {r.snippet}")
-    return "\n".join(lines)
-
-
-async def fetch_research_context(
-    web_search_tool: WebSearchTool,
-    query: str,
-    *,
-    max_results: int = WEB_SEARCH_MAX_RESULTS,
-) -> str:
-    """Run a live web_search and format the top hits as a markdown block.
-
-    Scripted pre-fetch (the YandexGPT/GigaChat failover path — ADR-035): used when
-    the active provider can't forward native tool-calls. Degrades gracefully: any
-    web_search failure (no backend key configured, rate-limit, upstream/network
-    error) returns "" so the Researcher falls back to LLM-only synthesis instead of
-    failing the whole task run.
-    """
-    if not query.strip():
-        return ""
-    try:
-        results = await web_search_tool.search(
-            query, agent_id="researcher", max_results=max_results
-        )
-    except MCPError:  # WebSearchError + ToolRateLimitExceeded both subclass MCPError
-        return ""
-    return _format_search_results(results)
-
-
-def build_native_web_search(
-    web_search_tool: WebSearchTool,
-    *,
-    agent_id: str = "researcher",
-    max_results: int = WEB_SEARCH_MAX_RESULTS,
-) -> Callable[[str], Awaitable[str]]:
-    """Build the native Pydantic-AI ``web_search`` tool callable (AC-W1-19).
-
-    Bound to a rate-limited ``WebSearchTool`` + the Researcher ``agent_id`` so the
-    Redis ``ToolRateLimiter`` throttles the agent's own search loop. Registered on
-    the Researcher agent only on the DeepSeek path (ADR-035 gating in
-    ``dispatch_task``). The returned coroutine's name + docstring + ``str`` param
-    become the ``ToolDefinition`` forwarded to the provider.
-    """
-
-    async def web_search(query: str) -> str:
-        """Search the web for up-to-date facts, competitors, prices and market data.
-
-        Call this whenever the task needs current information you are unsure about.
-        Pass a focused query in the user's language. Returns titled results with URLs
-        to cite. Returns a short note if the rate limit is hit or no backend is set.
-        """
-        try:
-            results = await web_search_tool.search(
-                query, agent_id=agent_id, max_results=max_results
-            )
-        except ToolRateLimitExceeded:
-            return "Лимит веб-поиска исчерпан — используй уже собранные результаты."
-        except MCPError:
-            # No backend configured / upstream error → let the model proceed
-            # from its own knowledge rather than fail the run.
-            return ""
-        return _format_search_results(results) or "Результаты не найдены."
-
-    return web_search
 
 
 def build_leaf_runner(
@@ -548,30 +384,6 @@ class PlanExecutingCoordinator:
                 assumptions=plan.assumptions,
             )
         )
-
-
-def _default_web_search_tool(
-    *,
-    rate_limiter: ToolRateLimiter | None = None,
-) -> WebSearchTool:
-    """Construct a WebSearchTool from Settings (Brave key).
-
-    ``rate_limiter`` is wired on the native tool-call path (AC-W1-19) so the
-    Researcher's own search loop is throttled via Redis; the scripted pre-fetch
-    path issues a single call per run and can pass ``None``. If no Brave/Yandex
-    key is configured the tool raises at search-time and the Researcher leaf
-    degrades to LLM-only (see fetch_research_context / build_native_web_search).
-    """
-    settings = get_settings()
-    return WebSearchTool(
-        rate_limiter=rate_limiter,
-        brave_api_key=settings.brave_search_api_key.get_secret_value() or None,
-        yandex_api_key=settings.yandex_search_api_key.get_secret_value() or None,
-        # Settings is the source of truth — fixes AC-W1-19 bug where the tool read
-        # os.environ directly so the .env WEB_SEARCH_MOCK_MODE flag was ignored
-        # (live Brave 422 in the Track A run).
-        mock_mode=settings.web_search_mock_mode,
-    )
 
 
 def _router_supports_native_tools(llm_router: Any, role_key: str) -> bool:

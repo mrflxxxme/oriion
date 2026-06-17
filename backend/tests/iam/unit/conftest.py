@@ -26,13 +26,16 @@ import pytest
 def _stub_emit_audit_event() -> Iterator[None]:
     """Replace emit_audit_event at the iam service modules' import sites.
 
-    Both auth_service and consent_service do
+    auth_service, account_recovery_service and consent_service each do
     ``from src.audit.services.audit_service import emit_audit_event`` —
     patching at those names is name-bound, so this fixture leaves the
     real impl available for anyone who imports the function directly.
+    (account_recovery_service was split out of auth_service for the
+    file-size canon; its recovery flows carry the audit calls.)
     """
     with (
         patch("src.iam.services.auth_service.emit_audit_event", AsyncMock()),
+        patch("src.iam.services.account_recovery_service.emit_audit_event", AsyncMock()),
         patch("src.iam.services.consent_service.emit_audit_event", AsyncMock()),
     ):
         yield
