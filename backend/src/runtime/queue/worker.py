@@ -55,16 +55,16 @@ def start_worker_metrics_exporter(settings: Settings) -> None:
         )
 
 
-configure_structlog()
-_settings = get_settings()
-# Under the StubBroker test path the broker is already installed (broker.py runs
-# configure_broker at import, and the actor is bound to it). Re-running it here
-# would swap in a SECOND stub broker and orphan the actor's queue declaration —
-# the exact init-ordering hazard broker.py warns about. So the real-process setup
-# (broker reconfigure + /metrics bind) only runs when NOT testing; both pieces are
-# unit-tested directly (start_worker_metrics_exporter) without importing this
-# entrypoint's side effects.
+# All module-level setup is the REAL worker-process path. It is skipped under the
+# StubBroker test flag because (a) broker.py already installed the stub broker and
+# the actor is bound to it — re-running configure_broker would swap in a SECOND
+# stub and orphan the actor's queue declaration (the init-ordering hazard broker.py
+# warns about); (b) configure_structlog would swap the global renderer mid-session
+# and pollute other tests; (c) start_worker_metrics_exporter would bind a real
+# socket at import. Each piece is unit-tested directly instead.
 if os.environ.get("DRAMATIQ_TESTING") != "1":
+    configure_structlog()
+    _settings = get_settings()
     configure_broker(_settings)
     start_worker_metrics_exporter(_settings)
 

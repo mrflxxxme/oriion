@@ -89,6 +89,10 @@ class LLMGatewayModel(Model):
         self._workspace_id = workspace_id or UUID("00000000-0000-0000-0000-000000000000")
         self._model_hint = model_hint
         self._last_model_name: str | None = None
+        # Runtime provider/model of the most recent completion — read by the
+        # leaf runner to attribute real cost to the actual (post-failover)
+        # provider rather than the archetype's configured default (AC-W1-13).
+        self._last_provider_slug: str | None = None
 
     # ── abstract Model interface ─────────────────────────────────────────
 
@@ -100,6 +104,16 @@ class LLMGatewayModel(Model):
     @property
     def system(self) -> str:
         return _SYSTEM_TAG
+
+    @property
+    def last_model_name(self) -> str | None:
+        """Provider model string of the most recent completion (post-failover)."""
+        return self._last_model_name
+
+    @property
+    def last_provider_slug(self) -> str | None:
+        """Provider slug of the most recent completion (post-failover)."""
+        return self._last_provider_slug
 
     async def request(
         self,
@@ -144,6 +158,7 @@ class LLMGatewayModel(Model):
             tools=tools,
         )
         self._last_model_name = target_model
+        self._last_provider_slug = provider_slug
 
         parts: list[ModelResponsePart] = []
         if resp.content:
