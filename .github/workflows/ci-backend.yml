@@ -94,6 +94,11 @@ jobs:
           # The synced copy must match canonical exactly (loader + prod image rely on it).
           diff -rq .planning/contracts/role-prompts backend/role_prompts
 
+      - name: Tools-allowlist → registry conformance (ADR-028 P-AUDIT-3)
+        # Every tool slug in a vertical-prompt tools_allowed: block must exist in
+        # the canonical .planning/tools/registry.md. Unknown slug => block merge.
+        run: python scripts/check_tools_allowlist.py
+
       - name: Enable pgvector + pg_trgm + unaccent extensions
         env:
           PGPASSWORD: oriion-dev
