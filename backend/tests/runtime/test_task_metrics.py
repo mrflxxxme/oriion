@@ -34,7 +34,7 @@ class _FakeAgent:
     def __init__(self, *, raise_on_run: BaseException | None = None) -> None:
         self._raise = raise_on_run
 
-    async def run(self, prompt: str, *, deps: Any) -> _FakeRunResult:  # noqa: ARG002
+    async def run(self, prompt: str, *, deps: Any) -> _FakeRunResult:
         if self._raise is not None:
             raise self._raise
         return _FakeRunResult()

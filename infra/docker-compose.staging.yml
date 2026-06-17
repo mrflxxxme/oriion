@@ -192,10 +192,16 @@ services:
   loki:
     image: grafana/loki:3.2.0
     restart: always
+    environment:
+      # S3 (Yandex Object Storage) static access key for index + chunk archival
+      # to oriion-staging-loki-archive (AC-W1-14). Deploy materializes from Lockbox.
+      LOKI_S3_ACCESS_KEY_ID: ${LOCKBOX_LOKI_S3_ACCESS_KEY_ID:-${LOKI_S3_ACCESS_KEY_ID:-}}
+      LOKI_S3_SECRET_ACCESS_KEY: ${LOCKBOX_LOKI_S3_SECRET_ACCESS_KEY:-${LOKI_S3_SECRET_ACCESS_KEY:-}}
     volumes:
       - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
       - loki_data:/loki
-    command: ["-config.file=/etc/loki/loki.yaml"]
+    # -config.expand-env=true expands ${LOKI_S3_*} in loki.yaml at startup.
+    command: ["-config.file=/etc/loki/loki.yaml", "-config.expand-env=true"]
     expose:
       - "3100"
 
@@ -211,13 +217,15 @@ services:
       - "4317" # OTLP gRPC (Tempo can receive directly; we route via collector
                # but expose for direct-write debugging)
 
-  # Alertmanager — Wave-0 SHIP с in-stack mock-receiver (logs alerts только).
-  # PagerDuty/Telegram webhook wiring = Wave-1 hardening pin.
+  # Alertmanager — Telegram (all) + PagerDuty (critical) receivers (AC-W1-15).
+  # Secrets (bot token, PD routing key) are mounted from alertmanager-secrets/,
+  # materialized by the deploy from YC Lockbox — never inlined in the config.
   alertmanager:
     image: prom/alertmanager:v0.27.0
     restart: always
     volumes:
       - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./observability/alertmanager-secrets:/etc/alertmanager/secrets:ro
       - alertmanager_data:/alertmanager
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml

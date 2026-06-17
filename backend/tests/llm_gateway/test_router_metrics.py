@@ -28,7 +28,7 @@ class _FakeProvider:
         self._response = response
         self._exc = exc
 
-    async def chat(self, req: LLMRequest) -> LLMResponse:  # noqa: ARG002
+    async def chat(self, req: LLMRequest) -> LLMResponse:
         if self._exc is not None:
             raise self._exc
         assert self._response is not None

@@ -79,7 +79,7 @@ def _record_llm_metrics(
             LLM_TOKENS_OUTPUT.labels(provider=provider, model=model).inc(
                 int(response.usage.tokens_output)
             )
-    except Exception as exc:  # noqa: BLE001 — observability is non-fatal
+    except Exception as exc:
         logger.debug("llm_gateway.router.metrics_skipped", error=str(exc))
 
 

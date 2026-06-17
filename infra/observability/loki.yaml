@@ -1,16 +1,18 @@
-# Loki config — Phase 00.6 Stage A staging stack.
+# Loki config — Phase 01.1 infra-PR (AC-W1-14).
 #
-# Single-binary mode (no microservices); filesystem storage for Wave-0
-# (BoltDB index + filesystem chunks). Suitable до ~1 GB ingestion/day —
-# adequate для Wave-0 demo traffic. Wave-1 migrates к S3-compatible
-# object storage (Yandex Object Storage) если ingestion grows.
+# Wave-0 kept 7d retention on local filesystem. AC-W1-14 raises retention to 90d
+# and ships index + chunks to the RU-zone Yandex Object Storage bucket
+# `oriion-staging-loki-archive` (provisioned in infra/terraform/object_storage.tf),
+# so the log ledger stays in РФ (ФЗ-152) and survives VM-disk loss.
 #
-# Loki tails docker container stdout — backend emits structlog JSON
-# к stdout (LOG_FORMAT=json), so each container's docker logs driver
-# routes к Loki via promtail-style scrape OR direct Docker logging
-# driver. Wave-0: rely on Docker default json-file driver + Promtail-
-# equivalent stream from filesystem. Stage A local can use Docker
-# logging-driver=loki (compose.staging-local.override.yml C8).
+# S3 credentials are env-expanded (the loki command adds `-config.expand-env=true`):
+#   LOKI_S3_ACCESS_KEY_ID / LOKI_S3_SECRET_ACCESS_KEY — the storage SA static key
+#   (object_storage.tf yandex_iam_service_account_static_access_key.storage),
+#   materialized by the deploy from YC Lockbox. Yandex Object Storage is
+#   S3-compatible (endpoint storage.yandexcloud.net, path-style addressing).
+#
+# Loki tails container stdout (structlog JSON, LOG_FORMAT=json) via the Docker
+# logging driver / Promtail-equivalent stream (compose.staging-local override C8).
 
 auth_enabled: false
 
@@ -23,9 +25,14 @@ common:
   instance_addr: 127.0.0.1
   path_prefix: /loki
   storage:
-    filesystem:
-      chunks_directory: /loki/chunks
-      rules_directory: /loki/rules
+    s3:
+      endpoint: storage.yandexcloud.net
+      region: ru-central1
+      bucketnames: oriion-staging-loki-archive
+      access_key_id: ${LOKI_S3_ACCESS_KEY_ID}
+      secret_access_key: ${LOKI_S3_SECRET_ACCESS_KEY}
+      s3forcepathstyle: true
+      insecure: false
   replication_factor: 1
   ring:
     kvstore:
@@ -42,20 +49,29 @@ schema_config:
   configs:
     - from: 2025-01-01
       store: tsdb
-      object_store: filesystem
+      object_store: s3
       schema: v13
       index:
         prefix: index_
         period: 24h
 
+# Compactor enforces the 90d retention against the S3 store: it rewrites index
+# files dropping out-of-retention streams and issues delete requests for the
+# expired chunks. retention_enabled MUST be set or retention_period is ignored.
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  retention_delete_delay: 2h
+  delete_request_store: s3
+
 ruler:
   alertmanager_url: http://alertmanager:9093
 
 limits_config:
-  # metric_aggregation_enabled landed в Loki 3.3+; Phase 00.6 ships Loki
-  # 3.2.0 без этого поля. Wave-1 bump к 3.3+ re-enables.
   allow_structured_metadata: true
-  retention_period: 168h  # 7 дней — Wave-0 short window. Wave-1+ к 30d when
-                          #  log volume justifies S3 backend.
+  # 90 days = 2160h (AC-W1-14). The compactor deletes chunks past this window
+  # from the S3 bucket; the bucket's own 90d lifecycle_rule (object_storage.tf)
+  # is the belt-and-braces backstop.
+  retention_period: 2160h
   reject_old_samples: true
-  reject_old_samples_max_age: 168h
+  reject_old_samples_max_age: 2160h
