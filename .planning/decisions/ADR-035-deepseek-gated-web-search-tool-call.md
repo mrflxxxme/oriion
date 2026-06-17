@@ -1,7 +1,10 @@
 # ADR-035: DeepSeek-gated native web_search tool-call (Researcher)
 
-- **Status:** Proposed (Phase 01.1 infra-PR, 2026-06-16) — deferred to a focused
-  follow-up PR. Only the Settings bug fix below landed in this PR.
+- **Status:** Accepted (Phase 01.1, 2026-06-17). The Settings `mock_mode` bug fix
+  landed in the infra-PR; the native DeepSeek-gated tool-call landed in the focused
+  follow-up (PRs [#45](https://github.com/mrflxxxme/oriion/pull/45) gateway tool-loop
+  + [#46](https://github.com/mrflxxxme/oriion/pull/46) Researcher wiring). See
+  **Update — Implemented** below.
 
 ## Context
 
@@ -52,6 +55,33 @@ partial**: the runtime→mcp edge is removed *for DeepSeek* and retained as fail
   already forwards `req.tools`), the Researcher agent factory, and `runtime/dispatch.py`
   (the gated fallback). Provider scaffolding partially exists; the adapter tool-loop is
   the hard part.
+
+## Update — Implemented (2026-06-17)
+
+The deferred native path landed exactly as decided above. AC-W1-19 is now **CLOSED**
+(no longer PARTIAL). What shipped:
+
+- **Gateway tool-loop** (PR #45): `LLMGatewayModel.request()` translates Pydantic-AI
+  `function_tools` → OpenAI `tools`, forwards via `router_service.acomplete(tools=…)`,
+  and parses response `tool_calls` → `ToolCallPart`s; `_messages_to_openai_shape` echoes
+  the assistant `tool_calls` + feeds `ToolReturnPart`/`RetryPromptPart` back as
+  `role="tool"` messages (the full request/response loop). `LLMRequest.tools` /
+  `LLMResponse.tool_calls` already round-tripped in `providers/base.py`, so the schema
+  was unchanged.
+- **DeepSeek gate** (PR #45): `provider_forwards_tools()` + `_NATIVE_TOOL_PROVIDERS={"deepseek"}`;
+  `acomplete` forwards tools **only to DeepSeek** and drops them on YandexGPT/GigaChat
+  failover. `LLMRouter.would_use_native_tools(role_key)` lets the leaf predict the active
+  provider.
+- **Researcher wiring** (PR #46): `web_search` registered as a native tool on the
+  DeepSeek path (no scripted pre-fetch); on failover `runtime.dispatch` falls back to
+  `fetch_research_context`. The native loop is rate-limited via the Redis
+  `ToolRateLimiter`, wired through `queue/actor.run_task_dispatch` → `dispatch_task`
+  (the async Dramatiq path from ADR-034 — the request handler no longer dispatches
+  inline). The direct runtime→mcp edge is removed for DeepSeek, retained as failover.
+
+Tests: tool-loop round-trip (`test_pydantic_ai_model_adapter.py`), provider-gating +
+tool-drop-on-failover (`test_router_service.py`), native-path dispatch (`test_dispatch.py`).
+`mypy --strict src` + full pytest green.
 
 ## Links
 
