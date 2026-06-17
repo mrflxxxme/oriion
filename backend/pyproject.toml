@@ -122,6 +122,7 @@ ignore = [
 # since rate-limit is keyed on email only).
 "**/email_service.py" = ["ARG002"]
 "**/auth_service.py" = ["ARG002"]
+"**/account_recovery_service.py" = ["ARG002"]
 # Phase 00.5b: canned RU content for the «Market & content brief» demo.
 # Cyrillic + Latin lookalikes are intentional content, not code style noise.
 "tests/_fixtures/canned_pydantic_ai/*.py" = ["RUF001", "RUF002", "RUF003"]
