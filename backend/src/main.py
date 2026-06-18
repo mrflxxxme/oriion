@@ -14,9 +14,7 @@ Phase 00.5b (Commit 2): full router-wiring overhaul:
 
 from __future__ import annotations
 
-import base64
-import os
-import secrets
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Final
@@ -27,9 +25,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src import __version__
-from src._shared.config import Settings, get_settings
+from src._shared.config import get_settings
 from src._shared.logging import configure_structlog
 from src._shared.observability import register_default_metrics, setup_otel, shutdown_otel
+from src._shared.secret_refresh import apply_secret_state, register_sighup_refresh
 from src.agents.exceptions import AgentsError
 from src.agents.routers.archetypes import router as archetypes_router
 from src.agents.routers.instances import router as agent_instances_router
@@ -38,13 +37,11 @@ from src.iam.exceptions import IamError, RateLimitExceeded
 from src.iam.routers.auth import router as auth_router
 from src.iam.routers.me import router as me_router
 from src.llm_gateway.exceptions import LLMGatewayException
-from src.llm_gateway.factory import build_llm_router
 from src.llm_gateway.routers.byok import router as byok_router
 from src.llm_gateway.routers.chat import router as chat_router
 from src.llm_gateway.routers.embeddings import router as embeddings_router
 from src.llm_gateway.routers.providers import router as providers_router
 from src.llm_gateway.routers.usage import router as usage_router
-from src.llm_gateway.services.kms_provider import KMSProvider, LocalAESKMS, YandexKMS
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
 from src.multitenancy.exceptions import MultitenancyError
 from src.multitenancy.routers.cells import router as cells_router
@@ -71,43 +68,6 @@ class HealthResponse(BaseModel):
 
 
 # ── lifespan: provider DI + KMS + LLMRouter construction ──────────────────
-
-
-def _resolve_master_key_bytes(settings: Settings) -> bytes:
-    """Resolve the LocalAESKMS master key bytes from Settings.
-
-    Precedence:
-        1. settings.byok_master_key_b64 (non-empty SecretStr)
-        2. env BYOK_MASTER_KEY_B64 (legacy path — kept for back-compat
-           with deployments that haven't migrated to Settings yet)
-        3. dev/test only: generate an ephemeral 32-byte key + emit a loud
-           warning. NEVER use in prod — startup fails fast instead.
-
-    Audit M3 closure: prod paths must come through Settings; this resolver
-    surfaces empty-config as an explicit error rather than silently
-    booting a broken KMS.
-    """
-    b64 = settings.byok_master_key_b64.get_secret_value() if settings.byok_master_key_b64 else ""
-    if not b64:
-        b64 = os.environ.get("BYOK_MASTER_KEY_B64", "")
-    if b64:
-        return base64.b64decode(b64)
-
-    if settings.is_prod:
-        raise RuntimeError(
-            "BYOK_MASTER_KEY_B64 is empty in prod. Set the env-var (or Settings "
-            "field) to a base64-encoded 32-byte AES-256 key. See ADR-014 §1."
-        )
-    _logger.warning(
-        "kms.master_key.ephemeral",
-        msg=(
-            "BYOK_MASTER_KEY_B64 is empty — generating an ephemeral dev key. "
-            "BYOK keys encrypted in this process cannot be decrypted after "
-            "restart. Set BYOK_MASTER_KEY_B64 for stable dev encryption."
-        ),
-        app_env=settings.app_env,
-    )
-    return secrets.token_bytes(32)
 
 
 @asynccontextmanager
@@ -150,31 +110,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # instrumentation в orchestrator/router_service is Wave-1 AC-W1-2.
     register_default_metrics()
 
-    # ── KMS provider ─────────────────────────────────────────────────────
-    kms_provider: KMSProvider
-    if settings.kms_backend == "yandex":
-        kms_provider = YandexKMS()
-    else:
-        master_key = _resolve_master_key_bytes(settings)
-        kms_provider = LocalAESKMS(master_key=master_key)
+    # ── KMS + LLM providers + router ─────────────────────────────────────
+    # apply_secret_state is the single construction path shared with the AC-W1-9
+    # no-redeploy refresh (src._shared.secret_refresh), so a SIGHUP-driven
+    # rebuild and this startup build can never drift. The provider matrix is also
+    # shared verbatim with the Dramatiq worker (src.runtime.queue.worker) — same
+    # failover / timeout / TLS config (AC-W1-16a). Stashes on app.state for the
+    # llm_gateway.deps DI factories.
+    apply_secret_state(app, settings)
 
-    # ── LLM providers + router ───────────────────────────────────────────
-    # Single source of truth shared with the Dramatiq dispatch worker
-    # (src.runtime.queue.worker) so the web and worker processes never drift
-    # in provider matrix / failover / timeout / TLS config (AC-W1-16a).
-    providers, circuits, llm_router = build_llm_router(settings)
-
-    # Stash everything on app.state — llm_gateway.deps reads from here.
-    app.state.settings = settings
-    app.state.kms_provider = kms_provider
-    app.state.llm_providers = providers
-    app.state.llm_circuits = circuits
-    app.state.llm_router = llm_router
+    # AC-W1-9: SIGHUP → re-read Lockbox + rebuild the secret-derived state with no
+    # redeploy (Unix only; elsewhere rotation falls back to a rolling restart).
+    sighup_registered = register_sighup_refresh(app, asyncio.get_running_loop())
 
     _logger.info(
         "lifespan.startup.complete",
         kms_backend=settings.kms_backend,
-        provider_slugs=list(providers.keys()),
+        provider_slugs=list(app.state.llm_providers.keys()),
+        sighup_refresh=sighup_registered,
     )
 
     try:
