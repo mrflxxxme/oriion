@@ -70,6 +70,37 @@ async def test_refresh_app_secrets_rebuilds(monkeypatch: pytest.MonkeyPatch) -> 
     assert app.state.settings is settings
 
 
+@pytest.mark.asyncio
+async def test_reset_db_redis_caches_clears_engine_and_redis() -> None:
+    """AC-W1-9: a refresh must drop the DB/Redis lru_caches so a rotated
+    DATABASE_URL/REDIS_URL is picked up in-process (not left on the old DSN)."""
+    from src._shared.db.redis import get_redis_client
+    from src._shared.db.session import get_engine, get_session_maker
+
+    # Populate the process-wide caches, then prove the reset clears all three.
+    # finally-clear so this test never leaks a populated cache to its neighbours
+    # (the caches are process-wide; other tests lazily rebuild from get_settings()).
+    get_engine.cache_clear()
+    get_session_maker.cache_clear()
+    get_redis_client.cache_clear()
+    try:
+        _ = get_engine()
+        _ = get_session_maker()
+        _ = get_redis_client()
+        assert get_engine.cache_info().currsize == 1
+        assert get_redis_client.cache_info().currsize == 1
+
+        await secret_refresh._reset_db_redis_caches()
+
+        assert get_engine.cache_info().currsize == 0
+        assert get_session_maker.cache_info().currsize == 0
+        assert get_redis_client.cache_info().currsize == 0
+    finally:
+        get_session_maker.cache_clear()
+        get_engine.cache_clear()
+        get_redis_client.cache_clear()
+
+
 def test_register_sighup_refresh_false_without_sighup(monkeypatch: pytest.MonkeyPatch) -> None:
     """No SIGHUP (e.g. Windows) → returns False; rotation falls back to restart."""
     monkeypatch.delattr(secret_refresh.signal, "SIGHUP", raising=False)
