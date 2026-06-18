@@ -30,10 +30,14 @@ f5d3e56d216c23fdab3c03aaf6bb071660c86e61:.planning/contracts/llm-gateway/README.
 # allowlists the legacy commit so the --first-parent PR diff scan ignores it.
 567c524e436e7b9b9c2ad63f984132ea9b387367:backend/tests/integration/test_e2e_auth_flow.py:generic-api-key:105
 
-# AC-W1-9 — dev-only dummy base64 in the dev-secret guard test (commit df577ff).
-# `byok_master_key_b64="cmVhbC1ieW9rLW1hc3Rlci1rZXk="` decodes to
-# "real-byok-master-key" — NOT a real secret (the guard only asserts non-empty).
-# Follow-up commit 92ba499 lowered it to a low-entropy dummy (`dGVzdA==`) + added
-# `# gitleaks:allow`; this fingerprint allowlists the legacy commit so the
-# --first-parent PR diff scan ignores it.
+# AC-W1-9 — dev-only dummy BYOK base64 in the dev-secret guard test (commit
+# df577ff): a throwaway test fixture (the guard only asserts the value is
+# non-empty), since replaced with a low-entropy dummy + inline gitleaks:allow in
+# commit 92ba499. Allowlist the legacy commit so the --first-parent PR diff scan
+# ignores it. (NB: do NOT quote the literal base64 here — it would itself trip
+# generic-api-key in this commit.)
 df577ff6c3651cc5121c50810b0d95c07026cb59:backend/tests/_shared/test_config_guard.py:generic-api-key:43
+# The first allowlist attempt (commit 6e03902) quoted that literal base64 in a
+# comment, which itself tripped generic-api-key in that commit's diff. The comment
+# above no longer quotes it; this fingerprint allowlists the legacy commit.
+6e039027088c833cdb3f30e82016e031cf6df153:.gitleaksignore:generic-api-key:34
