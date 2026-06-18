@@ -35,6 +35,7 @@
 | [ADR-032](./ADR-032-coordinator-plan-then-execute.md) | Координатор: plan-then-execute через PromptedOutput (не native tool-calling); failover-робастно (Phase 01.1) |
 | [ADR-034](./ADR-034-async-dispatch-redis-sse-ac8-reframe.md) | Async Dramatiq dispatch (POST /run → 202 <1s) + Redis-Streams SSE + AC8 reframe (dispatch-gate + generation-SLI) (Phase 01.1 infra-PR) |
 | [ADR-035](./ADR-035-deepseek-gated-web-search-tool-call.md) | Native web_search tool-call gated to DeepSeek + scripted failover fallback; Settings mock_mode bug fixed (infra-PR), native tool-loop implemented (Accepted, AC-W1-19 CLOSED) |
+| [ADR-036](./ADR-036-outbox-relay-self-scheduling.md) | Transactional-outbox relay drained by a self-rescheduling Dramatiq actor (no periodiq dep) + per-row failure isolation; Wave-0 bridge to the Wave-1 Redis-Streams consumer (Accepted, AC-W1-4 relay-gap closeout) |
 
 ## LLM / AI
 

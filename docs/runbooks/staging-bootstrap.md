@@ -88,14 +88,20 @@ the deploy fast (`Settings._guard_no_dev_secrets`) instead of booting insecure.
 1. Add a new Lockbox secret version: `yc lockbox secret add-version --id <id> ...`.
 2. Pick it up WITHOUT a new deploy/image:
    ```bash
-   # web tier: gunicorn graceful reload — new workers re-read Lockbox in place.
+   # web tier: gunicorn graceful reload — the MASTER intercepts SIGHUP and
+   # re-forks workers, each of which re-reads Lockbox at fresh startup (the
+   # in-process asyncio SIGHUP handler below runs inside a worker, so it does
+   # NOT fire under the gunicorn master; rotation here is by worker re-fork).
    docker compose -f infra/docker-compose.staging.yml kill -s HUP backend
    # worker: recreate to re-read (no rebuild).
    docker compose -f infra/docker-compose.staging.yml up -d --force-recreate worker
    ```
-   A single-process backend (uvicorn, no gunicorn) refreshes in-process via the
-   `SIGHUP` handler in `backend/src/_shared/secret_refresh.py` — same
-   `apply_secret_state` rebuild path as startup, so they never drift.
+   A single-process backend (bare uvicorn, no gunicorn) refreshes **in-process**
+   via the `SIGHUP` handler in `backend/src/_shared/secret_refresh.py`:
+   `refresh_app_secrets` re-reads Lockbox and rebuilds the KMS + LLM providers
+   **and drops the DB/Redis `lru_cache`s** (AC-W1-9) so a rotated
+   `DATABASE_URL`/`REDIS_URL` is applied in place, not just the LLM secrets —
+   no drift vs a fresh startup.
 
 ## Step 4 — GitHub Actions secrets + vars
 
