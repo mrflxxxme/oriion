@@ -19,7 +19,7 @@ def get_redis_client() -> Redis:
     """Process-wide Redis client. Lazy-constructed; cached."""
     settings = get_settings()
     client = Redis.from_url(
-        settings.redis_url,
+        settings.redis_url.get_secret_value(),
         encoding="utf-8",
         decode_responses=True,
         health_check_interval=30,

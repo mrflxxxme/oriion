@@ -121,7 +121,7 @@ async def _run_dispatch(task_id: UUID, user_id: UUID) -> None:
     bundle = build_llm_router(settings)
     publisher = get_sse_publisher()
     tool_rate_limiter = ToolRateLimiter(get_redis_client())
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    engine = create_async_engine(settings.database_url.get_secret_value(), poolclass=NullPool)
     try:
         maker = async_sessionmaker(
             bind=engine, class_=AsyncSession, expire_on_commit=False, autoflush=False

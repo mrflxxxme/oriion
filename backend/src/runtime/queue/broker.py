@@ -37,7 +37,7 @@ def _build_broker(settings: Settings) -> dramatiq.Broker:
     # constructor calls read as untyped in this typed module.
     if _testing():
         return StubBroker()  # type: ignore[no-untyped-call]
-    return RedisBroker(url=settings.redis_url)  # type: ignore[no-untyped-call]
+    return RedisBroker(url=settings.redis_url.get_secret_value())  # type: ignore[no-untyped-call]
 
 
 def configure_broker(settings: Settings) -> dramatiq.Broker:
