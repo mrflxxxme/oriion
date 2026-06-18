@@ -13,6 +13,7 @@ Chat:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
@@ -55,37 +56,50 @@ class GigaChatProvider:
         self._token: str | None = None
         # Epoch seconds — refresh ~60s before expiry.
         self._token_expires_at: float = 0.0
+        # AC-W1-10: serialize OAuth refreshes so concurrent chat/chat_stream
+        # callers don't each fire a round-trip (and clobber each other's token).
+        self._token_lock = asyncio.Lock()
+
+    def _token_is_fresh(self) -> bool:
+        return self._token is not None and time.time() < self._token_expires_at - 60
 
     async def _ensure_token(self) -> str:
-        if self._token and time.time() < self._token_expires_at - 60:
-            return self._token
-        async with httpx.AsyncClient(timeout=self._timeout, verify=self._verify_ssl) as client:
-            resp = await client.post(
-                self._oauth_url,
-                headers={
-                    "Authorization": f"Basic {self._auth_key}",
-                    "RqUID": str(uuid4()),
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json",
-                },
-                data={"scope": self._scope},
+        # Fast path: a valid cached token needs no lock.
+        if self._token_is_fresh():
+            return self._token  # type: ignore[return-value]  # _token_is_fresh() guards None
+        # AC-W1-10: serialize the refresh. Under concurrency only the first
+        # waiter performs the OAuth round-trip; the rest fall through the
+        # double-check below and reuse the freshly-minted token.
+        async with self._token_lock:
+            if self._token_is_fresh():
+                return self._token  # type: ignore[return-value]
+            async with httpx.AsyncClient(timeout=self._timeout, verify=self._verify_ssl) as client:
+                resp = await client.post(
+                    self._oauth_url,
+                    headers={
+                        "Authorization": f"Basic {self._auth_key}",
+                        "RqUID": str(uuid4()),
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "Accept": "application/json",
+                    },
+                    data={"scope": self._scope},
+                )
+                resp.raise_for_status()
+                payload = resp.json()
+            token = payload.get("access_token")
+            if not isinstance(token, str):
+                raise RuntimeError("gigachat OAuth response missing access_token")
+            # Yandex/Sber return `expires_at` as ms epoch. Tolerate seconds too.
+            expires_at_raw = payload.get("expires_at") or 0
+            expires_at = (
+                float(expires_at_raw) / 1000 if expires_at_raw > 1e12 else float(expires_at_raw)
             )
-            resp.raise_for_status()
-            payload = resp.json()
-        token = payload.get("access_token")
-        if not isinstance(token, str):
-            raise RuntimeError("gigachat OAuth response missing access_token")
-        # Yandex/Sber return `expires_at` as ms epoch. Tolerate seconds too.
-        expires_at_raw = payload.get("expires_at") or 0
-        expires_at = (
-            float(expires_at_raw) / 1000 if expires_at_raw > 1e12 else float(expires_at_raw)
-        )
-        if expires_at <= time.time():
-            # Fallback: 30 min if upstream omits it.
-            expires_at = time.time() + 1800
-        self._token = token
-        self._token_expires_at = expires_at
-        return token
+            if expires_at <= time.time():
+                # Fallback: 30 min if upstream omits it.
+                expires_at = time.time() + 1800
+            self._token = token
+            self._token_expires_at = expires_at
+            return token
 
     def _body(self, req: LLMRequest, *, stream: bool) -> dict[str, Any]:
         return {
