@@ -401,3 +401,111 @@ async def test_dispatch_sse_event_order_is_started_then_completed(
         f"Last SSE event must be 'task.completed'; got {event_types[-1]!r} "
         f"(full sequence: {event_types})"
     )
+
+
+# ---------------------------------------------------------------------------
+# PART C — terminal-status guard (audit P2): cascade skips terminal nodes +
+# re-cancel is idempotent.
+# ---------------------------------------------------------------------------
+
+
+async def _set_gucs(
+    session: AsyncSession, user_id: UUID, workspace_id: UUID, cell_id: UUID
+) -> None:
+    """Re-apply the three tenant GUCs (SET LOCAL resets at each commit)."""
+    for key, val in (
+        ("app.current_user_id", user_id),
+        ("app.current_workspace_id", workspace_id),
+        ("app.current_cell_id", cell_id),
+    ):
+        await session.execute(text("SELECT set_config(:k, :v, true)"), {"k": key, "v": str(val)})
+
+
+async def test_cancel_skips_terminal_descendant_and_is_idempotent(
+    db_session_committed: AsyncSession,
+    db_engine: AsyncEngine,
+) -> None:
+    """A cascade must NOT clobber an already-terminal descendant, and a re-cancel
+    of a now-terminal root must be a no-op (no duplicate tasks.cancelled event)."""
+    user_id = uuid4()
+    session = db_session_committed
+
+    workspace_id, cell_id = await _insert_workspace_and_cell(session)
+    await session.commit()
+
+    svc = TaskService(session)
+    await _set_gucs(session, user_id, workspace_id, cell_id)
+    root = await svc.create_task(
+        cell_id=cell_id, user_id=user_id, title="root", description="", prompt="p"
+    )
+    root_id = root.id
+    await session.commit()
+    await _set_gucs(session, user_id, workspace_id, cell_id)
+    child = await svc.create_task(
+        cell_id=cell_id,
+        user_id=user_id,
+        title="child",
+        description="",
+        prompt="p",
+        parent_task_id=root_id,
+    )
+    child_id = child.id
+    await session.commit()
+    await _set_gucs(session, user_id, workspace_id, cell_id)
+    grandchild = await svc.create_task(
+        cell_id=cell_id,
+        user_id=user_id,
+        title="gc",
+        description="",
+        prompt="p",
+        parent_task_id=child_id,
+    )
+    grandchild_id = grandchild.id
+    await session.commit()
+
+    # Mark the CHILD terminal (succeeded) with a fixed completed_at.
+    await _set_gucs(session, user_id, workspace_id, cell_id)
+    await session.execute(
+        text(
+            "UPDATE tasks.tasks SET status='succeeded', "
+            "completed_at='2026-01-01 00:00:00+00' WHERE id=:id"
+        ),
+        {"id": str(child_id)},
+    )
+    await session.commit()
+
+    # Cancel the root.
+    await _set_gucs(session, user_id, workspace_id, cell_id)
+    cascaded = await svc.cancel_task(root_id)
+    await session.commit()
+    assert set(cascaded) == {child_id, grandchild_id}
+
+    async with AsyncSession(db_engine, expire_on_commit=False) as fresh:
+        rows = await fresh.execute(
+            text("SELECT id, status, completed_at FROM tasks.tasks WHERE id = ANY(:ids)"),
+            {"ids": [root_id, child_id, grandchild_id]},
+        )
+        state: dict[UUID, tuple[str, Any]] = {row[0]: (row[1], row[2]) for row in rows.all()}
+
+    assert state[root_id][0] == "cancelled"
+    assert state[grandchild_id][0] == "cancelled"
+    # The terminal child is untouched — NOT flipped to 'cancelled', completed_at kept.
+    assert state[child_id][0] == "succeeded"
+    assert state[child_id][1] is not None
+
+    # Re-cancel the now-terminal root → no-op + no second cancelled event.
+    await _set_gucs(session, user_id, workspace_id, cell_id)
+    recancel = await svc.cancel_task(root_id)
+    await session.commit()
+    assert recancel == []
+
+    async with AsyncSession(db_engine, expire_on_commit=False) as fresh:
+        evt = await fresh.execute(
+            text(
+                "SELECT count(*) FROM tasks.outbox "
+                "WHERE ce_type='oriion.tasks.cancelled.v1' AND data->>'task_id'=:id"
+            ),
+            {"id": str(root_id)},
+        )
+        count = evt.scalar_one()
+    assert count == 1  # exactly one cancelled event despite the double cancel

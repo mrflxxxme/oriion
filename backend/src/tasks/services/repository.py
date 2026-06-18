@@ -16,7 +16,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.tasks.models import OutboxEvent, Task
+from src.tasks.models import TERMINAL_TASK_STATUSES, OutboxEvent, Task
 
 
 class TaskRepository(Protocol):
@@ -63,21 +63,37 @@ class SqlAlchemyTaskRepository:
         return (await self._session.execute(stmt)).scalar_one_or_none()
 
     async def descendant_ids(self, root_id: UUID) -> list[UUID]:
-        """BFS over the parent_task_id graph rooted at ``root_id``."""
+        """BFS over the parent_task_id forest rooted at ``root_id``.
+
+        A ``visited`` set bounds the walk so it terminates even on cyclic /
+        corrupt ``parent_task_id`` data (the DB enforces only the self-FK, not
+        acyclicity) — otherwise a cycle would loop the cancel forever and hang
+        the worker. Matches the cycle-guard convention already used by
+        ``cost_rollup_service`` and ``_depth_from_root``.
+        """
         result: list[UUID] = []
+        visited: set[UUID] = {root_id}
         frontier = [root_id]
         while frontier:
             stmt = select(Task.id).where(Task.parent_task_id.in_(frontier))
             children = [row[0] for row in (await self._session.execute(stmt)).all()]
-            if not children:
+            fresh = [c for c in children if c not in visited]
+            if not fresh:
                 break
-            result.extend(children)
-            frontier = children
+            visited.update(fresh)
+            result.extend(fresh)
+            frontier = fresh
         return result
 
     async def cancel_cascade(self, task_ids: list[UUID], *, at: datetime) -> None:
+        """Flip the given tasks to 'cancelled' — but ONLY the non-terminal ones,
+        so a cascade landing on an already-terminal (succeeded/failed/...) task
+        does not clobber its ``completed_at``/status (no terminal-state
+        corruption; safe to re-run)."""
         await self._session.execute(
-            update(Task).where(Task.id.in_(task_ids)).values(status="cancelled", completed_at=at)
+            update(Task)
+            .where(Task.id.in_(task_ids), Task.status.notin_(TERMINAL_TASK_STATUSES))
+            .values(status="cancelled", completed_at=at)
         )
 
     async def add_outbox_event(

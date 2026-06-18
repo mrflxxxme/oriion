@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.tasks.events import TASKS_EVENT_SOURCE
 from src.tasks.exceptions import DelegationDepthExceeded, TaskNotFound
-from src.tasks.models import Task
+from src.tasks.models import TERMINAL_TASK_STATUSES, Task
 from src.tasks.services.repository import SqlAlchemyTaskRepository, TaskRepository
 
 DEFAULT_MAX_DELEGATION_DEPTH = 5
@@ -95,6 +95,12 @@ class TaskService:
         to the outbox in that same TX (AC-W1-4).
         """
         task = await self.get_task(task_id)
+
+        # Idempotency + state integrity: a task already in a terminal state is
+        # not re-cancelled — no completed_at clobber, no duplicate
+        # tasks.cancelled event on a re-POST (emit only on a real transition).
+        if task.status in TERMINAL_TASK_STATUSES:
+            return []
 
         descendants = await self._repo.descendant_ids(task_id)
         all_ids = [task_id, *descendants]

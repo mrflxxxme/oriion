@@ -14,6 +14,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src._shared.db.base import Base
 
+# Terminal task states — no further transitions. A cancel cascade must NOT touch
+# these (re-cancelling would clobber completed_at + re-emit a duplicate event);
+# kept in sync with the ``tasks_status_chk`` CHECK values below.
+TERMINAL_TASK_STATUSES: frozenset[str] = frozenset(
+    {"succeeded", "failed", "cancelled", "timed_out"}
+)
+
 
 def _uuid_pk() -> Mapped[UUID]:
     return mapped_column(
