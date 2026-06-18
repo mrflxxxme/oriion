@@ -110,9 +110,7 @@ async def test_relay_isolates_poison_row_without_blocking_siblings() -> None:
 
 def test_safe_error_redacts_dsn_credentials() -> None:
     # A connection error carrying a DSN must not leak the password into logs.
-    exc = RuntimeError(
-        "could not connect: postgresql+asyncpg://oriion:s3cr3t@db.host:5432/oriion"
-    )
+    exc = RuntimeError("could not connect: postgresql+asyncpg://oriion:s3cr3t@db.host:5432/oriion")
     redacted = outbox_relay._safe_error(exc)
     assert "s3cr3t" not in redacted
     assert "oriion:s3cr3t@" not in redacted

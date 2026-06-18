@@ -217,36 +217,29 @@ async def test_cancel_cascade_on_real_pg_asserts_all_nodes_cancelled(
     await session.commit()
 
     # ── 5. Assert returned cascade list ─────────────────────────────────────
-    assert set(cascaded) == {child_id, grandchild_id}, (
-        f"Expected cascade={{{child_id}, {grandchild_id}}}, got {set(cascaded)}"
-    )
+    assert set(cascaded) == {
+        child_id,
+        grandchild_id,
+    }, f"Expected cascade={{{child_id}, {grandchild_id}}}, got {set(cascaded)}"
 
     # ── 6. Read back state via a FRESH session (sees committed rows) ─────────
     async with AsyncSession(db_engine, expire_on_commit=False) as fresh:
         # Fresh session runs as DB owner — FORCE RLS only blocks oriion_app,
         # so the owner can bypass for read-back assertions.
         rows = await fresh.execute(
-            text(
-                "SELECT id, status, completed_at "
-                "FROM tasks.tasks "
-                "WHERE id = ANY(:ids)"
-            ),
+            text("SELECT id, status, completed_at " "FROM tasks.tasks " "WHERE id = ANY(:ids)"),
             {"ids": [root_id, child_id, grandchild_id]},
         )
-        result_map: dict[UUID, tuple[str, Any]] = {
-            row[0]: (row[1], row[2]) for row in rows.all()
-        }
+        result_map: dict[UUID, tuple[str, Any]] = {row[0]: (row[1], row[2]) for row in rows.all()}
 
-    assert len(result_map) == 3, (
-        f"Expected 3 task rows; got {len(result_map)}: {list(result_map.keys())}"
-    )
+    assert (
+        len(result_map) == 3
+    ), f"Expected 3 task rows; got {len(result_map)}: {list(result_map.keys())}"
     for task_id, (status, completed_at) in result_map.items():
-        assert status == "cancelled", (
-            f"task {task_id}: expected status='cancelled', got {status!r}"
-        )
-        assert completed_at is not None, (
-            f"task {task_id}: expected completed_at to be set, got None"
-        )
+        assert status == "cancelled", f"task {task_id}: expected status='cancelled', got {status!r}"
+        assert (
+            completed_at is not None
+        ), f"task {task_id}: expected completed_at to be set, got None"
 
     # ── 7. Assert outbox row for root cancellation ───────────────────────────
     async with AsyncSession(db_engine, expire_on_commit=False) as fresh:
@@ -262,15 +255,15 @@ async def test_cancel_cascade_on_real_pg_asserts_all_nodes_cancelled(
         rows_all = outbox_row.all()
 
     assert len(rows_all) == 1, (
-        f"Expected exactly 1 oriion.tasks.cancelled.v1 outbox row for root; "
-        f"got {len(rows_all)}"
+        f"Expected exactly 1 oriion.tasks.cancelled.v1 outbox row for root; " f"got {len(rows_all)}"
     )
     outbox_data: dict[str, Any] = rows_all[0][0]
     assert outbox_data["task_id"] == str(root_id)
     cascaded_from_outbox: set[str] = set(outbox_data.get("cascaded_to_task_ids", []))
-    assert cascaded_from_outbox == {str(child_id), str(grandchild_id)}, (
-        f"Outbox cascaded_to_task_ids mismatch: {cascaded_from_outbox}"
-    )
+    assert cascaded_from_outbox == {
+        str(child_id),
+        str(grandchild_id),
+    }, f"Outbox cascaded_to_task_ids mismatch: {cascaded_from_outbox}"
 
 
 # ---------------------------------------------------------------------------
