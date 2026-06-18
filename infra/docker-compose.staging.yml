@@ -38,6 +38,13 @@ services:
       BRAVE_SEARCH_API_KEY: ${LOCKBOX_BRAVE_SEARCH_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}
       YANDEX_SEARCH_API_KEY: ${LOCKBOX_YANDEX_SEARCH_API_KEY:-${YANDEX_SEARCH_API_KEY:-}}
       BYOK_MASTER_KEY_B64: ${LOCKBOX_BYOK_MASTER_KEY_B64:-${BYOK_MASTER_KEY_B64}}
+      # AC-W1-9: when LOCKBOX_SECRET_ID is set the backend reads its secrets
+      # DIRECTLY from YC Lockbox at startup (backend/src/_shared/lockbox.py, via
+      # the instance SA IAM token) — no secrets on disk. Empty = keep sourcing
+      # the per-key LOCKBOX_*/.env values above (the migration default until the
+      # on-disk .env materialization is fully retired — PARTIAL follow-up).
+      LOCKBOX_SECRET_ID: ${LOCKBOX_SECRET_ID:-}
+      LOCKBOX_ENDPOINT: ${LOCKBOX_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: oriion-backend
       OTEL_TRACES_ENABLED: "true"

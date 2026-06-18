@@ -10,11 +10,46 @@ Wave 1+; Wave 0 uses literal env-vars.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+
+from src._shared.lockbox import fetch_lockbox_secrets
+
+
+class LockboxSettingsSource(PydanticBaseSettingsSource):
+    """pydantic-settings source that loads secrets from YC Lockbox (AC-W1-9).
+
+    No-op unless ``LOCKBOX_SECRET_ID`` is set in the environment, so dev / test /
+    CI (which never set it) construct ``Settings`` with no network call. When it
+    IS set, the Lockbox payload keys (case-insensitive) populate matching
+    ``Settings`` fields. It sits BELOW the env source, so an explicit env-var
+    still wins (break-glass override); above it, secrets come from Lockbox so
+    nothing has to be written to the VM disk.
+    """
+
+    def get_field_value(self, _field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        # Required abstract override but unused — __call__ returns the whole
+        # Lockbox payload in one shot, bypassing per-field resolution.
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        secret_id = os.environ.get("LOCKBOX_SECRET_ID", "").strip()
+        if not secret_id:
+            return {}
+        iam_token = os.environ.get("LOCKBOX_IAM_TOKEN", "").strip() or None
+        endpoint = os.environ.get("LOCKBOX_ENDPOINT", "").strip() or None
+        secrets = fetch_lockbox_secrets(secret_id, iam_token=iam_token, endpoint=endpoint)
+        # Lower-case keys so they map to Settings fields (case_sensitive=False).
+        return {key.lower(): value for key, value in secrets.items()}
 
 
 class Settings(BaseSettings):
@@ -31,10 +66,44 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Insert the YC Lockbox source below env/dotenv (AC-W1-9): explicit
+        env-vars override (break-glass), otherwise prod secrets come from Lockbox
+        with nothing written to disk. No-op unless LOCKBOX_SECRET_ID is set."""
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            LockboxSettingsSource(settings_cls),
+            file_secret_settings,
+        )
+
     # ── Runtime mode ────────────────────────────────────────────────────
     app_env: Literal["dev", "test", "staging", "prod"] = Field(
         default="dev",
         description="Active deployment environment. Affects log renderer and dev-stub behaviour.",
+    )
+
+    # ── Secrets backend (AC-W1-9 — YC Lockbox direct-read) ──────────────
+    lockbox_secret_id: str = Field(
+        default="",
+        description=(
+            "YC Lockbox secret id. When set, the backend reads its secrets "
+            "DIRECTLY from Lockbox at startup (no on-disk .env) via the payload "
+            "REST API — see _shared/lockbox.py. Empty = pure env/.env (dev/test)."
+        ),
+    )
+    lockbox_endpoint: str = Field(
+        default="",
+        description="Override the Lockbox payload API base URL (empty = YC default).",
     )
 
     # ── Storage ──────────────────────────────────────────────────────────
