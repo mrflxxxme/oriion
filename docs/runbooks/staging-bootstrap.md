@@ -50,31 +50,52 @@ Verify before deploying (Caddy ACME HTTP-01 needs it resolving):
 nslookup staging.oriion.dev
 ```
 
-## Step 3 — Materialize VM secrets + infra (one-time)
+## Step 3 — VM bootstrap + infra (one-time)
 
-The Wave-0 deploy reads `/opt/oriion/.env` on the VM (AC-W1-9 swaps this for
-the backend reading Lockbox via SDK). Resolve Lockbox → `.env`:
+**AC-W1-9:** the backend + worker read their secrets DIRECTLY from YC Lockbox at
+startup — the deploy no longer materializes the *secrets* into `/opt/oriion/.env`.
+`.env` now holds ONLY the Lockbox pointer + deploy-time, non-Lockbox vars. The
+VM's instance service account must have `lockbox.payloadViewer` on the secret.
 
 ```bash
 ssh deploy@<vm_public_ip>
 # on the VM:
 cd /opt/oriion
 git clone https://github.com/mrflxxxme/oriion.git .    # or rsync infra/ + scripts/
-# resolve Lockbox payload into .env (yc CLI configured on the VM, or scp the file):
-yc lockbox payload get --id <lockbox_secret_id> --format json \
-  | jq -r '.entries[] | "\(.key)=\(.text_value)"' > .env
-# add the deploy-time, non-Lockbox vars:
-cat >> .env <<'EOF'
+cat > .env <<'EOF'
+# AC-W1-9: app secrets come from Lockbox at runtime — DO NOT put them here.
+LOCKBOX_SECRET_ID=<lockbox_secret_id>
 YC_CR_REGISTRY=cr.yandex/<YC_CR_FOLDER>
 CADDY_SITE_ADDR=staging.oriion.dev
 CADDY_ACME_EMAIL=deploy@oriion.dev
 # CADDY_GLOBAL_OPTS intentionally unset → auto_https ON (ACME)
-# Live web_search for the Researcher (REAL market data, not LLM memory):
 WEB_SEARCH_MOCK_MODE=false
-BRAVE_SEARCH_API_KEY=<your-brave-search-api-key>
+# Grafana admin password is consumed by the grafana service (NOT the backend);
+# keep it here until a later pass moves it to Lockbox too:
+LOCKBOX_GRAFANA_ADMIN_PASSWORD=<grafana-admin-password>
 EOF
 chmod 600 .env
 ```
+
+The Lockbox payload (provisioned by `lockbox.tf`) MUST contain every backend
+secret: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET_ACCESS_V1`, `BYOK_MASTER_KEY_B64`,
+`DEEPSEEK_API_KEY`, `YANDEX_IAM_TOKEN`/`YANDEX_CATALOG_ID`, `GIGACHAT_AUTH_KEY`,
+`BRAVE_SEARCH_API_KEY`/`YANDEX_SEARCH_API_KEY`. A missing/dev-default secret fails
+the deploy fast (`Settings._guard_no_dev_secrets`) instead of booting insecure.
+
+### Secret rotation (no redeploy)
+
+1. Add a new Lockbox secret version: `yc lockbox secret add-version --id <id> ...`.
+2. Pick it up WITHOUT a new deploy/image:
+   ```bash
+   # web tier: gunicorn graceful reload — new workers re-read Lockbox in place.
+   docker compose -f infra/docker-compose.staging.yml kill -s HUP backend
+   # worker: recreate to re-read (no rebuild).
+   docker compose -f infra/docker-compose.staging.yml up -d --force-recreate worker
+   ```
+   A single-process backend (uvicorn, no gunicorn) refreshes in-process via the
+   `SIGHUP` handler in `backend/src/_shared/secret_refresh.py` — same
+   `apply_secret_state` rebuild path as startup, so they never drift.
 
 ## Step 4 — GitHub Actions secrets + vars
 

@@ -83,9 +83,14 @@ jobs:
             set -euo pipefail
             cd /opt/oriion
             export IMAGE_TAG="${{ steps.tag.outputs.tag }}"
-            # /opt/oriion/.env is materialized once during bootstrap from
-            # Lockbox (see docs/runbooks/staging-bootstrap.md); AC-W1-9 swaps
-            # this for the backend reading Lockbox via SDK at startup.
+            # AC-W1-9: the backend reads its secrets DIRECTLY from YC Lockbox at
+            # startup when LOCKBOX_SECRET_ID is set (backend/src/_shared/lockbox.py
+            # — payload REST API via the instance service-account IAM token from
+            # the metadata server, so nothing is written to disk). Rotation = bump
+            # the Lockbox secret version + rolling-restart (read-at-startup).
+            # Fully retiring the /opt/oriion/.env secret materialization + a live
+            # no-redeploy in-process refresh are the staging-gated follow-up
+            # (AC-W1-9 PARTIAL); until then .env still seeds non-Lockbox bootstrap.
             echo "$IMAGE_TAG" > .deployed_tag
             docker compose -f infra/docker-compose.staging.yml --env-file .env pull
             docker compose -f infra/docker-compose.staging.yml --env-file .env up -d

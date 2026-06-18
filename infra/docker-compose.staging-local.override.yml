@@ -23,6 +23,23 @@
 #   * Tempo trace visible для task.created→orchestrator→llm_gateway
 #
 # See docs/runbooks/local-smoke.md для step-by-step (lands C13).
+#
+# AC-W1-9: the BASE compose passes NO secrets (staging/prod read them directly
+# from YC Lockbox). Local founder validation has no Lockbox, so this override
+# injects the per-key secrets from `backend/.env` into backend + worker. APP_ENV=dev
+# also disables the staging/prod dev-default guard (Settings._guard_no_dev_secrets).
+x-local-secrets: &local-secrets
+  DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@postgres:5432/oriion_dev
+  REDIS_URL: redis://redis:6379/0
+  APP_ENV: dev
+  DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+  YANDEX_IAM_TOKEN: ${YANDEX_IAM_TOKEN:-}
+  YANDEX_CATALOG_ID: ${YANDEX_CATALOG_ID:-}
+  GIGACHAT_AUTH_KEY: ${GIGACHAT_AUTH_KEY:-}
+  JWT_SECRET_ACCESS_V1: ${JWT_SECRET_ACCESS_V1:-}
+  BRAVE_SEARCH_API_KEY: ${BRAVE_SEARCH_API_KEY:-}
+  YANDEX_SEARCH_API_KEY: ${YANDEX_SEARCH_API_KEY:-}
+  BYOK_MASTER_KEY_B64: ${BYOK_MASTER_KEY_B64:-}
 
 services:
   postgres:
@@ -62,15 +79,28 @@ services:
 
   backend:
     # Override managed-service references к internal hostnames + add
-    # dependency на newly-inline postgres + redis services.
+    # dependency на newly-inline postgres + redis services. AC-W1-9: inject the
+    # per-key secrets from .env (no Lockbox locally) via the *local-secrets anchor.
     environment:
-      DATABASE_URL: postgresql+asyncpg://oriion:oriion-dev@postgres:5432/oriion_dev
-      REDIS_URL: redis://redis:6379/0
-      APP_ENV: dev
+      <<: *local-secrets
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       LOG_FORMAT: json
     ports:
       - "${BACKEND_LOCAL_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  # AC-W1-9: the Dramatiq worker needs the same secrets + inline DB/Redis for the
+  # local demo dispatch. Injects them from .env (no Lockbox locally); base-compose
+  # non-secret config (FX rate, SSE_BACKEND, metrics port) merges underneath.
+  worker:
+    environment:
+      <<: *local-secrets
     depends_on:
       postgres:
         condition: service_healthy

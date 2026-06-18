@@ -10,11 +10,52 @@ Wave 1+; Wave 0 uses literal env-vars.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, model_validator
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+
+from src._shared.lockbox import fetch_lockbox_secrets
+
+# Known dev-only defaults — referenced by the field defaults AND the
+# staging/prod guard (_guard_no_dev_secrets) so the cutover to Lockbox-only
+# secrets fails fast if a real secret didn't land (AC-W1-9).
+_DEV_JWT_DEFAULT = "changeme-dev-only-please-replace-in-prod-min-32-chars"
+_DEV_DATABASE_URL = "postgresql+asyncpg://oriion:oriion-dev@localhost:5432/oriion_dev"
+
+
+class LockboxSettingsSource(PydanticBaseSettingsSource):
+    """pydantic-settings source that loads secrets from YC Lockbox (AC-W1-9).
+
+    No-op unless ``LOCKBOX_SECRET_ID`` is set in the environment, so dev / test /
+    CI (which never set it) construct ``Settings`` with no network call. When it
+    IS set, the Lockbox payload keys (case-insensitive) populate matching
+    ``Settings`` fields. It sits BELOW the env source, so an explicit env-var
+    still wins (break-glass override); above it, secrets come from Lockbox so
+    nothing has to be written to the VM disk.
+    """
+
+    def get_field_value(self, _field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        # Required abstract override but unused — __call__ returns the whole
+        # Lockbox payload in one shot, bypassing per-field resolution.
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        secret_id = os.environ.get("LOCKBOX_SECRET_ID", "").strip()
+        if not secret_id:
+            return {}
+        iam_token = os.environ.get("LOCKBOX_IAM_TOKEN", "").strip() or None
+        endpoint = os.environ.get("LOCKBOX_ENDPOINT", "").strip() or None
+        secrets = fetch_lockbox_secrets(secret_id, iam_token=iam_token, endpoint=endpoint)
+        # Lower-case keys so they map to Settings fields (case_sensitive=False).
+        return {key.lower(): value for key, value in secrets.items()}
 
 
 class Settings(BaseSettings):
@@ -31,15 +72,49 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Insert the YC Lockbox source below env/dotenv (AC-W1-9): explicit
+        env-vars override (break-glass), otherwise prod secrets come from Lockbox
+        with nothing written to disk. No-op unless LOCKBOX_SECRET_ID is set."""
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            LockboxSettingsSource(settings_cls),
+            file_secret_settings,
+        )
+
     # ── Runtime mode ────────────────────────────────────────────────────
     app_env: Literal["dev", "test", "staging", "prod"] = Field(
         default="dev",
         description="Active deployment environment. Affects log renderer and dev-stub behaviour.",
     )
 
+    # ── Secrets backend (AC-W1-9 — YC Lockbox direct-read) ──────────────
+    lockbox_secret_id: str = Field(
+        default="",
+        description=(
+            "YC Lockbox secret id. When set, the backend reads its secrets "
+            "DIRECTLY from Lockbox at startup (no on-disk .env) via the payload "
+            "REST API — see _shared/lockbox.py. Empty = pure env/.env (dev/test)."
+        ),
+    )
+    lockbox_endpoint: str = Field(
+        default="",
+        description="Override the Lockbox payload API base URL (empty = YC default).",
+    )
+
     # ── Storage ──────────────────────────────────────────────────────────
     database_url: str = Field(
-        default="postgresql+asyncpg://oriion:oriion-dev@localhost:5432/oriion_dev",
+        default=_DEV_DATABASE_URL,
         description="Async DSN consumed by SQLAlchemy AsyncEngine + alembic env.py.",
     )
     redis_url: str = Field(
@@ -69,7 +144,7 @@ class Settings(BaseSettings):
 
     # ── JWT (Phase 00.2) ────────────────────────────────────────────────
     jwt_secret_access_v1: SecretStr = Field(
-        default=SecretStr("changeme-dev-only-please-replace-in-prod-min-32-chars"),
+        default=SecretStr(_DEV_JWT_DEFAULT),
         description="HS256 signing secret for access tokens. Rotate quarterly via _V2 alongside _V1.",
     )
     jwt_iss: str = Field(default="oriion-iam", description="JWT iss claim literal.")
@@ -283,8 +358,43 @@ class Settings(BaseSettings):
     def is_prod(self) -> bool:
         return self.app_env == "prod"
 
+    @model_validator(mode="after")
+    def _guard_no_dev_secrets(self) -> Settings:
+        """Fail fast if staging/prod boots on a known dev-default secret (AC-W1-9).
+
+        This makes retiring the on-disk ``.env`` safe: if the YC Lockbox payload
+        is missing a critical secret it would otherwise fall back to the Settings
+        dev-default and boot *healthy-but-insecure* (e.g. the dev JWT secret). The
+        deploy's wait_healthy/smoke then surfaces this as a failed deploy instead.
+        Dev/test are exempt (they intentionally run on the defaults)."""
+        if self.app_env not in ("staging", "prod"):
+            return self
+        problems: list[str] = []
+        if self.jwt_secret_access_v1.get_secret_value() == _DEV_JWT_DEFAULT:
+            problems.append("JWT_SECRET_ACCESS_V1 is the dev default")
+        if not self.byok_master_key_b64.get_secret_value():
+            problems.append("BYOK_MASTER_KEY_B64 is empty")
+        if self.database_url == _DEV_DATABASE_URL:
+            problems.append("DATABASE_URL is the dev default")
+        if problems:
+            raise ValueError(
+                f"insecure config in app_env={self.app_env!r}: {'; '.join(problems)}. "
+                "Provide real secrets via YC Lockbox (LOCKBOX_SECRET_ID) or env. AC-W1-9."
+            )
+        return self
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Cached accessor — Settings is immutable across the process lifetime."""
     return Settings()
+
+
+def reload_settings() -> Settings:
+    """Drop the cached Settings and rebuild from all sources, re-reading YC
+    Lockbox (AC-W1-9 no-redeploy refresh). Returns the fresh instance — callers
+    that hold secret-derived state (LLM provider clients, KMS) must rebuild it
+    from the returned Settings. NOTE: this re-runs the LockboxSettingsSource, so
+    it performs a network fetch when LOCKBOX_SECRET_ID is set."""
+    get_settings.cache_clear()
+    return get_settings()

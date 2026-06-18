@@ -11,9 +11,11 @@
 # override.yml which adds inline postgres + redis services and toggles
 # Caddy к HTTP-only mode. See docs/runbooks/local-smoke.md.
 #
-# Secrets: production reads from Yandex Lockbox via ${LOCKBOX_*} env-vars.
-# Stage A local validation reads from backend/.env (gitignored). See
-# C13 local-smoke runbook for full env-var checklist.
+# Secrets (AC-W1-9): staging/prod read them DIRECTLY from Yandex Lockbox at
+# startup (the deploy sets only LOCKBOX_SECRET_ID — nothing materialized to disk).
+# Local founder validation has no Lockbox, so docker-compose.staging-local.
+# override.yml injects the per-key secrets from backend/.env (gitignored). See
+# the local-smoke + staging-bootstrap runbooks for the env-var checklist.
 
 services:
   backend:
@@ -27,17 +29,19 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
     environment:
-      DATABASE_URL: ${LOCKBOX_DATABASE_URL:-${DATABASE_URL}}
-      REDIS_URL: ${LOCKBOX_REDIS_URL:-${REDIS_URL}}
-      DEEPSEEK_API_KEY: ${LOCKBOX_DEEPSEEK_API_KEY:-${DEEPSEEK_API_KEY}}
-      YANDEX_IAM_TOKEN: ${LOCKBOX_YANDEX_IAM_TOKEN:-${YANDEX_IAM_TOKEN}}
-      YANDEX_CATALOG_ID: ${LOCKBOX_YANDEX_CATALOG_ID:-${YANDEX_CATALOG_ID}}
-      GIGACHAT_AUTH_KEY: ${LOCKBOX_GIGACHAT_AUTH_KEY:-${GIGACHAT_AUTH_KEY}}
-      JWT_SECRET_ACCESS_V1: ${LOCKBOX_JWT_SECRET:-${JWT_SECRET_ACCESS_V1}}
-      # Live web_search for the Researcher (Brave; Yandex-XML = Wave-1).
-      BRAVE_SEARCH_API_KEY: ${LOCKBOX_BRAVE_SEARCH_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}
-      YANDEX_SEARCH_API_KEY: ${LOCKBOX_YANDEX_SEARCH_API_KEY:-${YANDEX_SEARCH_API_KEY:-}}
-      BYOK_MASTER_KEY_B64: ${LOCKBOX_BYOK_MASTER_KEY_B64:-${BYOK_MASTER_KEY_B64}}
+      # AC-W1-9: ALL secrets are read DIRECTLY from YC Lockbox at startup
+      # (backend/src/_shared/lockbox.py via the instance SA IAM token) — they are
+      # intentionally NOT passed as env here, so nothing is materialized to the VM
+      # disk. The deploy only sets LOCKBOX_SECRET_ID; the backend pulls
+      # DATABASE_URL / REDIS_URL / DEEPSEEK_API_KEY / YANDEX_* / GIGACHAT_AUTH_KEY /
+      # JWT_SECRET_ACCESS_V1 / BRAVE|YANDEX_SEARCH_API_KEY / BYOK_MASTER_KEY_B64
+      # from the Lockbox payload. A missing/dev-default secret fails fast in
+      # staging/prod (Settings._guard_no_dev_secrets) → a failed deploy, never an
+      # insecure boot. Rotate = bump the Lockbox version + SIGHUP (no redeploy) or
+      # rolling-restart. Local founder validation injects these from .env via
+      # docker-compose.staging-local.override.yml (APP_ENV=dev, guard off).
+      LOCKBOX_SECRET_ID: ${LOCKBOX_SECRET_ID:-}
+      LOCKBOX_ENDPOINT: ${LOCKBOX_ENDPOINT:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: oriion-backend
       OTEL_TRACES_ENABLED: "true"
@@ -85,18 +89,12 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
     environment:
-      DATABASE_URL: ${LOCKBOX_DATABASE_URL:-${DATABASE_URL}}
-      REDIS_URL: ${LOCKBOX_REDIS_URL:-${REDIS_URL}}
-      DEEPSEEK_API_KEY: ${LOCKBOX_DEEPSEEK_API_KEY:-${DEEPSEEK_API_KEY}}
-      YANDEX_IAM_TOKEN: ${LOCKBOX_YANDEX_IAM_TOKEN:-${YANDEX_IAM_TOKEN}}
-      YANDEX_CATALOG_ID: ${LOCKBOX_YANDEX_CATALOG_ID:-${YANDEX_CATALOG_ID}}
-      GIGACHAT_AUTH_KEY: ${LOCKBOX_GIGACHAT_AUTH_KEY:-${GIGACHAT_AUTH_KEY}}
-      JWT_SECRET_ACCESS_V1: ${LOCKBOX_JWT_SECRET:-${JWT_SECRET_ACCESS_V1}}
-      BRAVE_SEARCH_API_KEY: ${LOCKBOX_BRAVE_SEARCH_API_KEY:-${BRAVE_SEARCH_API_KEY:-}}
-      YANDEX_SEARCH_API_KEY: ${LOCKBOX_YANDEX_SEARCH_API_KEY:-${YANDEX_SEARCH_API_KEY:-}}
-      BYOK_MASTER_KEY_B64: ${LOCKBOX_BYOK_MASTER_KEY_B64:-${BYOK_MASTER_KEY_B64}}
+      # AC-W1-9: the worker reads the SAME secrets from YC Lockbox at startup as
+      # the backend (see that service) — not passed as env, nothing on disk.
+      LOCKBOX_SECRET_ID: ${LOCKBOX_SECRET_ID:-}
+      LOCKBOX_ENDPOINT: ${LOCKBOX_ENDPOINT:-}
       # Real LLM cost (AC-W1-13) prices via pricing_service × FX; the worker runs
-      # the orchestration so it needs the FX rate in its env.
+      # the orchestration so it needs the FX rate in its env (non-secret config).
       FX_RATE_USD_TO_RUB: ${FX_RATE_USD_TO_RUB:-100.0}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_SERVICE_NAME: oriion-worker
