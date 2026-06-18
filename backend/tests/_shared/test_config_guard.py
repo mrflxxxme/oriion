@@ -39,8 +39,8 @@ def test_guard_passes_with_real_secrets(monkeypatch: pytest.MonkeyPatch) -> None
     settings = Settings(
         _env_file=None,  # type: ignore[call-arg]
         app_env="staging",
-        jwt_secret_access_v1="prod-jwt-signing-secret-min-32-characters!!",
-        byok_master_key_b64="cmVhbC1ieW9rLW1hc3Rlci1rZXk=",
+        jwt_secret_access_v1="prod-jwt-signing-secret-min-32-characters!!",  # gitleaks:allow
+        byok_master_key_b64="dGVzdA==",  # gitleaks:allow — dummy base64; guard only checks non-empty
         database_url="postgresql+asyncpg://u:p@managed-pg.yandexcloud:5432/oriion",
     )
     assert settings.app_env == "staging"
