@@ -56,6 +56,14 @@ class _StubSession:
             return _StubResult()
         return self.execute_queue.pop(0)
 
+    # AC-W1-4: cancel_task now also writes a task.cancelled outbox row in the
+    # same TX (TaskRepository.add_outbox_event) — no-op add/flush for the stub.
+    def add(self, _obj: Any) -> None:
+        return None
+
+    async def flush(self) -> None:
+        return None
+
 
 @pytest.mark.asyncio
 async def test_cancel_task_cascade_collects_descendants() -> None:

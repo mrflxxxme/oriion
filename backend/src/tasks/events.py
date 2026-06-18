@@ -9,7 +9,11 @@ from uuid import UUID
 
 from src._shared.cloudevents import emit_cloudevent
 
-_SOURCE = "oriion://contexts/tasks"
+# Canonical CloudEvents `source` for the tasks bounded context. Public so the
+# transactional-outbox writer (TaskService → TaskRepository, AC-W1-4) stamps the
+# same source these log-only emitters use.
+TASKS_EVENT_SOURCE = "oriion://contexts/tasks"
+_SOURCE = TASKS_EVENT_SOURCE
 
 
 async def emit_task_created(

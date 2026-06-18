@@ -122,6 +122,48 @@ class TaskStep(Base):
     error_jsonb: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
 
+class OutboxEvent(Base):
+    """Transactional outbox row (AC-W1-4).
+
+    A domain CloudEvent is INSERTed in the SAME transaction as the state change
+    that produced it (no dual-write to an external bus that could diverge from
+    the DB on a crash). A relay (``runtime.queue.outbox_relay``) drains
+    unpublished rows and republishes them with at-least-once delivery, stamping
+    ``published_at``. Downstream consumers dedupe on ``ce_id`` (the CloudEvents
+    id) so a redelivered event is idempotent.
+    """
+
+    __tablename__ = "outbox"
+    __table_args__ = (
+        Index(
+            "idx_outbox_unpublished",
+            "created_at",
+            postgresql_where=text("published_at IS NULL"),
+        ),
+        {"schema": "tasks"},
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    # The CloudEvents id — the downstream idempotency key. Unique so a relay
+    # never inserts the same logical event twice.
+    ce_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=False,
+        unique=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    ce_type: Mapped[str] = mapped_column(Text, nullable=False)
+    ce_source: Mapped[str] = mapped_column(Text, nullable=False)
+    ce_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = _ts_default_now()
+    # NULL until the relay publishes the event downstream.
+    published_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
 class TaskArtifact(Base):
     __tablename__ = "task_artifacts"
     __table_args__ = ({"schema": "tasks"},)
