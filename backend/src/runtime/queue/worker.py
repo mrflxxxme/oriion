@@ -68,5 +68,8 @@ if os.environ.get("DRAMATIQ_TESTING") != "1":
     configure_broker(_settings)
     start_worker_metrics_exporter(_settings)
 
-# Import AFTER the broker is configured so the actor declares on the Redis broker.
+# Import AFTER the broker is configured so the actors declare on the Redis broker.
+# The outbox relay (AC-W1-4) is enqueued via trigger_outbox_relay() after a
+# producer commit, or on a periodic schedule (ops choice — e.g. periodiq/cron).
 from src.runtime.queue.actor import dispatch_task_actor  # noqa: E402, F401
+from src.runtime.queue.outbox_relay import relay_outbox_actor  # noqa: E402, F401
