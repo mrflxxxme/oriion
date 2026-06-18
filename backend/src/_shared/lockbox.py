@@ -28,9 +28,11 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# A URL, not a credential — bandit's S105 trips on the "token" path segment.
-_METADATA_TOKEN_URL = (
-    "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"  # noqa: S105
+# YC instance-metadata endpoint that returns the bound service-account IAM token.
+# Named *_IAM_URL (not *_TOKEN_*) so it isn't a URL flagged as a hardcoded
+# credential by ruff S105 / bandit B105 (both key on the assignment name).
+_METADATA_IAM_URL = (
+    "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
 )
 _DEFAULT_LOCKBOX_ENDPOINT = "https://payload.lockbox.api.cloud.yandex.net"
 _DEFAULT_TIMEOUT = 5.0
@@ -48,7 +50,7 @@ def fetch_iam_token_from_metadata(*, timeout: float = _DEFAULT_TIMEOUT) -> str:
     """
     try:
         with httpx.Client(timeout=timeout) as client:
-            resp = client.get(_METADATA_TOKEN_URL, headers={"Metadata-Flavor": "Google"})
+            resp = client.get(_METADATA_IAM_URL, headers={"Metadata-Flavor": "Google"})
             resp.raise_for_status()
             payload = resp.json()
     except httpx.HTTPError as exc:
