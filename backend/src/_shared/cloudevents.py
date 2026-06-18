@@ -43,6 +43,7 @@ async def emit_cloudevent(
     data: dict[str, Any],
     subject: str | None = None,
     correlation_id: str | None = None,
+    ce_id: str | None = None,
 ) -> None:
     """Emit a CloudEvents 1.0-shaped record.
 
@@ -69,7 +70,9 @@ async def emit_cloudevent(
     structlog.get_logger(__name__).bind(
         cloudevent=True,
         ce_specversion="1.0",
-        ce_id=str(uuid4()),
+        # A stable ce_id (e.g. the outbox row's, AC-W1-4) makes at-least-once
+        # redelivery idempotent for downstream consumers; default = fresh uuid4.
+        ce_id=ce_id or str(uuid4()),
         ce_type=ce_type,
         ce_source=source,
         ce_subject=subject,
