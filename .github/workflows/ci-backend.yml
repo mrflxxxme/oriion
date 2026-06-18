@@ -195,27 +195,17 @@ jobs:
           #   sanctioned cross-context model import per ADR-024 §3
           #   amendment landing in Phase 00.5b Commit 8).
           uv run pytest tests/llm_gateway  --cov=src/billing      --cov-fail-under=85 -q -m "not integration"
-          # Phase 00.6 Commit 12 (AC13 strict honor) extended Commit 19 fix:
-          # tests/tasks/ + tests/runtime/ unit tests landed Commits 10-11
-          # (95.82% src/tasks + 94.92% src/runtime). agents contexts are
-          # only indirectly covered through demo-flow integration tests +
-          # role_prompt_loader + delegate_tool unit tests — per-directory
-          # `tests/agents --cov=src/agents` hits ~28% (routers/schemas/
-          # services/writer/seed_data have no dedicated unit tests).
-          # Phase 00.5b STATUS «agents 100%» was inaccurate; Commit 19
-          # corrects к Wave-1 AC pin AC-W1-17. F-TR-M1/M2 audit closure:
-          # test_cancel_cascade.py relocated tests/agents/ → tests/tasks/.
+          # Phase 00.6 Commit 12 (AC13 strict honor): tests/tasks/ +
+          # tests/runtime/ unit tests landed Commits 10-11 (95.82% src/tasks +
+          # 94.92% src/runtime). F-TR-M1/M2 audit closure: test_cancel_cascade.py
+          # relocated tests/agents/ → tests/tasks/.
           uv run pytest tests/tasks       --cov=src/tasks        --cov-fail-under=85 -q -m "not integration"
           uv run pytest tests/runtime     --cov=src/runtime      --cov-fail-under=85 -q -m "not integration"
-          # tests/agents per-directory gate deferred — Wave-1 AC-W1-17:
-          # proper unit tests for src/agents (coordinator/researcher/writer/
-          # analyst factory functions, routers via TestClient, schemas,
-          # seed_data, archetype_service, team_provisioning_service).
-          # Indirect coverage via tests/agents/* runs unchanged below.
-          # ratchet floor — local measure 2026-06-17 = ~45% (the ~28% above is a
-          # stale note); floor set just below actual to lock the gain. Raise
-          # toward 85% as dedicated unit tests land — AC-W1-17.
-          uv run pytest tests/agents --cov=src/agents --cov-fail-under=40 -q -m "not integration"
+          # AC-W1-17: src/agents now has dedicated unit tests (factories, routers,
+          # schemas, models, events, seed_data, archetype + team_provisioning
+          # services) — the per-module ≥85 gate now matches every other context
+          # (local measure ~98%). The Wave-0 40 ratchet floor is retired.
+          uv run pytest tests/agents --cov=src/agents --cov-fail-under=85 -q -m "not integration"
           # _shared/db + _shared/middleware gates: deferred. set_tenant_
           # context is exercised through test_e2e_auth_flow.py integration
           # (oriion_app role canary) + Phase 00.6 Commit 3 refactor moved

@@ -20,9 +20,9 @@ Until orchestrator wires up, callers either:
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -33,13 +33,37 @@ from src.agents.exceptions import DelegationDepthExceeded, DelegationTargetInval
 DEFAULT_MAX_DELEGATION_DEPTH = 5
 
 
+# ── canonical agent slugs (single source of truth) ──────────────────────
+
+
+class AgentSlug(StrEnum):
+    """Canonical agent role-slugs — the single source of truth (AC-W1-8).
+
+    Constrains ``DelegateInput.target_agent_slug`` at *validation* time so an
+    unknown slug fails fast with a Pydantic ``ValidationError`` instead of
+    slipping through to dispatch. This is distinct from the per-cell *team
+    membership* check in ``assert_delegation_allowed`` — that is the runtime
+    authz layer (is this slug provisioned in THIS cell + under the depth cap);
+    this enum only asserts the slug names a known archetype at all.
+
+    ``StrEnum`` keeps each member a real ``str`` so existing comparisons,
+    membership tests against ``available_agent_slugs: list[str]``, dict/SSE
+    payloads and JSON serialization keep working unchanged.
+    """
+
+    COORDINATOR = "coordinator"
+    RESEARCHER = "researcher"
+    WRITER = "writer"
+    ANALYST = "analyst"
+
+
 # ── tool payload schemas ────────────────────────────────────────────────
 
 
 class DelegateInput(BaseModel):
     """Coordinator-side delegation payload — passed as the tool argument."""
 
-    target_agent_slug: str = Field(
+    target_agent_slug: AgentSlug = Field(
         ...,
         description="Role-key of the target agent — 'researcher' | 'writer' | 'analyst'",
     )
@@ -58,34 +82,49 @@ class DelegateResult(BaseModel):
     """Coordinator-side delegation result."""
 
     sub_task_id: UUID
-    target_agent_slug: str
+    target_agent_slug: AgentSlug
     output: str
     cost_credits: Decimal = Decimal(0)
     tokens_used: int = 0
 
 
-# ── runner protocol — injected via deps ─────────────────────────────────
+# ── runner protocol + the single deps container ─────────────────────────
 
 
-DelegateRunner = Callable[["DelegateInput", "CoordinatorDepsLike"], Awaitable[DelegateResult]]
+DelegateRunner = Callable[["DelegateInput", "CoordinatorDeps"], Awaitable[DelegateResult]]
 """Signature: ``async (DelegateInput, deps) -> DelegateResult``."""
 
 
 @dataclass
-class CoordinatorDepsLike:
-    """Minimum surface ``delegate_task`` needs from the parent agent's deps.
+class CoordinatorDeps:
+    """The single per-run deps container for the Coordinator (AC-W1-7).
 
-    Concrete Agent definitions (coordinator.py) compose this into a richer
-    Pydantic BaseModel — we keep this dataclass-style shim so the tool
-    signature stays independent of the larger CoordinatorDeps class.
+    Collapses the former ``CoordinatorDeps`` (Pydantic BaseModel, was in
+    ``agents/coordinator.py``) ↔ ``CoordinatorDepsLike`` (dataclass, was here)
+    duality into ONE type. It lives in this low-level module because
+    ``coordinator.py`` imports from ``delegate.py`` (not vice-versa), so the
+    single type must be defined here to avoid an import cycle;
+    ``coordinator.py`` re-exports it for backwards-compatible imports.
+
+    Holds the minimum surface ``delegate_task`` + the plan-executor
+    (``runtime.dispatch.PlanExecutingCoordinator``) need; the runtime
+    orchestrator (Commit 6) injects the real DB-backed ``runner``.
     """
 
     cell_id: UUID
     task_id: UUID
     user_id: UUID
-    available_agent_slugs: list[str]
+    available_agent_slugs: list[str] = field(
+        default_factory=lambda: [
+            AgentSlug.RESEARCHER,
+            AgentSlug.WRITER,
+            AgentSlug.ANALYST,
+        ]
+    )
     current_depth: int = 0
     max_delegation_depth: int = DEFAULT_MAX_DELEGATION_DEPTH
+    # in-process runner for demo-flow tests; runtime orchestrator (Commit 6)
+    # injects the real DB-backed runner.
     runner: DelegateRunner | None = None
 
 
@@ -124,7 +163,7 @@ def assert_delegation_allowed(
 
 
 async def delegate_task(
-    ctx: RunContext[Any],
+    ctx: RunContext[CoordinatorDeps],
     inp: DelegateInput,
 ) -> DelegateResult:
     """Tool body — guards + dispatch.
@@ -143,12 +182,12 @@ async def delegate_task(
 
     assert_delegation_allowed(
         inp.target_agent_slug,
-        available=list(getattr(deps, "available_agent_slugs", []) or []),
-        current_depth=int(getattr(deps, "current_depth", 0)),
-        max_depth=int(getattr(deps, "max_delegation_depth", DEFAULT_MAX_DELEGATION_DEPTH)),
+        available=list(deps.available_agent_slugs or []),
+        current_depth=deps.current_depth,
+        max_depth=deps.max_delegation_depth,
     )
 
-    runner: DelegateRunner | None = getattr(deps, "runner", None)
+    runner = deps.runner
     if runner is None:
         raise NotImplementedError(
             "delegate_task has no runner attached. Wire ctx.deps.runner in the "

@@ -14,8 +14,10 @@ instance for an archetype, skip insertion (audit-friendly).
 
 from __future__ import annotations
 
+from typing import Protocol
 from uuid import UUID
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +25,22 @@ from src.agents import events as agents_events
 from src.agents.exceptions import TeamPresetNotFound
 from src.agents.models import AgentArchetype, AgentInstance, TeamPreset
 from src.agents.seed_data.productivity_core_v1 import ensure_productivity_core_seed
+
+logger = structlog.get_logger(__name__)
+
+
+class TeamProvisioning(Protocol):
+    """Port for provisioning a team-preset into a cell (AC-W1-7).
+
+    Lets ``AuthService`` depend on the capability rather than the concrete
+    service, so the optional-``None`` constructor seam collapses: unit tests
+    inject the ``NullTeamProvisioningService`` no-op, production wires the real
+    ``TeamProvisioningService`` (``iam/deps.py``).
+    """
+
+    async def provision_team(
+        self, *, preset_slug: str, cell_id: UUID, user_id: UUID
+    ) -> list[AgentInstance]: ...
 
 
 class TeamProvisioningService:
@@ -112,3 +130,29 @@ class TeamProvisioningService:
         )
         rows = (await self._session.execute(stmt)).all()
         return {row[0]: row[1] for row in rows}
+
+
+class NullTeamProvisioningService:
+    """No-op ``TeamProvisioning`` (AC-W1-7).
+
+    The default collaborator for ``AuthService`` in contexts that do not
+    provision a team (unit tests, CLI / admin flows). Mirrors
+    ``NoOpEmailSender``: silent, returns the empty result. Production wiring
+    (``iam/deps.py``) supplies the real ``TeamProvisioningService``.
+    """
+
+    async def provision_team(
+        self, *, preset_slug: str, cell_id: UUID, user_id: UUID
+    ) -> list[AgentInstance]:
+        logger.debug(
+            "NullTeamProvisioningService — provisioning skipped (no-op default)",
+            preset_slug=preset_slug,
+            cell_id=str(cell_id),
+            user_id=str(user_id),
+        )
+        return []
+
+
+# Stateless no-op → safe to share one module-level instance as the AuthService
+# default (collapses the optional-`None` constructor seam — AC-W1-7).
+NULL_TEAM_PROVISIONING: TeamProvisioning = NullTeamProvisioningService()

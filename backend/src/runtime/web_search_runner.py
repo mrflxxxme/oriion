@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 
 from src._shared.config import get_settings
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
+from src.mcp.tools.read_url import ReadURLTool
 from src.mcp.tools.web_search import WebSearchResult, WebSearchTool
 
 if TYPE_CHECKING:
@@ -111,6 +112,59 @@ def build_native_web_search(
     return web_search
 
 
+# read_url deep-read (AC-W1-18): the Researcher may fetch a promising source
+# page beyond search snippets. Content is capped so the fed-back context (and
+# thus the AC10 cost) stays bounded; the ReadURLTool itself is rate-limited to
+# 10/min per agent_id (SSRF-guarded — see mcp/tools/read_url.py).
+READ_URL_MAX_CHARS = 4000
+
+
+def build_native_read_url(
+    read_url_tool: ReadURLTool,
+    *,
+    agent_id: str = "researcher",
+    max_chars: int = READ_URL_MAX_CHARS,
+) -> Callable[[str], Awaitable[str]]:
+    """Build the native Pydantic-AI ``read_url`` tool callable (AC-W1-18).
+
+    Bound to a rate-limited ``ReadURLTool`` + the Researcher ``agent_id``.
+    Registered on the Researcher only on the DeepSeek path (ADR-035 gating in
+    ``dispatch_task``) so the model can deep-read a source page when search
+    snippets aren't enough. Output is content-capped to ``max_chars`` to keep the
+    fed-back context (and thus the AC10 cost) bounded. Degrades gracefully on
+    rate-limit / SSRF-refusal / network errors so the run never fails on a
+    single unreadable page.
+    """
+
+    async def read_url(url: str) -> str:
+        """Fetch a web page by URL and return its main text content.
+
+        Use after web_search to deep-read a promising source (competitor page,
+        article, documentation) when the snippet isn't enough. Pass one http(s)
+        URL. Returns a short note if the rate limit is hit or the page can't be
+        read.
+        """
+        try:
+            result = await read_url_tool.fetch(url, agent_id=agent_id)
+        except ToolRateLimitExceeded:
+            return "Лимит чтения страниц исчерпан — используй уже собранные данные."
+        except MCPError:
+            # SSRF refusal / network / extraction error → let the model proceed
+            # from search snippets rather than fail the whole run.
+            return ""
+        text = result.text_content.strip()
+        if len(text) > max_chars:
+            text = text[:max_chars].rstrip() + "…"
+        if not text:
+            return f"Страница {url} не содержит читаемого текста."
+        header = f"## Содержимое страницы {result.url}"
+        if result.title:
+            header += f" — {result.title}"
+        return f"{header}\n{text}"
+
+    return read_url
+
+
 def _default_web_search_tool(
     *,
     rate_limiter: ToolRateLimiter | None = None,
@@ -136,7 +190,9 @@ def _default_web_search_tool(
 
 
 __all__ = [
+    "READ_URL_MAX_CHARS",
     "WEB_SEARCH_MAX_RESULTS",
+    "build_native_read_url",
     "build_native_web_search",
     "fetch_research_context",
 ]
