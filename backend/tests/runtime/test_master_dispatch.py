@@ -178,6 +178,10 @@ async def test_master_aggregate_cost_is_authority_no_double_count() -> None:
     assert task.status == "succeeded"
     # 2 (plan) + 1*3 (leaves) + 2 (synthesis) = 7 — each counted exactly once.
     assert task.total_cost_credits == Decimal("7")
+    # Token totals reconcile with cost: leaves (3 in / 5 out each) + the 2 Master
+    # calls (_FakeUsage 10/10 each) — Master tokens are NOT dropped from the rollup.
+    assert task.total_input_tokens == 3 * 3 + 10 * 2  # 29
+    assert task.total_output_tokens == 5 * 3 + 10 * 2  # 35
     assert result["final_artifact_markdown"] == "# Финальный deliverable"
 
     events = [ev.event_type for ev in publisher._drain.get(task.id, [])]

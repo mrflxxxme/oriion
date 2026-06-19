@@ -80,7 +80,12 @@ from src.mcp.tools.read_url import ReadURLTool
 from src.mcp.tools.web_search import WebSearchTool
 from src.multitenancy.models import Cell
 from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
-from src.runtime.orchestrator import MasterStepRecorder, OrchestratorContext, execute_agent_task
+from src.runtime.orchestrator import (
+    MasterStepRecorder,
+    OrchestratorContext,
+    estimate_step_cost,
+    execute_agent_task,
+)
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
 from src.runtime.web_search_runner import (
     WEB_SEARCH_MAX_RESULTS,
@@ -736,7 +741,14 @@ class MasterAgent:
             vertical_tag=self._vertical_tag,
         )
 
+        # AC-W1-3: pre-call budget gate (symmetric with leaf delegations) — a
+        # Master call that would breach the per-task cap is rejected BEFORE the
+        # paid LLM call, so the aggregate cap is hard for the Master too.
+        precheck = getattr(deps, "budget_precheck", None)
+
         # 1. Strategic plan (domain lens) — billed as the parent task's step 0.
+        if precheck is not None:
+            precheck(estimate_step_cost(ROLE_KEY_PLAN))
         t0 = perf_counter()
         plan_run = await plan_agent.run(user_prompt, deps=master_deps)
         plan_latency = int((perf_counter() - t0) * 1000)
@@ -780,6 +792,10 @@ class MasterAgent:
         coordinator_output = coord_run.output
 
         # 3. Domain-quality synthesis (free-text, R1) — billed after the leaves.
+        # Pre-check here matters most: leaf costs have accumulated, so an
+        # over-cap synthesis is rejected before the paid call (no over-cap bill).
+        if precheck is not None:
+            precheck(estimate_step_cost(ROLE_KEY_SYNTHESIS))
         synthesis_prompt = _compose_master_synthesis_prompt(
             user_prompt, strategic_context, coordinator_output
         )

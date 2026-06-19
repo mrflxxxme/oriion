@@ -869,3 +869,43 @@ async def test_resolve_archetype_id_unknown_slug_raises() -> None:
     session = _RecorderSession(cell=_CellStub(workspace_id=uuid4()), archetype_id=None)
     with pytest.raises(LookupError):
         await _resolve_archetype_id(session, "ghost")  # type: ignore[arg-type]
+
+
+# ── AC-W1-3.2: strategic_context preamble through PlanExecutingCoordinator.run ──
+
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_prepends_strategic_preamble() -> None:
+    """AC-W1-3.2: a deps.strategic_context prepends its domain preamble to the
+    prompt the Coordinator agent actually receives (verified, not in isolation)."""
+    from src.agents.strategic_context import StrategicContext
+    from src.agents.tools.delegate import CoordinatorDeps
+
+    agent = _FakeCoordinatorAgent(_market_brief_plan())
+    coord = PlanExecutingCoordinator(coordinator_agent=agent)
+    sc = StrategicContext(
+        objective="кампания",
+        vertical_tag="agency_marketing_ru",
+        domain_constraints=["только РФ-каналы"],
+    )
+    deps = CoordinatorDeps(
+        cell_id=uuid4(), task_id=uuid4(), user_id=uuid4(), runner=_ok_runner(), strategic_context=sc
+    )
+    await coord.run("исходная цель", deps=deps)
+    prompt = agent.run_prompts[0]
+    assert "Стратегический контекст" in prompt
+    assert "только РФ-каналы" in prompt
+    assert "исходная цель" in prompt
+
+
+@pytest.mark.asyncio
+async def test_plan_executing_coordinator_no_preamble_when_context_none() -> None:
+    """AC-W1-3.1: strategic_context=None → the Coordinator prompt is byte-identical
+    to the user prompt (no preamble injected)."""
+    from src.agents.tools.delegate import CoordinatorDeps
+
+    agent = _FakeCoordinatorAgent(_market_brief_plan())
+    coord = PlanExecutingCoordinator(coordinator_agent=agent)
+    deps = CoordinatorDeps(cell_id=uuid4(), task_id=uuid4(), user_id=uuid4(), runner=_ok_runner())
+    await coord.run("чистый промпт", deps=deps)
+    assert agent.run_prompts[0] == "чистый промпт"

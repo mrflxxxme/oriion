@@ -130,6 +130,11 @@ class OrchestratorContext:
         self.budget_cap = budget_cap
         self.accumulated_cost = Decimal(0)
         self.leaf_outputs: list[DelegateResult] = []
+        # AC-W1-3: Master plan/synthesis token counts (their cost folds into
+        # accumulated_cost; their tokens roll up here so task.total_*_tokens
+        # reconciles with task.total_cost_credits on the Master path).
+        self.master_input_tokens = 0
+        self.master_output_tokens = 0
 
 
 async def execute_agent_task(
@@ -243,6 +248,10 @@ async def execute_agent_task(
     async def master_call_recorder(billing: MasterCallBilling) -> Decimal:
         cost = await master_step_recorder(session, billing)  # type: ignore[misc]
         ctx.accumulated_cost += cost
+        # Roll the Master call's tokens up alongside its cost so the per-task
+        # token totals reconcile with total_cost_credits (no leaf-only undercount).
+        ctx.master_input_tokens += billing.input_tokens
+        ctx.master_output_tokens += billing.output_tokens
         check_budget(accumulated_cost=ctx.accumulated_cost, cap=ctx.budget_cap)
         await sse_publisher.publish(
             TaskStreamEvent(
@@ -253,6 +262,17 @@ async def execute_agent_task(
         )
         return cost
 
+    # Pre-call budget gate for the Master's own LLM calls — symmetric with the
+    # leaf pre-check (a Master call that *would* blow the cap is rejected BEFORE
+    # the paid call, so the aggregate cap is hard for the Master too, not just
+    # post-checked). The Master passes a forward estimate as pending_cost.
+    def master_budget_precheck(pending_cost: Decimal) -> None:
+        check_budget(
+            accumulated_cost=ctx.accumulated_cost,
+            pending_cost=pending_cost,
+            cap=ctx.budget_cap,
+        )
+
     deps = CoordinatorDeps(
         cell_id=cell_id,
         task_id=task_id,
@@ -262,6 +282,7 @@ async def execute_agent_task(
         max_delegation_depth=5,
         runner=runner_with_orchestration,
         master_recorder=master_call_recorder if master_step_recorder is not None else None,
+        budget_precheck=master_budget_precheck if master_step_recorder is not None else None,
     )
 
     # F-ARC-M2 audit fix: wrap Agent.run() in a try/except so any uncaught
@@ -313,8 +334,13 @@ async def execute_agent_task(
             task.total_cost_credits = ctx.accumulated_cost
         refund_unused(ctx.accumulated_cost, reserved)
         error_code = getattr(exc, "code", exc.__class__.__name__)
+        # The runtime budget guard raises tasks.exceptions.BudgetExceeded
+        # (code='tasks.budget_exceeded') — including for the Master aggregate cap.
+        # (llm_gateway.budget_exceeded kept for the BYOK gateway-side variant.)
         outcome = (
-            "budget_exceeded" if str(error_code) == "llm_gateway.budget_exceeded" else "failed"
+            "budget_exceeded"
+            if str(error_code) in ("tasks.budget_exceeded", "llm_gateway.budget_exceeded")
+            else "failed"
         )
         _record_terminal_task_metrics(
             cell_label=cell_label,
@@ -380,8 +406,14 @@ async def execute_agent_task(
         # from the steps, never from the lineage child Tasks, so there is no
         # double count.
         task.total_cost_credits = ctx.accumulated_cost
-        task.total_input_tokens = sum(r.input_tokens for r in ctx.leaf_outputs)
-        task.total_output_tokens = sum(r.tokens_used for r in ctx.leaf_outputs)
+        # AC-W1-3: token totals = leaf delegations + the Master's own plan/synthesis
+        # calls, so they reconcile with total_cost_credits (cost includes both).
+        task.total_input_tokens = (
+            sum(r.input_tokens for r in ctx.leaf_outputs) + ctx.master_input_tokens
+        )
+        task.total_output_tokens = (
+            sum(r.tokens_used for r in ctx.leaf_outputs) + ctx.master_output_tokens
+        )
     refund_unused(ctx.accumulated_cost, reserved)
     _record_terminal_task_metrics(
         cell_label=cell_label,

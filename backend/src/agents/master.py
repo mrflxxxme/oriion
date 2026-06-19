@@ -72,7 +72,10 @@ class MasterResponse(BaseModel):
     domain_quality_notes: list[str] = Field(default_factory=list)
     coordinator_output: CoordinatorOutput
     confidence: str = "medium"  # 'high' | 'medium' | 'low'
-    total_cost_credits: Decimal = Decimal(0)
+    # NOTE: the aggregate cost authority is the orchestrator step-sum
+    # (task.total_cost_credits + the SSE result dict's top-level
+    # total_cost_credits) — the Master cannot compute the leaf+Master aggregate
+    # at construction, so this model carries no (stale-zero) cost field.
 
 
 # ── per-run deps for the Master's own Pydantic-AI agents ──────────────────

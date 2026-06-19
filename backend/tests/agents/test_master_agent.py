@@ -105,6 +105,7 @@ class _RecorderStub:
 class _DepsStub:
     runner: Any = None
     master_recorder: Any = None
+    budget_precheck: Any = None
     cell_id: UUID = field(default_factory=uuid4)
     task_id: UUID = field(default_factory=uuid4)
     user_id: UUID = field(default_factory=uuid4)
@@ -282,6 +283,27 @@ async def test_master_run_rejects_non_master_plan_output() -> None:
     )
     with pytest.raises(TypeError):
         await master.run("x", deps=_DepsStub(master_recorder=_RecorderStub()))
+
+
+@pytest.mark.asyncio
+async def test_master_run_precheck_blocks_synthesis_before_paid_call() -> None:
+    """AC-W1-3.5: budget_precheck rejects an over-cap Master call BEFORE the paid
+    LLM call (symmetric with leaves) — the synthesis agent never runs."""
+    master, _plan_agent, synth_agent, _coord = _master(
+        plan=_plan(), synth_text="deliverable", coord_out=_coordinator_output()
+    )
+    calls = {"n": 0}
+
+    def _precheck(_pending: Any) -> None:
+        calls["n"] += 1
+        if calls["n"] == 2:  # the synthesis pre-check (plan pre-check is #1)
+            raise BudgetExceeded("over cap before synthesis")
+
+    deps = _DepsStub(master_recorder=_RecorderStub(), budget_precheck=_precheck)
+    with pytest.raises(BudgetExceeded):
+        await master.run("Нужна кампания", deps=deps)
+    # The synthesis LLM call was rejected pre-call → never executed.
+    assert synth_agent.prompts == []
 
 
 @pytest.mark.asyncio

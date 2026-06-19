@@ -142,6 +142,10 @@ class CoordinatorDeps:
     # calls into the shared per-task budget accumulator (set by the
     # orchestrator only on the Master path; ``None`` for horizontal).
     master_recorder: MasterCallRecorder | None = None
+    # ctx-aware PRE-call budget gate (raises BudgetExceeded if accumulated +
+    # pending would breach the cap) — the Master calls it before each LLM call
+    # so the cap is hard for the Master, symmetric with leaf delegations.
+    budget_precheck: Callable[[Decimal], None] | None = None
 
 
 # ── shared delegation guard ──────────────────────────────────────────────
