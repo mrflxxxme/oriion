@@ -24,6 +24,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.agents import events as agents_events
 from src.agents.exceptions import TeamPresetNotFound
 from src.agents.models import AgentArchetype, AgentInstance, TeamPreset
+from src.agents.seed_data.agency_marketing_ru_v1 import (
+    PRESET_SLUG as AGENCY_MARKETING_PRESET_SLUG,
+)
+from src.agents.seed_data.agency_marketing_ru_v1 import ensure_agency_marketing_ru_seed
 from src.agents.seed_data.productivity_core_v1 import ensure_productivity_core_seed
 
 logger = structlog.get_logger(__name__)
@@ -61,8 +65,14 @@ class TeamProvisioningService:
         Idempotent: re-running for an already-provisioned cell is a no-op
         (returns the existing instances).
         """
-        # Idempotent seed — guarantees productivity-core exists for Wave 0.
-        await ensure_productivity_core_seed(self._session)
+        # Idempotent seed. AC-W1-3: the Marketing-agency vertical seed adds its
+        # Master archetype + preset on top of the horizontal specialists (it
+        # ensures the productivity-core base itself); every other preset just
+        # needs the horizontal base.
+        if preset_slug == AGENCY_MARKETING_PRESET_SLUG:
+            await ensure_agency_marketing_ru_seed(self._session)
+        else:
+            await ensure_productivity_core_seed(self._session)
 
         preset = await self._load_preset(preset_slug)
 

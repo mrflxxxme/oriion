@@ -31,6 +31,7 @@ from src._shared.observability.metrics import (
     TASK_QUEUE_DEPTH,
     TASK_TOTAL,
 )
+from src.agents.master import MasterCallBilling
 from src.agents.tools.delegate import CoordinatorDeps, DelegateInput, DelegateResult
 from src.llm_gateway.services.router_service import resolve_max_tokens
 from src.runtime.budget_guard import (
@@ -47,6 +48,11 @@ from src.tasks.models import Task
 
 LeafRunner = Callable[[DelegateInput, "OrchestratorContext"], Awaitable[DelegateResult]]
 """Signature an orchestrator's leaf-dispatch callable must follow."""
+
+# AC-W1-3: session-bound biller for a Master's own LLM call (plan / synthesis).
+# Built by ``runtime.dispatch`` (it has the session); the orchestrator wraps it
+# into the ctx-aware ``CoordinatorDeps.master_recorder`` (budget + SSE).
+MasterStepRecorder = Callable[[AsyncSession, MasterCallBilling], Awaitable[Decimal]]
 
 # P1-D forward-estimate constants. Mirror runtime.dispatch.estimate_credits's
 # DeepSeek per-token T-credit rates (kept local to avoid the dispatch→
@@ -138,6 +144,7 @@ async def execute_agent_task(
     sse_publisher: SSEPublisher,
     session: AsyncSession,
     budget_cap: Decimal = DEFAULT_TASK_CAP_TCREDITS,
+    master_step_recorder: MasterStepRecorder | None = None,
 ) -> dict[str, Any]:
     """Run the Coordinator agent end-to-end + emit SSE event ledger.
 
@@ -226,6 +233,26 @@ async def execute_agent_task(
         )
         return result
 
+    # AC-W1-3: ctx-aware recorder for a Master's own LLM calls (plan/synthesis).
+    # Symmetric to ``runner_with_orchestration`` for leaves — it bills via the
+    # session-bound ``master_step_recorder`` then folds the cost into the SAME
+    # ``ctx.accumulated_cost`` so the per-task 50-credit cap covers the whole
+    # Master + children aggregate (R-32 / R-04). Master calls post-check the cap
+    # (they are bounded at 2 per task; the unbounded leaf fan-out keeps the
+    # pre-call check). Only wired when a Master path supplied a recorder.
+    async def master_call_recorder(billing: MasterCallBilling) -> Decimal:
+        cost = await master_step_recorder(session, billing)  # type: ignore[misc]
+        ctx.accumulated_cost += cost
+        check_budget(accumulated_cost=ctx.accumulated_cost, cap=ctx.budget_cap)
+        await sse_publisher.publish(
+            TaskStreamEvent(
+                event_type="task.step_completed",
+                task_id=task_id,
+                payload={"phase": billing.phase, "cost_credits": str(cost)},
+            )
+        )
+        return cost
+
     deps = CoordinatorDeps(
         cell_id=cell_id,
         task_id=task_id,
@@ -234,6 +261,7 @@ async def execute_agent_task(
         current_depth=0,
         max_delegation_depth=5,
         runner=runner_with_orchestration,
+        master_recorder=master_call_recorder if master_step_recorder is not None else None,
     )
 
     # F-ARC-M2 audit fix: wrap Agent.run() in a try/except so any uncaught

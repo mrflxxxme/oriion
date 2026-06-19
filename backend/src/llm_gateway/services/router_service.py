@@ -92,6 +92,12 @@ ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
     # and is cheaper/faster against the AC8/AC10 gates.
     "coordinator": ("deepseek", "deepseek-chat"),
     "specialist": ("deepseek", "deepseek-chat"),
+    # AC-W1-3 Master-Agent (ADR-029): the plan call needs structured JSON, so
+    # it uses deepseek-chat (same rationale as coordinator — R1 breaks the
+    # fenced-JSON parse); the free-text synthesis call uses deepseek-reasoner
+    # (R1) where its reasoning depth applies without JSON fragility.
+    "master": ("deepseek", "deepseek-chat"),
+    "master_synthesis": ("deepseek", "deepseek-reasoner"),
     "embedder": ("yandexgpt", "text-search-doc"),
     "default": ("deepseek", "deepseek-chat"),
 }
@@ -108,6 +114,10 @@ ROLE_TO_MAX_TOKENS: dict[str, int] = {
     "researcher": 4096,
     "analyst": 4096,
     "writer": 8192,
+    # AC-W1-3: the Master plan is a compact StrategicContext JSON (like the
+    # coordinator plan); the synthesis is a full deliverable (like the writer).
+    "master": 2048,
+    "master_synthesis": 8192,
     "default": 4096,
 }
 

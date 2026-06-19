@@ -119,8 +119,8 @@ def parse_role_prompt_text(raw: str, *, role_filename: str) -> RolePrompt:
     )
 
 
-def load_role_prompt(role_slug: str, *, prompts_dir: Path | None = None) -> RolePrompt:
-    """Load `contracts/role-prompts/<role_slug>.md` and parse it.
+def _resolve_prompts_dir(prompts_dir: Path | None) -> Path:
+    """Resolve the role-prompts root directory.
 
     Resolution order:
       1. explicit ``prompts_dir`` arg (tests);
@@ -129,22 +129,45 @@ def load_role_prompt(role_slug: str, *, prompts_dir: Path | None = None) -> Role
          into the image at ``/app/role_prompts`` and pointed at via this var);
       3. host/dev fallback — walk up to ``.planning/contracts/role-prompts``.
     """
-    if prompts_dir is None:
-        env_dir = os.environ.get("ROLE_PROMPTS_DIR", "").strip()
-        if env_dir:
-            prompts_dir = Path(env_dir)
-        else:
-            # Host/dev walk: backend/src/agents/services/role_prompt_loader.py →
-            # … → backend → repo-root → .planning/contracts/role-prompts
-            here = Path(__file__).resolve()
-            repo_root = here.parents[4]
-            prompts_dir = repo_root / ".planning" / "contracts" / "role-prompts"
+    if prompts_dir is not None:
+        return prompts_dir
+    env_dir = os.environ.get("ROLE_PROMPTS_DIR", "").strip()
+    if env_dir:
+        return Path(env_dir)
+    # Host/dev walk: backend/src/agents/services/role_prompt_loader.py →
+    # … → backend → repo-root → .planning/contracts/role-prompts
+    here = Path(__file__).resolve()
+    repo_root = here.parents[4]
+    return repo_root / ".planning" / "contracts" / "role-prompts"
 
-    path = prompts_dir / f"{role_slug}.md"
+
+def load_role_prompt(role_slug: str, *, prompts_dir: Path | None = None) -> RolePrompt:
+    """Load `contracts/role-prompts/<role_slug>.md` and parse it."""
+    resolved = _resolve_prompts_dir(prompts_dir)
+    path = resolved / f"{role_slug}.md"
     if not path.exists():
         raise RolePromptParseError(
             f"role-prompt not found at {path}. Expected one of "
             "{coordinator, researcher, writer, analyst}.md under "
             ".planning/contracts/role-prompts/."
+        )
+    return parse_role_prompt_text(path.read_text(encoding="utf-8"), role_filename=str(path))
+
+
+def load_master_prompt(vertical: str, *, prompts_dir: Path | None = None) -> RolePrompt:
+    """Load `contracts/role-prompts/masters/<vertical>.md` and parse it (ADR-029).
+
+    Master prompts live in a ``masters/`` subdirectory of the role-prompts root
+    (per the ADR-029 storage layout) and obey the same 9-section + frontmatter
+    contract as specialist prompts. ``vertical`` is the canonical underscore
+    slug (e.g. ``agency_marketing_ru``), matching ``Cell.vertical_template_slug``.
+    """
+    masters_dir = _resolve_prompts_dir(prompts_dir) / "masters"
+    path = masters_dir / f"{vertical}.md"
+    if not path.exists():
+        raise RolePromptParseError(
+            f"master-prompt not found at {path}. Expected "
+            "masters/<vertical>.md under .planning/contracts/role-prompts/ "
+            "(canonical underscore slug, e.g. agency_marketing_ru.md)."
         )
     return parse_role_prompt_text(path.read_text(encoding="utf-8"), role_filename=str(path))
