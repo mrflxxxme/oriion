@@ -21,6 +21,7 @@ Why two backends?
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Final
@@ -37,6 +38,10 @@ _TOOL_NAME: Final = "web_search"
 _DEFAULT_LIMIT_PER_MIN: Final = 30
 _DEFAULT_WINDOW_SECONDS: Final = 60
 _DEFAULT_TIMEOUT_SECONDS: Final = 5.0
+# Cap the search-API response body (mirrors read_url): a compromised, spoofed
+# (DNS/BGP) or buggy upstream could otherwise stream an unbounded body and
+# OOM-kill the single Dramatiq worker before max_results can trim it.
+_MAX_BODY_BYTES: Final = 5 * 1024 * 1024
 
 _BRAVE_API_URL: Final = "https://api.search.brave.com/res/v1/web/search"
 _YANDEX_API_URL: Final = "https://yandex.ru/search/xml"
@@ -174,14 +179,14 @@ class WebSearchTool:
         }
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout_seconds)) as client:
-                response = await client.get(_BRAVE_API_URL, headers=headers, params=params)
-                response.raise_for_status()
-                payload = response.json()
+                body = await self._get_capped(
+                    client, _BRAVE_API_URL, headers=headers, params=params
+                )
         except httpx.RequestError as exc:
             raise WebSearchError(f"brave network error: {exc!s}") from exc
         except httpx.HTTPStatusError as exc:
             raise WebSearchError(f"brave http error: {exc.response.status_code}") from exc
-        return _parse_brave(payload, max_results)
+        return _parse_brave(json.loads(body), max_results)
 
     async def _search_yandex(self, query: str, max_results: int) -> list[WebSearchResult]:
         """Yandex Search XML API (yandex.ru/search/xml).
@@ -203,19 +208,44 @@ class WebSearchTool:
         }
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout_seconds)) as client:
-                response = await client.get(_YANDEX_API_URL, params=params)
-                response.raise_for_status()
-                # Tests stub a JSON body; real Yandex returns XML. Be permissive.
-                try:
-                    payload = response.json()
-                except ValueError:
-                    # XML path (AC-W1-18): parse the live Yandex Search XML.
-                    return _parse_yandex_xml(response.text, max_results)
+                body = await self._get_capped(client, _YANDEX_API_URL, params=params)
         except httpx.RequestError as exc:
             raise WebSearchError(f"yandex network error: {exc!s}") from exc
         except httpx.HTTPStatusError as exc:
             raise WebSearchError(f"yandex http error: {exc.response.status_code}") from exc
+        # Tests stub a JSON body; real Yandex returns XML. Be permissive.
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            # XML path (AC-W1-18): parse the live Yandex Search XML.
+            return _parse_yandex_xml(body.decode("utf-8", errors="replace"), max_results)
         return _parse_yandex(payload, max_results)
+
+    async def _get_capped(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> bytes:
+        """GET ``url`` and return the body, streaming with a hard size cap.
+
+        Mirrors ``read_url``: the body is read chunk-by-chunk and aborted past
+        ``_MAX_BODY_BYTES`` so an unbounded response (compromised/spoofed/buggy
+        upstream) can't materialise into worker memory. ``raise_for_status``
+        runs before any body read so an error status short-circuits.
+        """
+        async with client.stream("GET", url, headers=headers, params=params) as response:
+            response.raise_for_status()
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in response.aiter_bytes():
+                total += len(chunk)
+                if total > _MAX_BODY_BYTES:
+                    raise WebSearchError(f"search response exceeded {_MAX_BODY_BYTES} bytes cap")
+                chunks.append(chunk)
+            return b"".join(chunks)
 
 
 def _parse_brave(payload: dict[str, Any], max_results: int) -> list[WebSearchResult]:
@@ -280,7 +310,9 @@ def _parse_yandex_xml(xml_text: str, max_results: int) -> list[WebSearchResult]:
 
     Hardened against XXE / entity-expansion (defence-in-depth even though the
     Yandex endpoint is trusted): the parser resolves no entities, loads no DTD
-    and makes no network calls.
+    and makes no network calls. ``recover`` is OFF so a truncated/partial body
+    raises (→ ``[]``) instead of being best-effort recovered into mangled hits
+    (e.g. a half-streamed ``<title>`` surfaced as a real result).
     """
     from lxml import etree
 
@@ -288,7 +320,7 @@ def _parse_yandex_xml(xml_text: str, max_results: int) -> list[WebSearchResult]:
         resolve_entities=False,
         no_network=True,
         load_dtd=False,
-        recover=True,
+        recover=False,
     )
     try:
         # S320 suppressed: the parser above is hardened against the XML attacks
@@ -301,7 +333,12 @@ def _parse_yandex_xml(xml_text: str, max_results: int) -> list[WebSearchResult]:
     if root is None:
         return []
 
-    error_el = root.find(".//error")
+    # Anchor the failure check to the documented top-level position
+    # (``yandexsearch/response/error``) — a descendant ``.//error`` would nuke a
+    # whole valid result set if any nested element happened to be named "error".
+    error_el = root.find("./response/error")
+    if error_el is None and root.tag == "response":
+        error_el = root.find("./error")
     if error_el is not None:
         logger.warning(
             "mcp.tools.web_search.yandex.api_error",

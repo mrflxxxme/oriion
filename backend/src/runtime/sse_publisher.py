@@ -94,7 +94,7 @@ def get_sse_publisher() -> SSEPublisher:
             from src.runtime.redis_sse_publisher import RedisSSEPublisher
 
             _singleton = RedisSSEPublisher(
-                redis_url=settings.redis_url,
+                redis_url=settings.redis_url.get_secret_value(),
                 poll_fallback=settings.sse_redis_poll_fallback,
             )
         else:

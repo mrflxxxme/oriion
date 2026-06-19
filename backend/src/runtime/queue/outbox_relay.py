@@ -130,7 +130,7 @@ async def _run_relay() -> int:
     """Worker-side entry: a fresh NullPool engine + session per run (each
     asyncio.run gets its own loop, so a pooled engine would bind to a dead one)."""
     settings = get_settings()
-    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    engine = create_async_engine(settings.database_url.get_secret_value(), poolclass=NullPool)
     try:
         maker = async_sessionmaker(
             bind=engine, class_=AsyncSession, expire_on_commit=False, autoflush=False

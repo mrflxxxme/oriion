@@ -239,3 +239,72 @@ async def test_env_var_picked_up_when_not_passed(
     tool = WebSearchTool(rate_limiter=limiter)  # no explicit kwargs
     results = await tool.search("anything", agent_id="agent-1")
     assert results == []
+
+
+@pytest.mark.asyncio
+async def test_search_body_size_cap_enforced(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An over-cap response body is aborted (memory-DoS guard) — audit P2."""
+    big = b"<yandexsearch>" + (b"x" * (6 * 1024 * 1024)) + b"</yandexsearch>"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=big, headers={"content-type": "application/xml"})
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    with pytest.raises(WebSearchError, match="exceeded"):
+        await tool.search("q", agent_id="a", max_results=5)
+
+
+@pytest.mark.asyncio
+async def test_yandex_xml_truncated_returns_empty(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """recover=False: a truncated/partial XML body degrades to [] rather than
+    surfacing a half-streamed <title> as a real (mangled) hit — audit P3(b)."""
+    truncated = (
+        b'<?xml version="1.0"?><yandexsearch><response><results><grouping><group>'
+        b"<doc><url>https://example.test/a</url><title>Tru"  # cut mid-title, unclosed
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=truncated, headers={"content-type": "application/xml"})
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    assert await tool.search("q", agent_id="a", max_results=5) == []
+
+
+@pytest.mark.asyncio
+async def test_yandex_xml_nested_error_does_not_nuke_results(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An element merely named <error> nested inside a valid <doc> must NOT
+    discard the whole result set — the failure check is anchored to
+    response/error, not a descendant .//error — audit P3(a)."""
+    xml = (
+        b'<?xml version="1.0"?><yandexsearch><response><results><grouping>'
+        b"<group><doc><url>https://example.test/ok</url><title>Fine</title>"
+        b"<properties><error>0</error></properties></doc></group>"
+        b"</grouping></results></response></yandexsearch>"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=xml, headers={"content-type": "application/xml"})
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    results = await tool.search("q", agent_id="a", max_results=5)
+    assert len(results) == 1
+    assert results[0].url == "https://example.test/ok"
+    assert results[0].title == "Fine"

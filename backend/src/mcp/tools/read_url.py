@@ -11,18 +11,22 @@ Safety controls
 * **5 MB max body size**: streamed download with running counter. Aborts
   + raises ``ReadURLError`` if the server tries to deliver more (large
   binaries, log endpoints, etc.). Protects worker memory.
-* **Basic SSRF guard**: pre-resolves the target host and refuses RFC 1918
-  / loopback / link-local IPs. Mitigates the most common SSRF vector
-  (asking us to fetch ``http://169.254.169.254/`` to exfil cloud creds, or
-  ``http://10.0.0.1/`` to probe internal services).
+* **SSRF guard + DNS-rebinding pin**: the host is resolved **once** to a
+  vetted public IP (RFC 1918 / loopback / link-local / reserved IPs are
+  refused), and the connection is **pinned to that exact IP** — httpx is
+  handed the IP as the connect target while the original hostname is kept
+  for SNI + TLS-cert verification (``sni_hostname``) and the ``Host``
+  header. This closes the TOCTOU window where a malicious resolver could
+  answer a public IP to the guard's lookup, then ``169.254.169.254`` /
+  ``127.0.0.1`` to httpx's own re-resolution at connect time. Reachable
+  now that the Researcher LLM can pick URLs from web-search content.
 * **5s timeout**: total request budget — connect + read combined.
 
-The SSRF guard runs **on every redirect target** too — we set
-``follow_redirects=True`` on httpx but enforce a custom event hook so a
-303 → ``http://127.0.0.1/`` is caught.
+Redirects are followed **manually** (``follow_redirects=False``) so every
+hop is re-resolved, re-validated and re-pinned — a 303 → an internal host
+is caught, and the redirect chain is capped.
 
-Wave 1+ hardening (deferred per phase scope):
-    * DNS-rebinding mitigation (resolve once + pass IP to httpx).
+Wave 1+ hardening (still deferred per phase scope):
     * Robots.txt + content-type allow-list.
     * Per-cell egress allow-list (rbac integration).
 """
@@ -49,6 +53,7 @@ _DEFAULT_LIMIT_PER_MIN: Final = 10
 _DEFAULT_WINDOW_SECONDS: Final = 60
 _DEFAULT_TIMEOUT_SECONDS: Final = 5.0
 _MAX_BODY_BYTES: Final = 5 * 1024 * 1024  # 5 MB
+_MAX_REDIRECTS: Final = 5
 _ALLOWED_SCHEMES: Final = frozenset({"http", "https"})
 
 
@@ -85,9 +90,11 @@ def _is_private_ip(ip: str) -> bool:
 def _hostname_resolves_to_private(host: str) -> bool:
     """DNS-resolve a hostname and check whether any returned IP is private.
 
-    A hostname pointing at ``127.0.0.1`` (DNS rebinding-lite) is rejected.
-    If resolution itself fails we treat that as a hard error in the caller
-    (the upstream request will fail anyway, but we surface a clear msg).
+    Used as the static pre-flight check in :func:`_validate_url` (cheap reject
+    of an obviously-private literal/host). The authoritative anti-rebinding
+    control is :func:`_resolve_vetted_ip`, which resolves once and pins the
+    connection to the vetted IP. A DNS failure here is non-fatal (returns
+    False) — the pin resolve surfaces the hard error.
     """
     # If the host *is* an IP literal, check directly without DNS.
     try:
@@ -99,22 +106,16 @@ def _hostname_resolves_to_private(host: str) -> bool:
     try:
         infos = socket.getaddrinfo(host, None)
     except OSError:
-        # DNS failure — let the httpx call surface the real error; not our
-        # responsibility to fail-closed here (rate-limit accounting already
-        # done by the caller).
         return False
     for info in infos:
-        sockaddr = info[4]
-        ip_raw = sockaddr[0]
-        # IPv6 sockaddr has 4 elements; IPv4 has 2. First is always the string IP.
-        ip = str(ip_raw)
+        ip = str(info[4][0])
         if _is_private_ip(ip):
             return True
     return False
 
 
 def _validate_url(url: str) -> None:
-    """Raises ReadURLError if URL fails scheme allow-list or SSRF guard."""
+    """Raises ReadURLError if URL fails scheme allow-list or SSRF pre-check."""
     parsed = urlparse(url)
     if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
         raise ReadURLError(f"unsupported scheme {parsed.scheme!r}: only http/https allowed")
@@ -122,6 +123,47 @@ def _validate_url(url: str) -> None:
         raise ReadURLError("URL must include a hostname")
     if _hostname_resolves_to_private(parsed.hostname):
         raise ReadURLError(f"refusing to fetch private/loopback address: {parsed.hostname}")
+
+
+def _resolve_vetted_ip(host: str) -> str:
+    """Resolve ``host`` to a single public IP and return it, or raise ReadURLError.
+
+    Anti-rebinding pin: the caller connects to *this exact IP* rather than
+    re-resolving the hostname, so a resolver that flips its answer to a private
+    IP between the check and httpx's connect cannot bypass the guard. Rejects if
+    **any** resolved address is private (defeats round-robin / multi-A rebinding)
+    and raises on an unresolvable host (fail-closed — unlike the soft pre-check).
+    """
+    # IP literal: classify directly, no DNS.
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        if _is_private_ip(host):
+            raise ReadURLError(f"refusing to fetch private/loopback address: {host}")
+        return host
+
+    try:
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ReadURLError(f"DNS resolution failed for {host}") from exc
+    ips = [str(info[4][0]) for info in infos]
+    if not ips:
+        raise ReadURLError(f"no addresses resolved for {host}")
+    for ip in ips:
+        if _is_private_ip(ip):
+            raise ReadURLError(f"refusing to fetch private/loopback address: {host} -> {ip}")
+    return ips[0]
+
+
+def _host_header(url: httpx.URL) -> str:
+    """The ``Host`` header authority (host[:port], IPv6 bracketed) — without
+    userinfo, and using the original hostname (not the pinned IP)."""
+    host = url.host
+    if ":" in host:  # IPv6 literal
+        host = f"[{host}]"
+    return host if url.port is None else f"{host}:{url.port}"
 
 
 def _extract_with_readability(html: str) -> tuple[str, str]:
@@ -182,38 +224,79 @@ class ReadURLTool:
                 detail=f"read_url limit {self._limit_per_min}/min exceeded",
             )
 
-        # Pre-flight URL validation -----------------------------------------
+        # Static pre-flight (scheme + hostname + obvious-private literal) -----
         _validate_url(url)
 
-        # Fetch + size-cap streaming -----------------------------------------
-        timeout = httpx.Timeout(self._timeout_seconds)
-        try:
-            async with (
-                httpx.AsyncClient(
-                    timeout=timeout,
-                    follow_redirects=True,
-                    event_hooks={"response": [self._guard_redirect]},
-                ) as client,
-                client.stream("GET", url) as response,
-            ):
-                response.raise_for_status()
-                chunks: list[bytes] = []
-                total = 0
-                async for chunk in response.aiter_bytes():
-                    total += len(chunk)
-                    if total > self._max_body_bytes:
-                        raise ReadURLError(f"response exceeded {self._max_body_bytes} bytes cap")
-                    chunks.append(chunk)
-                body = b"".join(chunks)
-                encoding = response.encoding or "utf-8"
-                final_url = str(response.url)
-        except httpx.RequestError as exc:
-            raise ReadURLError(f"network error: {exc!s}") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ReadURLError(
-                f"http error: {exc.response.status_code} {exc.response.reason_phrase}"
-            ) from exc
+        # Fetch with per-hop resolve-validate-pin ----------------------------
+        return await self._fetch_pinned(url, agent_id)
 
+    async def _fetch_pinned(self, url: str, agent_id: str) -> ReadURLResult:
+        """Follow redirects manually; each hop is resolved to a vetted IP and
+        the connection is pinned to it (Host + SNI keep the original hostname)."""
+        timeout = httpx.Timeout(self._timeout_seconds)
+        logical_url = httpx.URL(url)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            for hop in range(_MAX_REDIRECTS + 1):
+                if logical_url.scheme.lower() not in _ALLOWED_SCHEMES:
+                    raise ReadURLError(
+                        f"unsupported scheme {logical_url.scheme!r}: only http/https allowed"
+                    )
+                host = logical_url.host
+                if not host:
+                    raise ReadURLError("URL must include a hostname")
+
+                vetted_ip = _resolve_vetted_ip(host)
+                connect_url = logical_url.copy_with(host=vetted_ip)
+                request = client.build_request(
+                    "GET",
+                    connect_url,
+                    headers={"Host": _host_header(logical_url)},
+                    # Pin TLS SNI + cert verification to the real hostname even
+                    # though we connect to the literal IP (httpcore reads this).
+                    extensions={"sni_hostname": host},
+                )
+                try:
+                    response = await client.send(request, stream=True)
+                except httpx.RequestError as exc:
+                    raise ReadURLError(f"network error: {exc!s}") from exc
+
+                try:
+                    if response.is_redirect:
+                        if hop >= _MAX_REDIRECTS:
+                            raise ReadURLError(f"too many redirects (>{_MAX_REDIRECTS})")
+                        location = response.headers.get("location")
+                        if not location:
+                            raise ReadURLError("redirect response missing Location header")
+                        logical_url = logical_url.join(location)
+                        continue
+                    response.raise_for_status()
+                    body, total = await self._read_capped(response)
+                    encoding = response.encoding or "utf-8"
+                except httpx.HTTPStatusError as exc:
+                    raise ReadURLError(
+                        f"http error: {exc.response.status_code} {exc.response.reason_phrase}"
+                    ) from exc
+                finally:
+                    await response.aclose()
+
+                return self._build_result(body, encoding, str(logical_url), agent_id, total)
+
+        raise ReadURLError(f"too many redirects (>{_MAX_REDIRECTS})")  # pragma: no cover
+
+    async def _read_capped(self, response: httpx.Response) -> tuple[bytes, int]:
+        """Stream the body, aborting past the size cap."""
+        chunks: list[bytes] = []
+        total = 0
+        async for chunk in response.aiter_bytes():
+            total += len(chunk)
+            if total > self._max_body_bytes:
+                raise ReadURLError(f"response exceeded {self._max_body_bytes} bytes cap")
+            chunks.append(chunk)
+        return b"".join(chunks), total
+
+    def _build_result(
+        self, body: bytes, encoding: str, final_url: str, agent_id: str, total: int
+    ) -> ReadURLResult:
         try:
             html_text = body.decode(encoding, errors="replace")
         except (LookupError, UnicodeDecodeError):
@@ -239,16 +322,3 @@ class ReadURLTool:
             text_len=len(text_content),
         )
         return result
-
-    async def _guard_redirect(self, response: httpx.Response) -> None:
-        """httpx event hook: re-validate redirect targets against SSRF guard.
-
-        httpx fires this hook for every response in the redirect chain.
-        We only need to act on 3xx — final 2xx already passed pre-flight
-        validation. Raise ReadURLError to abort the chain.
-        """
-        if response.is_redirect:
-            location = response.headers.get("location")
-            if location:
-                target = httpx.URL(response.url).join(location)
-                _validate_url(str(target))

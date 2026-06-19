@@ -113,13 +113,20 @@ class Settings(BaseSettings):
     )
 
     # ── Storage ──────────────────────────────────────────────────────────
-    database_url: str = Field(
-        default=_DEV_DATABASE_URL,
-        description="Async DSN consumed by SQLAlchemy AsyncEngine + alembic env.py.",
+    database_url: SecretStr = Field(
+        default=SecretStr(_DEV_DATABASE_URL),
+        description=(
+            "Async DSN consumed by SQLAlchemy AsyncEngine + alembic env.py. SecretStr "
+            "so the embedded password can't leak via repr/logs; call .get_secret_value() "
+            "only at the engine call site."
+        ),
     )
-    redis_url: str = Field(
-        default="redis://localhost:6379/0",
-        description="Redis DSN. Used for rate-limit + JWT blacklist + (future) event streams.",
+    redis_url: SecretStr = Field(
+        default=SecretStr("redis://localhost:6379/0"),
+        description=(
+            "Redis DSN (SecretStr — may embed a password). Used for rate-limit + JWT "
+            "blacklist + (future) event streams."
+        ),
     )
     sse_backend: Literal["inprocess", "redis"] = Field(
         default="inprocess",
@@ -374,7 +381,7 @@ class Settings(BaseSettings):
             problems.append("JWT_SECRET_ACCESS_V1 is the dev default")
         if not self.byok_master_key_b64.get_secret_value():
             problems.append("BYOK_MASTER_KEY_B64 is empty")
-        if self.database_url == _DEV_DATABASE_URL:
+        if self.database_url.get_secret_value() == _DEV_DATABASE_URL:
             problems.append("DATABASE_URL is the dev default")
         if problems:
             raise ValueError(

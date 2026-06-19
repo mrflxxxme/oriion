@@ -43,6 +43,7 @@ class _StubSession:
 
     root_task: Any
     execute_queue: list[_StubResult]
+    added: list[Any] = field(default_factory=list)
 
     async def get(self, _model: Any, _id: UUID) -> Any:
         return self.root_task
@@ -57,9 +58,10 @@ class _StubSession:
         return self.execute_queue.pop(0)
 
     # AC-W1-4: cancel_task now also writes a task.cancelled outbox row in the
-    # same TX (TaskRepository.add_outbox_event) — no-op add/flush for the stub.
-    def add(self, _obj: Any) -> None:
-        return None
+    # same TX (TaskRepository.add_outbox_event) — track adds so a test can assert
+    # whether a cancelled event was (not) emitted.
+    def add(self, obj: Any) -> None:
+        self.added.append(obj)
 
     async def flush(self) -> None:
         return None
@@ -130,6 +132,56 @@ async def test_cancel_task_with_no_descendants_returns_empty() -> None:
     service = TaskService(session)  # type: ignore[arg-type]
     descendants = await service.cancel_task(root_id)
     assert descendants == []
+
+
+@pytest.mark.asyncio
+async def test_cancel_task_already_terminal_is_noop() -> None:
+    """A root already in a terminal state is not re-cancelled: returns [] and
+    writes NO duplicate tasks.cancelled outbox event (idempotent re-cancel)."""
+    from src.tasks.models import Task
+    from src.tasks.services.task_service import TaskService
+
+    root_id = uuid4()
+    fake_root = Task(
+        cell_id=uuid4(),
+        initiated_by_user_id=uuid4(),
+        title="done",
+        description="",
+        status="cancelled",  # terminal
+        priority=5,
+    )
+    fake_root.id = root_id
+
+    session = _StubSession(root_task=fake_root, execute_queue=[])
+    service = TaskService(session)  # type: ignore[arg-type]
+
+    descendants = await service.cancel_task(root_id)
+
+    assert descendants == []
+    assert session.added == []  # no outbox event emitted — no real transition
+
+
+@pytest.mark.asyncio
+async def test_descendant_ids_terminates_on_cycle() -> None:
+    """A parent_task_id cycle must not loop forever — the visited-set guard stops
+    once a frontier child points back at an already-seen node."""
+    from src.tasks.services.repository import SqlAlchemyTaskRepository
+
+    root_id = uuid4()
+    b = uuid4()
+    # root -> b -> root (cycle). The second hop returns root, already visited.
+    session = _StubSession(
+        root_task=None,
+        execute_queue=[
+            _StubResult(rows=[(b,)]),  # children of root = b
+            _StubResult(rows=[(root_id,)]),  # children of b = root (visited) -> stop
+        ],
+    )
+    repo = SqlAlchemyTaskRepository(session)  # type: ignore[arg-type]
+
+    result = await repo.descendant_ids(root_id)
+
+    assert result == [b]  # terminates; root not re-traversed
 
 
 @pytest.mark.asyncio

@@ -137,6 +137,7 @@ async def test_read_url_extracts_title_and_main_content(
     # in CI may hit external DNS; force the hostname-resolves check to
     # return False so we exercise the extraction path deterministically.
     monkeypatch.setattr("src.mcp.tools.read_url._hostname_resolves_to_private", lambda h: False)
+    monkeypatch.setattr("src.mcp.tools.read_url._resolve_vetted_ip", lambda h: "93.184.216.34")
 
     result = await tool.fetch("https://example.test/article", agent_id="agent-1")
 
@@ -168,6 +169,7 @@ async def test_read_url_enforces_5mb_cap(
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
     tool = ReadURLTool(rate_limiter=limiter, max_body_bytes=5 * 1024 * 1024)
     monkeypatch.setattr("src.mcp.tools.read_url._hostname_resolves_to_private", lambda h: False)
+    monkeypatch.setattr("src.mcp.tools.read_url._resolve_vetted_ip", lambda h: "93.184.216.34")
     with pytest.raises(ReadURLError, match="exceeded"):
         await tool.fetch("https://example.test/huge", agent_id="agent-1")
 
@@ -210,6 +212,7 @@ async def test_read_url_network_error_wraps_into_read_url_error(
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
     tool = ReadURLTool(rate_limiter=limiter)
     monkeypatch.setattr("src.mcp.tools.read_url._hostname_resolves_to_private", lambda h: False)
+    monkeypatch.setattr("src.mcp.tools.read_url._resolve_vetted_ip", lambda h: "93.184.216.34")
     with pytest.raises(ReadURLError, match="network error"):
         await tool.fetch("https://example.test/", agent_id="agent-1")
 
