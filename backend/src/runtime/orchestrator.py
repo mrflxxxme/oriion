@@ -346,14 +346,13 @@ async def execute_agent_task(
     if task is not None:
         task.status = "succeeded"
         task.completed_at = completed_at
+        # AC-W1-2: task totals roll up from the per-delegation steps. Each leaf
+        # result carries the real cost + token split (the leaf runner persisted a
+        # matching task_steps row), so task.total_* == sum(steps). Cost is summed
+        # from the steps, never from the lineage child Tasks, so there is no
+        # double count.
         task.total_cost_credits = ctx.accumulated_cost
-        # F-CR-M1 audit fix: per-leaf result already encodes tokens_used as
-        # a single total; honest accounting is to sum them on output_tokens
-        # (matches provider-side convention where the completion is the
-        # downstream-billable side) and leave input_tokens as zero at
-        # Wave-0 granularity. Per-step persistence with proper split lands
-        # Wave-1 alongside the Pydantic-AI per-step instrumentation hook.
-        task.total_input_tokens = 0
+        task.total_input_tokens = sum(r.input_tokens for r in ctx.leaf_outputs)
         task.total_output_tokens = sum(r.tokens_used for r in ctx.leaf_outputs)
     refund_unused(ctx.accumulated_cost, reserved)
     _record_terminal_task_metrics(

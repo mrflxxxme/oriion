@@ -88,7 +88,10 @@ class LLMGatewayModel(Model):
         self._router = llm_router
         self._workspace_id = workspace_id or UUID("00000000-0000-0000-0000-000000000000")
         self._model_hint = model_hint
+        # Last provider/model actually selected by the failover chain — read by
+        # the leaf runner to bill the call via record_llm_cost (AC-W1-13).
         self._last_model_name: str | None = None
+        self._last_provider_slug: str | None = None
 
     # ── abstract Model interface ─────────────────────────────────────────
 
@@ -144,6 +147,7 @@ class LLMGatewayModel(Model):
             tools=tools,
         )
         self._last_model_name = target_model
+        self._last_provider_slug = provider_slug
 
         parts: list[ModelResponsePart] = []
         if resp.content:
