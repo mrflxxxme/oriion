@@ -139,7 +139,7 @@ async def _run_dispatch(task_id: UUID, user_id: UUID) -> None:
         await engine.dispose()
 
 
-@dramatiq.actor(max_retries=3, time_limit=300_000, queue_name="dispatch")
+@dramatiq.actor(max_retries=3, time_limit=900_000, queue_name="dispatch")
 def dispatch_task_actor(task_id: str, user_id: str) -> None:
     """Sync Dramatiq actor wrapping the async dispatch. Runs in a worker thread;
     asyncio.run gives it a fresh loop per message."""
