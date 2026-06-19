@@ -13,8 +13,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/.planning/contracts/role-prompts"
 DST="$ROOT/backend/role_prompts"
 
+# Mirror canonical EXACTLY, including the masters/ subdir (AC-W1-3). Wipe then
+# recursive-copy so a removed/renamed prompt never lingers in the packaged copy
+# and the CI `diff -rq` (recursive) matches.
+rm -rf "$DST"
 mkdir -p "$DST"
-# Mirror canonical exactly: drop stale .md first, then copy.
-rm -f "$DST"/*.md
-cp "$SRC"/*.md "$DST"/
-echo "Synced $(ls "$SRC"/*.md | wc -l | tr -d ' ') role-prompts -> backend/role_prompts/"
+cp -R "$SRC"/. "$DST"/
+echo "Synced $(find "$SRC" -name '*.md' | wc -l | tr -d ' ') role-prompts -> backend/role_prompts/"
