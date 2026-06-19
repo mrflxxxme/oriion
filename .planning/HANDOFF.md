@@ -41,7 +41,8 @@ Founder-process: bootstrap-from-worktree + dual-tree guard → `/grill-me` (8 fo
 
 ## Verification state
 
-- **CI-equivalent, all green (local):** `ruff check src tests` + `ruff format --check src tests` ✓ · `mypy --strict src` **163 files** ✓ · unit `pytest -m "not integration and not live"` **736 passed, 1 skipped** (cov **90.4%**) · per-module gates **agents 98% / runtime 87% / tasks 99% / billing 100%** (≥85) · integration `pytest -m "integration and not live"` **29 passed** (real testcontainers PG; +1 new Master-billing test) · `bandit -r src` **0 issues** · role-prompts drift `diff -rq` **DRIFT-OK** · tools-allowlist **OK**.
+- **CI-equivalent, all green (local, post-audit-remediation):** `ruff check src tests` + `ruff format --check src tests` ✓ · `mypy --strict src` **163 files** ✓ · unit `pytest -m "not integration and not live"` **739 passed, 1 skipped** (cov **90.45%**) · per-module gates **agents 98% / runtime 87% / tasks 99% / billing 100%** (≥85) · integration `pytest -m "integration and not live"` **29 passed** (real testcontainers PG; +1 new Master-billing test) · `bandit -r src` **0 issues** · role-prompts drift `diff -rq` **DRIFT-OK** · tools-allowlist **OK**.
+- **Adversarial audit (Workflow, 17 agents, 5 lenses + goal-backward):** 0 P0 / 0 P1 / 5 P2 / 3 P3 — all addressed in `c157f50` (token rollup, Master pre-call budget gate, budget-metric label, dropped stale-zero field, AC-3.2 test + AC-3.6 wording). No correctness/security/regression defects.
 - **8 AC-W1-3.x green** — see [`phases/01.2-master-agent-core.md`](./roadmap/wave-1-core-mvp/phases/01.2-master-agent-core.md).
 - **Live-валидация — НЕ выполнена** (founder-action, нужен funded DeepSeek + dev stack) — see Next actions.
 - The PR's GitHub Actions (ci-backend / ci-frontend / ci-security) is the binding gate at founder-merge.
