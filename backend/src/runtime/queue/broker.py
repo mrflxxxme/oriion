@@ -40,10 +40,24 @@ def _build_broker(settings: Settings) -> dramatiq.Broker:
     return RedisBroker(url=settings.redis_url.get_secret_value())  # type: ignore[no-untyped-call]
 
 
+def _drop_prometheus_middleware(broker: dramatiq.Broker) -> None:
+    """Remove Dramatiq's built-in Prometheus middleware.
+
+    AC-W1-13 metrics (the 9 global-registry families the orchestrator + router
+    increment) are exposed by ``worker.start_worker_metrics_exporter`` on
+    ``WORKER_METRICS_PORT``. Dramatiq's own Prometheus middleware ALSO starts an
+    exposition server on the same default port at worker boot, so leaving both
+    binds the port twice → ``OSError: [Errno 98] Address already in use`` crashes
+    Dramatiq's exposition fork on every boot (only its own internal metrics are
+    lost; the orchestration metrics stay on the custom exporter)."""
+    broker.middleware = [m for m in broker.middleware if type(m).__name__ != "Prometheus"]
+
+
 def configure_broker(settings: Settings) -> dramatiq.Broker:
     """Build + install the broker for the current process. Called at import below
     and again (explicitly) by the worker entrypoint."""
     broker = _build_broker(settings)
+    _drop_prometheus_middleware(broker)
     dramatiq.set_broker(broker)
     return broker
 
