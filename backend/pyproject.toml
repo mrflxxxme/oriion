@@ -53,6 +53,8 @@ dependencies = [
     "opentelemetry-instrumentation-asyncpg>=0.60b0",
     "prometheus-client>=0.21,<0.22",
     "gunicorn>=26.0.0",
+    # AC-W1-14 — audit_log cold-storage archival to RU Object Storage (S3-compatible).
+    "boto3>=1.35,<2.0",
 ]
 
 [dependency-groups]

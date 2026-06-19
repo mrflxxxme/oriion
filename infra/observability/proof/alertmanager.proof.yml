@@ -1,0 +1,37 @@
+# AC-W1-15 routing proof config — mirrors the real route tree in
+# ../alertmanager.yml (default receiver + a severity=critical route) but swaps
+# the Telegram/PagerDuty receivers for webhook deliveries to the echo `sink`,
+# each on a distinct path so the sink log proves WHICH receiver fired. The real
+# config's Telegram/PagerDuty validity is proven separately by `amtool
+# check-config`; this proves the fire -> route -> deliver pipeline live.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "severity", "service"]
+  group_wait: 1s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: telegram-default
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: pager-and-telegram
+
+receivers:
+  - name: telegram-default
+    webhook_configs:
+      - url: http://sink:8080/telegram-default
+        send_resolved: true
+  - name: pager-and-telegram
+    webhook_configs:
+      - url: http://sink:8080/pager-and-telegram
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ["alertname", "service"]

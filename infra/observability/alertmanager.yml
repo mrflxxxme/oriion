@@ -1,27 +1,62 @@
-# Alertmanager config — Phase 00.6 Stage A.
+# Alertmanager config — AC-W1-15: real Telegram + PagerDuty receivers.
 #
-# Wave-0 SHIP: log-only receiver (alerts surfaced в alertmanager UI +
-# Prometheus alerts panel). Telegram + PagerDuty webhooks = Wave-1
-# hardening pin (AC-W1-x).
+# The Wave-0 log-only mock receiver is retired. Routing:
+#   * severity=critical (e.g. R-04 cost runaway) -> PagerDuty page + Telegram.
+#   * everything else (warnings, info)            -> Telegram only.
+#
+# Secrets are injected from the environment — Alertmanager is started with
+# `--config.expand-env=true` so each ${VAR} below is substituted at boot:
+#   TELEGRAM_BOT_TOKEN     BotFather token for the on-call bot
+#   TELEGRAM_CHAT_ID       numeric chat/channel id (int64 — must NOT be quoted)
+#   PAGERDUTY_ROUTING_KEY  PagerDuty Events API v2 integration (routing) key
+# On staging these come from YC Lockbox (no on-disk secret — AC-W1-9). The local
+# routing proof (infra/observability/proof/) swaps the receivers for a webhook
+# sink so the fire->route->deliver pipeline is verified without real tokens; the
+# real-endpoint hop is the founder's deploy-time token swap.
 
 global:
   resolve_timeout: 5m
+  pagerduty_url: https://events.pagerduty.com/v2/enqueue
 
 route:
   group_by: ["alertname", "severity", "service"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
-  receiver: log-only-receiver
+  receiver: telegram-default
+  routes:
+    # Critical alerts page on-call AND post to Telegram.
+    - matchers:
+        - severity = critical
+      receiver: pager-and-telegram
 
 receivers:
-  - name: log-only-receiver
-    # Wave-0 mock-receiver. Webhook к /dev/null. Founder reads alerts
-    # via alertmanager UI (http://localhost:9093 — gated by Caddy basic-
-    # auth or local-override port-publish per C8).
-    webhook_configs:
-      - url: http://otel-collector:4318/v1/logs
+  - name: telegram-default
+    telegram_configs:
+      - bot_token: ${TELEGRAM_BOT_TOKEN}
+        chat_id: ${TELEGRAM_CHAT_ID}
+        parse_mode: HTML
         send_resolved: true
+        message: |
+          <b>{{ .Status | toUpper }}</b> · {{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})
+          {{ range .Alerts }}{{ .Annotations.summary }}
+          {{ end }}
+
+  - name: pager-and-telegram
+    pagerduty_configs:
+      - routing_key: ${PAGERDUTY_ROUTING_KEY}
+        severity: critical
+        description: "{{ .CommonLabels.alertname }} — {{ .CommonLabels.service }}"
+        send_resolved: true
+    telegram_configs:
+      - bot_token: ${TELEGRAM_BOT_TOKEN}
+        chat_id: ${TELEGRAM_CHAT_ID}
+        parse_mode: HTML
+        send_resolved: true
+        message: |
+          🔴 <b>CRITICAL · {{ .CommonLabels.alertname }}</b>
+          {{ range .Alerts }}{{ .Annotations.summary }}
+          {{ end }}
 
 inhibit_rules:
   - source_matchers:
