@@ -86,6 +86,9 @@ class DelegateResult(BaseModel):
     output: str
     cost_credits: Decimal = Decimal(0)
     tokens_used: int = 0
+    # Per-delegation input-token count (output is ``tokens_used``). Kept so the
+    # orchestrator can roll task.total_input_tokens up from the steps (AC-W1-2).
+    input_tokens: int = 0
 
 
 # ── runner protocol + the single deps container ─────────────────────────

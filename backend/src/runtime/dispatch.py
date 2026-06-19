@@ -38,8 +38,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
+
+from sqlalchemy import select
 
 from src.agents.analyst import AnalystDeps, build_analyst_agent
 from src.agents.coordinator import (
@@ -49,6 +52,7 @@ from src.agents.coordinator import (
     DelegationStep,
     build_coordinator_agent,
 )
+from src.agents.models import AgentArchetype
 from src.agents.researcher import ResearcherDeps, build_researcher_agent
 from src.agents.tools.delegate import (
     DelegateInput,
@@ -57,8 +61,10 @@ from src.agents.tools.delegate import (
 )
 from src.agents.writer import WriterDeps, build_writer_agent
 from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
+from src.llm_gateway.services.billing_service import record_llm_cost
 from src.mcp.tools.read_url import ReadURLTool
 from src.mcp.tools.web_search import WebSearchTool
+from src.multitenancy.models import Cell
 from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
 from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
@@ -69,7 +75,7 @@ from src.runtime.web_search_runner import (
     build_native_web_search,
     fetch_research_context,
 )
-from src.tasks.models import Task
+from src.tasks.models import Task, TaskStep
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,6 +119,114 @@ def estimate_credits(*, input_tokens: int, output_tokens: int) -> Decimal:
         Decimal(input_tokens) * CREDIT_PER_INPUT_TOKEN
         + Decimal(output_tokens) * CREDIT_PER_OUTPUT_TOKEN
     )
+
+
+# ── per-delegation billing + step persistence (AC-W1-2 / AC-W1-13) ─────────
+
+
+@dataclass(frozen=True)
+class StepBilling:
+    """Everything the step recorder needs to bill + persist one delegation."""
+
+    parent_task_id: UUID
+    cell_id: UUID
+    user_id: UUID
+    step_index: int
+    target_agent_slug: str
+    provider_slug: str
+    model_name: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: int
+
+
+# A recorder bills one delegation and returns its cost in credits. Injectable so
+# unit tests substitute a fake (the production default writes real ledger + step
+# rows, which need a real PG session).
+StepRecorder = Callable[["AsyncSession", StepBilling], Awaitable[Decimal]]
+
+
+async def _resolve_workspace_id(session: AsyncSession, cell_id: UUID) -> UUID:
+    cell = await session.get(Cell, cell_id)
+    if cell is None:
+        raise LookupError(f"cell {cell_id} not found — cannot resolve workspace for billing")
+    return cell.workspace_id
+
+
+async def _resolve_archetype_id(session: AsyncSession, slug: str) -> UUID:
+    """Resolve the active ``agent_archetypes`` row for a leaf slug.
+
+    ``task_steps.agent_archetype_id`` is a NOT-NULL FK, so a delegation step can
+    only be persisted once the archetype catalog is seeded (it is, by
+    ``agents.seed_data.productivity_core_v1``). Wave-1 picks the active row for
+    the slug; multi-vertical disambiguation lands with the Master-Agent (AC-W1-3).
+    """
+    stmt = (
+        select(AgentArchetype.id)
+        .where(AgentArchetype.slug == slug, AgentArchetype.is_active.is_(True))
+        .order_by(AgentArchetype.created_at.desc())
+        .limit(1)
+    )
+    archetype_id = (await session.execute(stmt)).scalars().first()
+    if archetype_id is None:
+        raise LookupError(f"no active agent_archetype for slug={slug!r}")
+    return archetype_id
+
+
+async def record_delegation_step(session: AsyncSession, billing: StepBilling) -> Decimal:
+    """Production step recorder (AC-W1-2 + AC-W1-13).
+
+    1. Bill the call through the REAL ledger: ``record_llm_cost`` writes
+       ``llm_usage_log`` + ``credit_transactions`` priced by the V4
+       ``pricing_service`` (replaces the Wave-0 ``estimate_credits``). 1 credit =
+       1 RUB, which equals the demo's 0.01-USD credit at the default FX=100, so
+       the AC10 cost number is unchanged while becoming real per-provider.
+    2. Persist a ``task_steps`` row on the PARENT task with the token split + the
+       real cost. The orchestrator sums step costs into ``task.total_cost_credits``
+       (never via the children, so there is no double count with the lineage
+       child Task), giving ``task.total_* == sum(steps)``.
+
+    Returns the step cost in credits (== ``cost_rub``).
+    """
+    workspace_id = await _resolve_workspace_id(session, billing.cell_id)
+    request_id = uuid4().hex
+    _cost_usd, cost_rub = await record_llm_cost(
+        session,
+        workspace_id=workspace_id,
+        cell_id=billing.cell_id,
+        user_id=billing.user_id,
+        task_id=billing.parent_task_id,
+        provider=billing.provider_slug,
+        model=billing.model_name,
+        tokens_in=billing.input_tokens,
+        tokens_out=billing.output_tokens,
+        latency_ms=billing.latency_ms,
+        status="success",
+        request_id=request_id,
+    )
+    archetype_id = await _resolve_archetype_id(session, billing.target_agent_slug)
+    now = datetime.now(UTC)
+    step = TaskStep(
+        task_id=billing.parent_task_id,
+        step_index=billing.step_index,
+        agent_archetype_id=archetype_id,
+        step_type="delegation",
+        input_jsonb={"target_agent_slug": billing.target_agent_slug},
+        output_jsonb={
+            "input_tokens": billing.input_tokens,
+            "output_tokens": billing.output_tokens,
+            "provider": billing.provider_slug,
+            "model": billing.model_name,
+            "request_id": request_id,
+        },
+        status="succeeded",
+        cost_credits=cost_rub,
+    )
+    step.started_at = now
+    step.completed_at = now
+    session.add(step)
+    await session.flush()
+    return cost_rub
 
 
 def _extract_output_text(run_result: Any) -> str:
@@ -161,6 +275,7 @@ def build_leaf_runner(
     native_web_search: Callable[[str], Awaitable[str]] | None = None,
     native_read_url: Callable[[str], Awaitable[str]] | None = None,
     user_prompt: str = "",
+    step_recorder: StepRecorder | None = None,
 ) -> Callable[[DelegateInput, OrchestratorContext], Awaitable[DelegateResult]]:
     """Build the production leaf-dispatch callable.
 
@@ -172,12 +287,18 @@ def build_leaf_runner(
            sub-prompt (scripted failover path).
         2. Builds the target specialist Agent (real ``LLMGatewayModel``).
         3. Runs it against the (possibly research-augmented) sub_prompt.
-        4. Persists a child ``Task`` row (status='succeeded').
-        5. Returns a ``DelegateResult`` with estimated cost + token usage.
+        4. Bills the call + persists a ``task_steps`` row on the parent via
+           ``step_recorder`` (AC-W1-2 / AC-W1-13) — defaults to the real-ledger
+           ``record_delegation_step``; unit tests inject a no-DB fake.
+        5. Persists a child ``Task`` row (status='succeeded') for lineage.
+        6. Returns a ``DelegateResult`` with the real cost + token split.
     """
     specs = leaf_specs or _DEFAULT_LEAF_SPECS
+    recorder = step_recorder or record_delegation_step
+    step_index = 0
 
     async def _run_leaf(inp: DelegateInput, _ctx: OrchestratorContext) -> DelegateResult:
+        nonlocal step_index
         spec = specs.get(inp.target_agent_slug)
         if spec is None:
             raise KeyError(
@@ -209,13 +330,33 @@ def build_leaf_runner(
                     sub_prompt = f"{context}\n\n{inp.sub_prompt}"
 
         agent = spec.build(**build_kwargs)
+        call_start = perf_counter()
         run_result = await agent.run(sub_prompt, deps=spec.deps_factory())
+        latency_ms = int((perf_counter() - call_start) * 1000)
 
         # Fence-stripping only: prior_context chaining must keep the role-
         # contract meta (frontmatter, structured summary) for downstream agents.
         output_text = strip_wrapping_fence(_extract_output_text(run_result))
         input_tokens, output_tokens = _extract_usage(run_result)
-        cost = estimate_credits(input_tokens=input_tokens, output_tokens=output_tokens)
+
+        # AC-W1-13: bill via the real ledger + persist a task_steps row. Provider/
+        # model come from the model adapter's last failover selection.
+        step_index += 1
+        cost = await recorder(
+            session,
+            StepBilling(
+                parent_task_id=parent_task_id,
+                cell_id=cell_id,
+                user_id=user_id,
+                step_index=step_index,
+                target_agent_slug=inp.target_agent_slug,
+                provider_slug=getattr(model, "_last_provider_slug", None) or "",
+                model_name=getattr(model, "_last_model_name", None) or "",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                latency_ms=latency_ms,
+            ),
+        )
 
         now = datetime.now(UTC)
         child = Task(
@@ -241,6 +382,7 @@ def build_leaf_runner(
             output=output_text,
             cost_credits=cost,
             tokens_used=output_tokens,
+            input_tokens=input_tokens,
         )
 
     return _run_leaf
@@ -411,6 +553,7 @@ async def dispatch_task(
     coordinator: PlanExecutingCoordinator | None = None,
     web_search_tool: WebSearchTool | None = None,
     tool_rate_limiter: ToolRateLimiter | None = None,
+    step_recorder: StepRecorder | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
@@ -456,6 +599,7 @@ async def dispatch_task(
         native_web_search=native_web_search,
         native_read_url=native_read_url,
         user_prompt=user_prompt,
+        step_recorder=step_recorder,
     )
 
     return await execute_agent_task(
@@ -476,11 +620,14 @@ __all__ = [
     "CREDIT_PER_OUTPUT_TOKEN",
     "WEB_SEARCH_MAX_RESULTS",
     "PlanExecutingCoordinator",
+    "StepBilling",
+    "StepRecorder",
     "build_leaf_runner",
     "build_native_web_search",
     "dispatch_task",
     "estimate_credits",
     "fetch_research_context",
     "normalize_artifact_markdown",
+    "record_delegation_step",
     "strip_wrapping_fence",
 ]

@@ -28,17 +28,33 @@ from src.runtime.dispatch import (
     CREDIT_PER_INPUT_TOKEN,
     CREDIT_PER_OUTPUT_TOKEN,
     PlanExecutingCoordinator,
+    StepBilling,
     _extract_output_text,
     _extract_usage,
     _LeafSpec,
+    _resolve_archetype_id,
+    _resolve_workspace_id,
     build_leaf_runner,
     dispatch_task,
     estimate_credits,
     fetch_research_context,
     normalize_artifact_markdown,
+    record_delegation_step,
     strip_wrapping_fence,
 )
-from src.tasks.models import Task
+from src.tasks.models import Task, TaskStep
+
+
+async def _estimate_recorder(_session: Any, billing: Any) -> Decimal:
+    """Unit-test step recorder: returns the Wave-0 estimate and writes NO rows.
+
+    The production ``record_delegation_step`` bills via ``record_llm_cost`` +
+    persists a ``task_steps`` row, both of which need a real PG session — that
+    path is covered by ``tests/tasks/test_task_steps_billing_integration.py``.
+    Injecting this fake keeps the leaf-runner unit tests on the ``_FakeSession``.
+    """
+    return estimate_credits(input_tokens=billing.input_tokens, output_tokens=billing.output_tokens)
+
 
 # ── estimate_credits ──────────────────────────────────────────────────────
 
@@ -302,6 +318,7 @@ async def test_build_leaf_runner_creates_child_task_and_costs() -> None:
         cell_id=cell_id,
         user_id=user_id,
         leaf_specs=specs,
+        step_recorder=_estimate_recorder,
     )
 
     result = await runner(
@@ -388,6 +405,7 @@ async def test_build_leaf_runner_prepends_research_context_for_researcher() -> N
         leaf_specs=specs,
         web_search_tool=tool,  # type: ignore[arg-type]
         user_prompt="рынок AI команд РФ",
+        step_recorder=_estimate_recorder,
     )
     await runner(DelegateInput(target_agent_slug="researcher", sub_prompt="собери матрицу"), None)  # type: ignore[arg-type]
 
@@ -428,6 +446,7 @@ async def test_build_leaf_runner_native_tool_path_skips_prefetch() -> None:
         web_search_tool=scripted_tool,  # type: ignore[arg-type]  # present but must be ignored
         native_web_search=_native_web_search,
         user_prompt="рынок AI команд РФ",
+        step_recorder=_estimate_recorder,
     )
     await runner(DelegateInput(target_agent_slug="researcher", sub_prompt="собери матрицу"), None)  # type: ignore[arg-type]
 
@@ -491,6 +510,7 @@ async def test_build_leaf_runner_no_search_tool_uses_plain_subprompt() -> None:
         leaf_specs=specs,
         web_search_tool=None,  # no live search → plain sub-prompt
         user_prompt="рынок",
+        step_recorder=_estimate_recorder,
     )
     await runner(DelegateInput(target_agent_slug="researcher", sub_prompt="собери матрицу"), None)  # type: ignore[arg-type]
     assert fake_agent.run_prompts[0] == "собери матрицу"
@@ -733,3 +753,119 @@ async def test_dispatch_task_runs_orchestrator_and_returns_output() -> None:
     assert task.status == "succeeded"
     drained = publisher._drain.get(task_id, [])
     assert [ev.event_type for ev in drained] == ["task.started", "task.completed"]
+
+
+# ── record_delegation_step + resolvers (AC-W1-2 / AC-W1-13, no DB) ─────────
+
+
+class _Scalars:
+    def __init__(self, value: Any) -> None:
+        self._value = value
+
+    def first(self) -> Any:
+        return self._value
+
+
+class _ResultStub:
+    def __init__(self, value: Any) -> None:
+        self._value = value
+
+    def scalars(self) -> _Scalars:
+        return _Scalars(self._value)
+
+
+@dataclass
+class _CellStub:
+    workspace_id: UUID
+
+
+class _RecorderSession:
+    """Minimal session for record_delegation_step: get(Cell) + the archetype
+    SELECT + add/flush. ``record_llm_cost`` is monkeypatched, so no ledger SQL
+    runs — the real-PG ledger path is covered by the integration test."""
+
+    def __init__(self, *, cell: Any, archetype_id: Any) -> None:
+        self._cell = cell
+        self._archetype_id = archetype_id
+        self.added: list[Any] = []
+
+    async def get(self, _model: Any, _pk: Any) -> Any:
+        return self._cell
+
+    async def execute(self, _stmt: Any) -> _ResultStub:
+        return _ResultStub(self._archetype_id)
+
+    def add(self, obj: Any) -> None:
+        self.added.append(obj)
+
+    async def flush(self) -> None:
+        for obj in self.added:
+            if getattr(obj, "id", None) is None:
+                obj.id = uuid4()
+
+
+def _billing(step_index: int = 1) -> StepBilling:
+    return StepBilling(
+        parent_task_id=uuid4(),
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        step_index=step_index,
+        target_agent_slug="researcher",
+        provider_slug="deepseek",
+        model_name="deepseek-chat",
+        input_tokens=1000,
+        output_tokens=2000,
+        latency_ms=42,
+    )
+
+
+@pytest.mark.asyncio
+async def test_record_delegation_step_bills_and_persists_step(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace_id, archetype_id = uuid4(), uuid4()
+    captured: dict[str, Any] = {}
+
+    async def _fake_record_llm_cost(_session: Any, **kwargs: Any) -> tuple[Decimal, Decimal]:
+        captured.update(kwargs)
+        return Decimal("0.00247"), Decimal("0.2470")
+
+    monkeypatch.setattr("src.runtime.dispatch.record_llm_cost", _fake_record_llm_cost)
+    session = _RecorderSession(cell=_CellStub(workspace_id=workspace_id), archetype_id=archetype_id)
+    billing = _billing()
+
+    cost = await record_delegation_step(session, billing)  # type: ignore[arg-type]
+
+    # AC-W1-13: returns the real cost_rub + bills with the resolved workspace.
+    assert cost == Decimal("0.2470")
+    assert captured["workspace_id"] == workspace_id
+    assert captured["provider"] == "deepseek"
+    assert captured["tokens_in"] == 1000
+    assert captured["tokens_out"] == 2000
+    assert captured["task_id"] == billing.parent_task_id
+
+    # AC-W1-2: exactly one task_steps row, typed 'delegation', cost == cost_rub.
+    steps = [o for o in session.added if isinstance(o, TaskStep)]
+    assert len(steps) == 1
+    step = steps[0]
+    assert step.task_id == billing.parent_task_id
+    assert step.step_index == 1
+    assert step.agent_archetype_id == archetype_id
+    assert step.step_type == "delegation"
+    assert step.status == "succeeded"
+    assert step.cost_credits == Decimal("0.2470")
+    assert step.output_jsonb["output_tokens"] == 2000
+
+
+@pytest.mark.asyncio
+async def test_resolve_workspace_id_missing_cell_raises() -> None:
+    session = _RecorderSession(cell=None, archetype_id=uuid4())
+    with pytest.raises(LookupError):
+        await _resolve_workspace_id(session, uuid4())  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_resolve_archetype_id_unknown_slug_raises() -> None:
+    session = _RecorderSession(cell=_CellStub(workspace_id=uuid4()), archetype_id=None)
+    with pytest.raises(LookupError):
+        await _resolve_archetype_id(session, "ghost")  # type: ignore[arg-type]
