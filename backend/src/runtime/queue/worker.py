@@ -68,6 +68,13 @@ if os.environ.get("DRAMATIQ_TESTING") != "1":
     configure_broker(_settings)
     start_worker_metrics_exporter(_settings)
 
+# Register EVERY bounded-context model so the shared Base.metadata is complete
+# before the orchestration's first ORM flush. The web tier loads these
+# transitively via its routers; this out-of-process worker does not, so a Task
+# flush (FK -> agents.agent_instances / multitenancy.cells) raised
+# NoReferencedTableError and every dispatch dead-lettered until this import.
+import src._shared.db.models_registry  # noqa: E402, F401
+
 # Import AFTER the broker is configured so the actors declare on the Redis broker.
 from src.runtime.queue.actor import dispatch_task_actor  # noqa: E402, F401
 from src.runtime.queue.outbox_relay import relay_outbox_actor  # noqa: E402  (AC-W1-4)
