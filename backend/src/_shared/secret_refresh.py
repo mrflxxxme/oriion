@@ -82,14 +82,45 @@ def apply_secret_state(app: FastAPI, settings: Settings) -> None:
     app.state.llm_router = llm_router
 
 
+async def _reset_db_redis_caches() -> None:
+    """Drop the process-wide engine / sessionmaker / redis ``lru_cache``s so the
+    next access rebuilds from the rotated ``DATABASE_URL`` / ``REDIS_URL`` (AC-W1-9).
+
+    Without this, ``get_engine()`` / ``get_redis_client()`` keep the
+    pre-rotation DSN until a full restart — a SIGHUP refresh would otherwise
+    rebuild only KMS + LLM providers while DB/Redis stay on the old (possibly
+    compromised) credentials. The live engine/client are disposed before the
+    cache is cleared so the old connection pool is not leaked.
+    """
+    from src._shared.db.redis import get_redis_client
+    from src._shared.db.session import get_engine, get_session_maker
+
+    # Grab the live objects, then clear the caches FIRST so any concurrent caller
+    # immediately rebuilds from the rotated DSN — never handed a sessionmaker bound
+    # to an already-disposed engine. Dispose the old objects AFTER: their in-flight
+    # checked-out connections finish naturally, idle pool conns close on dispose.
+    old_engine = get_engine() if get_engine.cache_info().currsize else None
+    old_redis = get_redis_client() if get_redis_client.cache_info().currsize else None
+    get_session_maker.cache_clear()
+    get_engine.cache_clear()
+    get_redis_client.cache_clear()
+    if old_engine is not None:
+        await old_engine.dispose()
+    if old_redis is not None:
+        await old_redis.aclose()
+
+
 async def refresh_app_secrets(app: FastAPI) -> Settings:
     """Re-read secrets (Lockbox) + rebuild secret-derived ``app.state`` — no restart.
 
     The Lockbox fetch + Settings parse is blocking, so it runs in a worker thread
     to keep the event loop responsive; the (synchronous, in-memory) provider
-    rebuild then swaps ``app.state`` atomically from the caller's coroutine.
+    rebuild then swaps ``app.state`` atomically from the caller's coroutine. The
+    DB/Redis caches are dropped too so a rotated DATABASE_URL/REDIS_URL is applied
+    in-process, not just KMS + LLM (AC-W1-9).
     """
     settings = await asyncio.to_thread(reload_settings)
+    await _reset_db_redis_caches()
     apply_secret_state(app, settings)
     logger.info(
         "shared.secret_refresh.applied",

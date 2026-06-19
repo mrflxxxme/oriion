@@ -83,14 +83,21 @@ jobs:
             set -euo pipefail
             cd /opt/oriion
             export IMAGE_TAG="${{ steps.tag.outputs.tag }}"
-            # AC-W1-9: the backend reads its secrets DIRECTLY from YC Lockbox at
-            # startup when LOCKBOX_SECRET_ID is set (backend/src/_shared/lockbox.py
-            # — payload REST API via the instance service-account IAM token from
-            # the metadata server, so nothing is written to disk). Rotation = bump
-            # the Lockbox secret version + rolling-restart (read-at-startup).
-            # Fully retiring the /opt/oriion/.env secret materialization + a live
-            # no-redeploy in-process refresh are the staging-gated follow-up
-            # (AC-W1-9 PARTIAL); until then .env still seeds non-Lockbox bootstrap.
+            # AC-W1-9 (CLOSED in code): the backend + worker read their secrets
+            # DIRECTLY from YC Lockbox at startup when LOCKBOX_SECRET_ID is set
+            # (backend/src/_shared/lockbox.py — payload REST API via the instance
+            # service-account IAM token from the metadata server). The base
+            # docker-compose.staging.yml is Lockbox-only: NO backend/worker secret
+            # env-vars are injected, so no app secret (DB/Redis/JWT/BYOK/provider
+            # keys) is materialized to the VM disk. The sole disk-materialized
+            # secret is LOCKBOX_GRAFANA_ADMIN_PASSWORD in `.env` (gates the obs
+            # stack only; tracked for Lockbox migration in Wave-1); the rest of
+            # `.env` is LOCKBOX_SECRET_ID + non-secret deploy vars (IMAGE_TAG,
+            # registry, FX rate, Caddy). Rotation with no redeploy = bump
+            # the Lockbox version + SIGHUP/recreate (gunicorn graceful reload +
+            # worker re-fork re-read Lockbox; see staging-bootstrap.md). The live
+            # staging cutover (no secret on VM disk + version-bump pickup) is the
+            # remaining founder deploy validation.
             echo "$IMAGE_TAG" > .deployed_tag
             docker compose -f infra/docker-compose.staging.yml --env-file .env pull
             docker compose -f infra/docker-compose.staging.yml --env-file .env up -d

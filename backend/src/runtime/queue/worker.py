@@ -68,5 +68,13 @@ if os.environ.get("DRAMATIQ_TESTING") != "1":
     configure_broker(_settings)
     start_worker_metrics_exporter(_settings)
 
-# Import AFTER the broker is configured so the actor declares on the Redis broker.
+# Import AFTER the broker is configured so the actors declare on the Redis broker.
 from src.runtime.queue.actor import dispatch_task_actor  # noqa: E402, F401
+from src.runtime.queue.outbox_relay import relay_outbox_actor  # noqa: E402  (AC-W1-4)
+
+# Kick off the self-rescheduling outbox drain — one chain per worker boot. The
+# actor re-arms itself after each run (ADR-036), so tasks.outbox rows written by
+# the web tier are published at-least-once on a fixed cadence. Guarded out of the
+# StubBroker test path (no Redis; tests drive relay_outbox_batch directly).
+if os.environ.get("DRAMATIQ_TESTING") != "1":
+    relay_outbox_actor.send()
