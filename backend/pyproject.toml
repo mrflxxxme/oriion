@@ -145,6 +145,11 @@ ignore = [
 # Phase 00.6 PR-B: demo_market_brief carries the RU demo prompt + RU-facing
 # docstring (gate evidence collector) — intentional content, not style noise.
 "scripts/*.py" = ["RUF001", "RUF002", "RUF003"]
+# AC-W1-3 (Master-Agent): agents tests + the agency-marketing seed embed RU
+# domain content mixed with Latin terms (CEO/COO, «deliverable») — confusable
+# chars are intentional content, same rationale as canned_pydantic_ai above.
+"tests/agents/*.py" = ["RUF001", "RUF002", "RUF003"]
+"src/agents/seed_data/agency_marketing_ru_v1.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.format]
 quote-style = "double"
