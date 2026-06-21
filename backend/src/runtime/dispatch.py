@@ -327,8 +327,11 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     ``input_tokens``/``output_tokens`` (newer) or
     ``request_tokens``/``response_tokens`` (older). Defensive across both.
     """
-    usage_fn = getattr(run_result, "usage", None)
-    usage = usage_fn() if callable(usage_fn) else None
+    # Pydantic-AI is migrating ``.usage`` from a method to a property (a live
+    # golden surfaced the deprecation warning). Handle BOTH so a version bump
+    # doesn't silently zero the token counts (billing-token correctness).
+    usage_attr = getattr(run_result, "usage", None)
+    usage = usage_attr() if callable(usage_attr) else usage_attr
     if usage is None:
         return 0, 0
     input_tokens = (
