@@ -4,63 +4,56 @@
 
 ## Last updated
 
-- Date: 2026-06-18 (**Phase 01.1-retro closeout — post-merge audit + fix-to-green**)
-- Session: `interesting-knuth-f649a6`
+- Date: 2026-06-19 (**Wave-1 kickoff — Phase 01.2 Master-Agent core, AC-W1-3**)
+- Session: `pedantic-satoshi-8ced82`
 - Agent: @claude-opus
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. **Phase 01.1-retro (AC-W1 hardening pin block) = ✅ VERIFIED-COMPLETE (scoped).**
-- **Lineage:** `origin/main` = `9aa776f` (this worktree's HEAD). The four AC-W1 domain PRs are merged on top of `6b40084` (= PR #53 merge): [#58](https://github.com/mrflxxxme/oriion/pull/58)/[#59](https://github.com/mrflxxxme/oriion/pull/59)/[#60](https://github.com/mrflxxxme/oriion/pull/60)/[#61](https://github.com/mrflxxxme/oriion/pull/61). **PR #53 itself is MERGED** (the prior HANDOFF's "open, awaiting founder-merge" is stale).
-- ⚠️ **Local `main` ref is stale** (`0a9eee8`, Phase-00.2 era) — canon base is **`origin/main`**, NOT local `main`. Don't diff/PR against local `main`.
-- This session's fix lives on branch **`claude/interesting-knuth-f649a6`** (uncommitted at time of writing → see Next actions; opens ONE PR → main).
+- **Wave:** Wave 1 (Core MVP) — **in progress**. **Phase 01.1-retro = ✅ COMPLETE** (#58–66 merged). **Phase 01.2 (Master-Agent core) = ✅ code-complete + locally verified (this PR).**
+- **What this PR delivers:** the two-tier Master-Agent layer (ADR-029, AC-W1-3) — the foundation all Wave-1 verticals sit on — proven end-to-end with the **Marketing-agency РФ** reference vertical. ADR-029 flipped **Proposed → Accepted**. Wave-1 `PHASES.md` regenerated (dependency-first 01.2→01.12).
+- **Branch:** `claude/pedantic-satoshi-8ced82` (off `origin/main` = `1a90ba9`). Focused PR → `main` → founder-merge.
+- ⚠️ **Dual-tree guard (it bit twice this session):** canon `.planning/` is in the **worktree**; the outer `…/TEAMLY_RU/.planning` is stale. Anchor to `git rev-parse --show-toplevel`. (The ADR Explore agent read the stale tree → falsely reported ADR-033/036 "missing"; they exist in canon. A Master-prompt Write first landed in the stale tree → relocated.)
 
-## Active blockers
+## Active blockers (unchanged; none block 01.2)
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
-| OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Wave 1) |
+| OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Phase 01.3) |
+| OQ-32 / OQ-33 | Telegram Business consent-UX + 152-ФЗ + РКН update | Founder + юрист | gates **Phase 01.11** (Business-API), NOT 01.2/01.9 |
 
-## What just happened — 01.1-retro closeout (2026-06-18)
+## What just happened — Phase 01.2 (2026-06-19)
 
-Founder-process: `/grill-me` (6 развилок → DoD=scoped-complete; audit=Workflow-harness; one-PR→founder-merge; verify=gsd-verifier+local-CI; **AC-4/5 = fix-to-green**) → multiagent adversarial audit → fix-to-green → exit ritual.
+Founder-process: bootstrap-from-worktree + dual-tree guard → `/grill-me` (8 forks) → Plan-agent code-grounded design → execute (9 logical commits) → local CI + multiagent audit + gsd-verifier → exit ritual → focused PR.
 
-1. **Step-3 verify-before-flip (код, не доку):** the claimed "AC-W1-2/13/14/15 closed in #48/49/50+ADR-035" contradiction is a **phantom** (no canon doc claims it). Verified all four are genuinely residual (2 = table scaffolding only; 13 = metrics+pricing wired but cost still estimated; 14 = bucket only; 15 = stub) → correctly DEFERRED.
-2. **Adversarial audit** of the merged combined diff `6b40084..HEAD` (48 files; Workflow harness — 32 agents, 3 lenses + 4 focused-AC, each finding adversarially re-verified) → **0 P0 / 4 P1 / 6 P2 / 6 P3**. Key: **2 of the 8 "closed" pins did not meet acceptance** — AC-W1-4 relay was dead code (never scheduled/imported), AC-W1-5 testcontainers test never delivered (still an in-memory stub).
-3. **Fix-to-green** (branch `claude/interesting-knuth-f649a6`):
-   - `fix(runtime): AC-W1-4` — self-rescheduling outbox relay ([ADR-036](./decisions/ADR-036-outbox-relay-self-scheduling.md)) wired into `worker.py` + per-row poison isolation + deterministic order. Closes the dead-relay (P1) + poison-message (P1).
-   - `test(tasks): AC-W1-5` — `backend/tests/tasks/test_cancel_cascade_integration.py` (real-PG testcontainers cancel-cascade + real-dispatch SSE order).
-   - `fix(_shared): AC-W1-9` — `refresh_app_secrets` drops DB/Redis lru_caches so a rotated `DATABASE_URL`/`REDIS_URL` actually applies in-process (P1 SIGHUP partial-apply).
-   - `docs/ci` — `deploy-staging.yml` stale "AC-W1-9 PARTIAL" comment → CLOSED; rotation runbook clarity.
-   - Doc-sync: `01.1-retro.md` (2026-06-18 closeout note + Status flip), `STATUS.md`, `JOURNAL.md`, ADR-036 + decisions index.
+**Implemented (ADR-029, AC-W1-3):**
+- `StrategicContext` (`agents/strategic_context.py`) + optional `CoordinatorDeps.{strategic_context, master_recorder}` (additive, default `None` → horizontal path byte-identical).
+- `PlanExecutingCoordinator.run` threads the strategic brief into the inner deps + prepends a domain preamble only when present (also fixes the previously-dropped depth fields).
+- `agents/master.py` — `MasterPlan` / `MasterResponse` / `MasterDeps` / `MasterCallBilling` + `build_master_{plan,synthesis}_agent` (split model: plan=deepseek-chat, synthesis=R1).
+- `runtime/dispatch.py` — `MasterAgent` orchestration object (CEO over the `PlanExecutingCoordinator` COO, reusing the same leaf runner) + `record_master_call_step` (`step_type='llm_call'`) + `resolve_master` (vertical detection via `Cell.vertical_template_slug`) + vertical-scoped `_resolve_archetype_id`.
+- `runtime/orchestrator.py` — optional `master_step_recorder` → ctx-aware `master_recorder` so the Master's plan+synthesis calls fold into the SAME `ctx.accumulated_cost`; the 50-credit per-task cap covers the **Master + children aggregate** (R-32/R-04). **2 physical task levels** (Coordinator runs inside the Master's single run as `task_steps`).
+- `router_service.py` — `master`/`master_synthesis` model + max-token entries.
+- `role_prompt_loader.py` — `load_master_prompt(masters/<vertical>.md)`; `scripts/sync_role_prompts.sh` now mirrors the `masters/` subdir recursively (CI `diff -rq` passes).
+- Marketing-agency seed (`agency_marketing_ru_v1.py` — Master archetype reusing the horizontal specialists) + provisioning wiring.
+- `contracts/role-prompts/masters/agency_marketing_ru.md` (AI baseline, `status: draft`) + `verticals/agency-marketing-ru/golden-dataset/` scaffold (methodology + 2 example tasks + 5 adversarial probes).
+- Cost authority reconciled (grill #7): `task.total_cost_credits` step-sum is the single source of truth; the Master path does NOT call `rollup_task_cost` (would double-count steps + lineage children — documented).
 
 ## Verification state
 
-- **CI-equivalent, all green (local, isolated):** `ruff` + `ruff format --check` ✓ · `mypy --strict` **158 files** ✓ · unit `pytest -m "not integration and not live"` **682 passed, 1 skipped** (SIGHUP Unix-only) · integration `pytest -m "integration and not live"` **25 passed** (real testcontainers `pgvector/pgvector:pg16`; 23 prior + 2 new AC-W1-5).
-- **Tier-4 review (ADR-027):** ADR-036-link present; code + security reviewer-agents run on the diff this session.
-- **Live-валидация — НЕ выполнена** (founder-action, нужен полный стек + funded keys): live golden AC8/9/10 + AC-W1-9 staging cutover.
-- The PR's GitHub Actions (ci-backend / ci-frontend / ci-security) is the binding CI gate at founder-merge.
+- **CI-equivalent, all green (local, post-audit-remediation):** `ruff check src tests` + `ruff format --check src tests` ✓ · `mypy --strict src` **163 files** ✓ · unit `pytest -m "not integration and not live"` **739 passed, 1 skipped** (cov **90.45%**) · per-module gates **agents 98% / runtime 87% / tasks 99% / billing 100%** (≥85) · integration `pytest -m "integration and not live"` **29 passed** (real testcontainers PG; +1 new Master-billing test) · `bandit -r src` **0 issues** · role-prompts drift `diff -rq` **DRIFT-OK** · tools-allowlist **OK**.
+- **Adversarial audit (Workflow, 17 agents, 5 lenses + goal-backward):** 0 P0 / 0 P1 / 5 P2 / 3 P3 — all addressed in `c157f50` (token rollup, Master pre-call budget gate, budget-metric label, dropped stale-zero field, AC-3.2 test + AC-3.6 wording). No correctness/security/regression defects.
+- **8 AC-W1-3.x green** — see [`phases/01.2-master-agent-core.md`](./roadmap/wave-1-core-mvp/phases/01.2-master-agent-core.md).
+- **Live-валидация — НЕ выполнена** (founder-action, нужен funded DeepSeek + dev stack) — see Next actions.
+- The PR's GitHub Actions (ci-backend / ci-frontend / ci-security) is the binding gate at founder-merge.
 
 ## Next actions (founder)
 
-1. **Open + merge the closeout PR** `claude/interesting-knuth-f649a6` → `main` (per ADR-027 — Tier-4 = explicit founder approve; touches delivery-semantics + secret-rotation + ADR-036).
-2. **Live golden AC8/9/10** on funded keys (DeepSeek/Yandex/GigaChat) — the carried-over live-validation.
-3. **AC-W1-9 staging cutover** (chip `task_8d5ce94c`): no secret on VM disk + Lockbox version-bump pickup without redeploy.
-4. **Pin real `RU_TRUSTED_CA_SHA256`** — `backend/Dockerfile:41` is still `REPLACE_WITH_REAL_SHA256_BEFORE_MERGE` (chip #54 placeholder); needed before the prod image build.
-5. **obs/IaC follow-up** (the verified-residual pins): AC-W1-2 (per-step TaskStep persistence) · AC-W1-13 (cost from `record_llm_cost` + worker-process metric exposition) · AC-W1-14 (Loki retention=90d + archival job) · AC-W1-15 (real Telegram/PagerDuty receivers).
-6. **P2/P3 backlog** (10 findings, in PR body + the follow-up chip): cancel_task terminal-status guard · read_url DNS-rebinding SSRF (now LLM-reachable) · web_search body-size cap · `tasks.outbox` RLS/`oriion_app` grant · BFS `descendant_ids` cycle guard · Yandex `.//error` XPath anchor · `recover=True` truncated-XML.
-7. After merge → **functional Phase 01.1** (Master-Agent layer + vertical-templates); AC-W1-3 (Master-Agent schema) unblocks once ADR-029 moves Proposed→Accepted (Wave-2).
+1. **Merge** the focused PR (`claude/pedantic-satoshi-8ced82` → `main`).
+2. **Live golden** on funded DeepSeek (worker tract touched — green units insufficient, per memory `live-golden-async-dispatch-findings`): provision a Marketing-agency cell, `POST /tasks/{id}/run`, assert dispatch <1s, `task.completed` carries a real `MasterResponse.final_artifact_markdown`, `0 < total_cost_credits ≤ 50`, `/metrics` shows the +2 Master LLM calls.
+3. **Evaluator run** (ADR-026) → promote the Master prompt + archetype `draft → reviewed` (≥75% golden + 100% adversarial); materialize the remaining golden tasks toward 30 (founder domain-expertise step).
+4. Fast-follow (optional): add `'master'` to the `agent_archetypes.role_category` CHECK (currently reuses `'coordinator'`).
 
-## Exit ritual (this session)
+## Next phase
 
-- [x] Bootstrap-4 + dual-tree guard (anchored to `git rev-parse --show-toplevel`; local-`main`-stale noted)
-- [x] `/grill-me` — 6 развилок resolved (AskUserQuestion)
-- [x] Multiagent adversarial audit (Workflow, 32 agents) → 0 P0 / 4 P1 / 6 P2 / 6 P3, adversarial-verified
-- [x] Step-3 verify-before-flip (AC-W1-2/13/14/15 truth established in code; phantom contradiction documented)
-- [x] Fix-to-green: AC-W1-4 relay (ADR-036) + AC-W1-5 integration test + AC-W1-9 SIGHUP P1 + doc-nits
-- [x] CI-equiv green (ruff/format/mypy-158/unit-682/integration-25)
-- [x] Tier-4 reviewer-agents (code + security) on the diff
-- [x] Doc-sync: 01.1-retro.md closeout + STATUS.md + JOURNAL.md + ADR-036 + decisions index + HANDOFF.md (this file)
-- [ ] **Commit + open PR** (this session, final step) → founder merge (per ADR-027)
-- [ ] **Founder:** live golden + staging cutover + CA-sha256 pin + obs/IaC follow-up + P2/P3 chip
+**Phase 01.3 — Billing** (ADR-008): T-credit ledger + Trial-14d/500 + Solo tier + per-task/cell caps + BYOK plumbing + ЮKassa **test mode** (live-flip gated on OQ-02/OQ-19).

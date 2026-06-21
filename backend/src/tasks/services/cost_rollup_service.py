@@ -3,6 +3,20 @@
 Per phase-spec AC6: parent.total_cost_credits == SUM(children.total_cost_credits +
 direct task_steps.cost_credits). Walks the parent chain upward in one TX so
 no intermediate state leaks.
+
+⚠️ Cost-authority note (AC-W1-3, grill 2026-06-19 decision #7). The **live**
+dispatch path does NOT use this utility — ``runtime.orchestrator`` sets
+``task.total_cost_credits = ctx.accumulated_cost`` (the per-task **step-sum**,
+which counts every billable LLM/delegation call exactly once and is the single
+source of truth). This recursive ``steps + children`` rollup is a separate
+reporting helper that is **only sound for trees where a task's delegation cost
+lives in EITHER its own steps OR its children — not both**. Today
+``runtime.dispatch.build_leaf_runner`` writes a delegation step on the parent
+AND a lineage child Task with the same cost, so calling this on a *real
+dispatched* task (horizontal or Master) would double-count. The Master path
+(2-level, AC-W1-3.4) therefore reads ``task.total_cost_credits`` (orchestrator
+authority) and never calls this. A unified rollup for genuine 3+ level trees is
+deferred to Wave-2.
 """
 
 from __future__ import annotations

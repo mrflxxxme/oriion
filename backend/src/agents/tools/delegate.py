@@ -23,12 +23,17 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
 
 from src.agents.exceptions import DelegationDepthExceeded, DelegationTargetInvalid
+from src.agents.strategic_context import StrategicContext
+
+if TYPE_CHECKING:
+    from src.agents.master import MasterCallRecorder
 
 DEFAULT_MAX_DELEGATION_DEPTH = 5
 
@@ -129,6 +134,18 @@ class CoordinatorDeps:
     # in-process runner for demo-flow tests; runtime orchestrator (Commit 6)
     # injects the real DB-backed runner.
     runner: DelegateRunner | None = None
+    # ── Wave-1 Master-Agent layer (AC-W1-3) ──────────────────────────────
+    # Optional strategic brief from a Master-Agent (ADR-029). ``None`` →
+    # single-layer horizontal path, byte-for-byte unchanged (AC-W1-3.1).
+    strategic_context: StrategicContext | None = None
+    # ctx-aware recorder the Master uses to bill its own plan/synthesis LLM
+    # calls into the shared per-task budget accumulator (set by the
+    # orchestrator only on the Master path; ``None`` for horizontal).
+    master_recorder: MasterCallRecorder | None = None
+    # ctx-aware PRE-call budget gate (raises BudgetExceeded if accumulated +
+    # pending would breach the cap) — the Master calls it before each LLM call
+    # so the cap is hard for the Master, symmetric with leaf delegations.
+    budget_precheck: Callable[[Decimal], None] | None = None
 
 
 # ── shared delegation guard ──────────────────────────────────────────────

@@ -52,9 +52,23 @@ from src.agents.coordinator import (
     DelegationStep,
     build_coordinator_agent,
 )
+from src.agents.exceptions import RolePromptParseError
+from src.agents.master import (
+    ROLE_KEY_PLAN,
+    ROLE_KEY_SYNTHESIS,
+    MasterCallBilling,
+    MasterDeps,
+    MasterPlan,
+    MasterResponse,
+    build_master_plan_agent,
+    build_master_synthesis_agent,
+)
 from src.agents.models import AgentArchetype
 from src.agents.researcher import ResearcherDeps, build_researcher_agent
+from src.agents.services.role_prompt_loader import load_master_prompt
+from src.agents.strategic_context import StrategicContext
 from src.agents.tools.delegate import (
+    DEFAULT_MAX_DELEGATION_DEPTH,
     DelegateInput,
     DelegateResult,
     assert_delegation_allowed,
@@ -66,7 +80,12 @@ from src.mcp.tools.read_url import ReadURLTool
 from src.mcp.tools.web_search import WebSearchTool
 from src.multitenancy.models import Cell
 from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
-from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
+from src.runtime.orchestrator import (
+    MasterStepRecorder,
+    OrchestratorContext,
+    estimate_step_cost,
+    execute_agent_task,
+)
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
 from src.runtime.web_search_runner import (
     WEB_SEARCH_MAX_RESULTS,
@@ -153,23 +172,29 @@ async def _resolve_workspace_id(session: AsyncSession, cell_id: UUID) -> UUID:
     return cell.workspace_id
 
 
-async def _resolve_archetype_id(session: AsyncSession, slug: str) -> UUID:
-    """Resolve the active ``agent_archetypes`` row for a leaf slug.
+async def _resolve_archetype_id(
+    session: AsyncSession, slug: str, *, vertical_slug: str | None = None
+) -> UUID:
+    """Resolve the active ``agent_archetypes`` row for a slug.
 
-    ``task_steps.agent_archetype_id`` is a NOT-NULL FK, so a delegation step can
-    only be persisted once the archetype catalog is seeded (it is, by
-    ``agents.seed_data.productivity_core_v1``). Wave-1 picks the active row for
-    the slug; multi-vertical disambiguation lands with the Master-Agent (AC-W1-3).
+    ``task_steps.agent_archetype_id`` is a NOT-NULL FK, so a step can only be
+    persisted once the archetype catalog is seeded. AC-W1-3 closes the former
+    multi-vertical TODO: when ``vertical_slug`` is given the active row for THAT
+    vertical wins (the Master archetype lives under its vertical); without it the
+    newest active row for the slug is used (horizontal leaves, unambiguous since
+    the marketing preset reuses the horizontal specialist archetypes).
     """
-    stmt = (
-        select(AgentArchetype.id)
-        .where(AgentArchetype.slug == slug, AgentArchetype.is_active.is_(True))
-        .order_by(AgentArchetype.created_at.desc())
-        .limit(1)
+    stmt = select(AgentArchetype.id).where(
+        AgentArchetype.slug == slug, AgentArchetype.is_active.is_(True)
     )
+    if vertical_slug is not None:
+        stmt = stmt.where(AgentArchetype.vertical_slug == vertical_slug)
+    stmt = stmt.order_by(AgentArchetype.created_at.desc()).limit(1)
     archetype_id = (await session.execute(stmt)).scalars().first()
     if archetype_id is None:
-        raise LookupError(f"no active agent_archetype for slug={slug!r}")
+        raise LookupError(
+            f"no active agent_archetype for slug={slug!r} " f"(vertical_slug={vertical_slug!r})"
+        )
     return archetype_id
 
 
@@ -212,6 +237,59 @@ async def record_delegation_step(session: AsyncSession, billing: StepBilling) ->
         agent_archetype_id=archetype_id,
         step_type="delegation",
         input_jsonb={"target_agent_slug": billing.target_agent_slug},
+        output_jsonb={
+            "input_tokens": billing.input_tokens,
+            "output_tokens": billing.output_tokens,
+            "provider": billing.provider_slug,
+            "model": billing.model_name,
+            "request_id": request_id,
+        },
+        status="succeeded",
+        cost_credits=cost_rub,
+    )
+    step.started_at = now
+    step.completed_at = now
+    session.add(step)
+    await session.flush()
+    return cost_rub
+
+
+async def record_master_call_step(session: AsyncSession, billing: MasterCallBilling) -> Decimal:
+    """Bill + persist one Master-Agent LLM call (plan/synthesis) — AC-W1-3.
+
+    Parallels ``record_delegation_step`` for the Master's OWN calls: bills via the
+    real ledger (``record_llm_cost``) and writes a ``task_steps`` row
+    (``step_type='llm_call'``) on the Master (parent) task, so the per-task
+    step-sum (the cost authority, AC-W1-3.4) includes the +1-2 Master calls that
+    R-32 flags (+15-20% tokens/vertical task). The archetype FK resolves to the
+    vertical's Master archetype.
+    """
+    workspace_id = await _resolve_workspace_id(session, billing.cell_id)
+    request_id = uuid4().hex
+    _cost_usd, cost_rub = await record_llm_cost(
+        session,
+        workspace_id=workspace_id,
+        cell_id=billing.cell_id,
+        user_id=billing.user_id,
+        task_id=billing.parent_task_id,
+        provider=billing.provider_slug,
+        model=billing.model_name,
+        tokens_in=billing.input_tokens,
+        tokens_out=billing.output_tokens,
+        latency_ms=billing.latency_ms,
+        status="success",
+        request_id=request_id,
+    )
+    archetype_id = await _resolve_archetype_id(
+        session, "master", vertical_slug=billing.vertical_tag
+    )
+    now = datetime.now(UTC)
+    step = TaskStep(
+        task_id=billing.parent_task_id,
+        step_index=billing.step_index,
+        agent_archetype_id=archetype_id,
+        step_type="llm_call",
+        input_jsonb={"phase": billing.phase},
         output_jsonb={
             "input_tokens": billing.input_tokens,
             "output_tokens": billing.output_tokens,
@@ -471,13 +549,28 @@ class PlanExecutingCoordinator:
 
     async def run(self, user_prompt: str, *, deps: Any) -> _PlanRunResult:
         agent = self._build_agent()
+        # AC-W1-3: propagate the strategic brief + depth fields so a Master's
+        # subordinate Coordinator runs with the right context (and the depth
+        # guards re-apply correctly). Defaults preserve the horizontal path.
+        strategic_context = getattr(deps, "strategic_context", None)
         inner_deps = CoordinatorDeps(
             cell_id=deps.cell_id,
             task_id=deps.task_id,
             user_id=deps.user_id,
             available_agent_slugs=list(deps.available_agent_slugs),
+            current_depth=int(getattr(deps, "current_depth", 0)),
+            max_delegation_depth=int(
+                getattr(deps, "max_delegation_depth", DEFAULT_MAX_DELEGATION_DEPTH)
+            ),
+            strategic_context=strategic_context,
         )
-        plan_run = await agent.run(user_prompt, deps=inner_deps)
+        # AC-W1-3.2: when a Master supplied a strategic brief, prepend it to the
+        # Coordinator's prompt so the operational plan honours the domain
+        # framing. ``None`` → prompt unchanged → horizontal byte-identical (3.1).
+        effective_prompt = user_prompt
+        if strategic_context is not None:
+            effective_prompt = f"{strategic_context.as_coordinator_preamble()}\n\n{user_prompt}"
+        plan_run = await agent.run(effective_prompt, deps=inner_deps)
         plan = getattr(plan_run, "output", None)
         if plan is None:
             plan = getattr(plan_run, "data", None)
@@ -535,6 +628,264 @@ class PlanExecutingCoordinator:
         )
 
 
+# ── Master-Agent layer (ADR-029, AC-W1-3) ────────────────────────────────
+
+
+@dataclass
+class _MasterRunResult:
+    """Mirror of AgentRunResult.output access used by the orchestrator."""
+
+    output: MasterResponse
+
+
+def _compose_master_synthesis_prompt(
+    user_prompt: str, strategic_context: StrategicContext, coordinator_output: CoordinatorOutput
+) -> str:
+    """Build the Master's synthesis prompt from the team's operational output."""
+    artifacts_block = (
+        "\n\n".join(f"### {a.type}\n{a.path_or_inline}" for a in coordinator_output.artifacts)
+        or coordinator_output.summary
+    )
+    return (
+        "Ты — Master-Agent вертикали и доменный эксперт. Команда под управлением "
+        "Координатора подготовила материалы ниже. Синтезируй финальный deliverable "
+        "для пользователя: сведи материалы в один связный документ, проверь доменное "
+        "качество, убери противоречия и дубли. Не выдумывай фактов и цифр.\n\n"
+        f"## Запрос пользователя\n{user_prompt}\n\n"
+        f"## Стратегическая цель\n{strategic_context.objective}\n\n"
+        f"## Материалы команды\n{artifacts_block}"
+    )
+
+
+def _master_quality_check(final_artifact: str) -> tuple[bool, list[str]]:
+    """Wave-1 soft domain-quality check — a flag, not a retry loop (Wave-2)."""
+    notes: list[str] = []
+    if not final_artifact.strip():
+        notes.append("Master synthesis produced an empty deliverable.")
+    return (not notes, notes)
+
+
+class MasterAgent:
+    """Wave-1 vertical Master-Agent (ADR-029): CEO above the Coordinator COO.
+
+    Structurally compatible with the orchestrator's ``coordinator_agent`` slot
+    (only ``.run(prompt, deps=...).output`` is consumed). For a vertical task:
+      1. plan agent (deepseek-chat) → ``MasterPlan`` (domain interpretation),
+         billed as an ``llm_call`` step via ``deps.master_recorder``;
+      2. assemble a ``StrategicContext`` + delegate to the inner
+         ``PlanExecutingCoordinator`` reusing ``deps.runner`` (leaf delegations
+         bill + chain under the Master task exactly as horizontal);
+      3. synthesis agent (deepseek-reasoner) → final deliverable, billed;
+      4. return a ``MasterResponse`` (domain-quality flag is a soft Wave-1
+         signal; the retry loop is Wave-2).
+
+    Tests inject ``plan_agent`` / ``synthesis_agent`` / ``coordinator``
+    (FakeLLMGatewayModel-backed); production builds them from ``llm_router``.
+    """
+
+    def __init__(
+        self,
+        *,
+        vertical_tag: str,
+        llm_router: LLMRouter | None = None,
+        workspace_id: UUID | None = None,
+        master_prompt: Any = None,
+        plan_agent: Any = None,
+        synthesis_agent: Any = None,
+        coordinator: PlanExecutingCoordinator | None = None,
+    ) -> None:
+        self._vertical_tag = vertical_tag
+        self._llm_router = llm_router
+        self._workspace_id = workspace_id
+        self._master_prompt = master_prompt
+        self._plan_agent = plan_agent
+        self._synthesis_agent = synthesis_agent
+        self._coordinator = coordinator
+
+    def _ensure_agents(self) -> tuple[Any, Any, Any, Any]:
+        if self._plan_agent is not None and self._synthesis_agent is not None:
+            return (
+                self._plan_agent,
+                getattr(self._plan_agent, "model", None),
+                self._synthesis_agent,
+                getattr(self._synthesis_agent, "model", None),
+            )
+        if self._llm_router is None or self._master_prompt is None:
+            raise ValueError("MasterAgent needs (llm_router + master_prompt) or injected agents.")
+        plan_model = LLMGatewayModel(
+            role_key=ROLE_KEY_PLAN, llm_router=self._llm_router, workspace_id=self._workspace_id
+        )
+        synth_model = LLMGatewayModel(
+            role_key=ROLE_KEY_SYNTHESIS,
+            llm_router=self._llm_router,
+            workspace_id=self._workspace_id,
+        )
+        return (
+            build_master_plan_agent(model=plan_model, master_prompt=self._master_prompt),
+            plan_model,
+            build_master_synthesis_agent(model=synth_model, master_prompt=self._master_prompt),
+            synth_model,
+        )
+
+    def _coordinator_for(self) -> PlanExecutingCoordinator:
+        return self._coordinator or PlanExecutingCoordinator(
+            llm_router=self._llm_router, workspace_id=self._workspace_id
+        )
+
+    async def run(self, user_prompt: str, *, deps: Any) -> _MasterRunResult:
+        plan_agent, plan_model, synth_agent, synth_model = self._ensure_agents()
+        master_deps = MasterDeps(
+            cell_id=deps.cell_id,
+            task_id=deps.task_id,
+            user_id=deps.user_id,
+            vertical_tag=self._vertical_tag,
+        )
+
+        # AC-W1-3: pre-call budget gate (symmetric with leaf delegations) — a
+        # Master call that would breach the per-task cap is rejected BEFORE the
+        # paid LLM call, so the aggregate cap is hard for the Master too.
+        precheck = getattr(deps, "budget_precheck", None)
+
+        # 1. Strategic plan (domain lens) — billed as the parent task's step 0.
+        if precheck is not None:
+            precheck(estimate_step_cost(ROLE_KEY_PLAN))
+        t0 = perf_counter()
+        plan_run = await plan_agent.run(user_prompt, deps=master_deps)
+        plan_latency = int((perf_counter() - t0) * 1000)
+        plan = getattr(plan_run, "output", None)
+        if plan is None:
+            plan = getattr(plan_run, "data", None)
+        if not isinstance(plan, MasterPlan):
+            raise TypeError(
+                f"Master plan agent did not return a MasterPlan (got {type(plan).__name__})."
+            )
+        await self._bill(
+            deps,
+            model=plan_model,
+            run_result=plan_run,
+            phase="plan",
+            step_index=0,
+            latency_ms=plan_latency,
+        )
+
+        # 2. Delegate the operational objective to the subordinate Coordinator.
+        strategic_context = StrategicContext(
+            objective=plan.objective,
+            vertical_tag=self._vertical_tag,
+            domain_constraints=plan.domain_constraints,
+            success_criteria=plan.success_criteria,
+            parent_task_id=deps.task_id,
+        )
+        inner_deps = CoordinatorDeps(
+            cell_id=deps.cell_id,
+            task_id=deps.task_id,
+            user_id=deps.user_id,
+            available_agent_slugs=list(deps.available_agent_slugs),
+            current_depth=int(getattr(deps, "current_depth", 0)),
+            max_delegation_depth=int(
+                getattr(deps, "max_delegation_depth", DEFAULT_MAX_DELEGATION_DEPTH)
+            ),
+            runner=deps.runner,
+            strategic_context=strategic_context,
+        )
+        coord_run = await self._coordinator_for().run(strategic_context.objective, deps=inner_deps)
+        coordinator_output = coord_run.output
+
+        # 3. Domain-quality synthesis (free-text, R1) — billed after the leaves.
+        # Pre-check here matters most: leaf costs have accumulated, so an
+        # over-cap synthesis is rejected before the paid call (no over-cap bill).
+        if precheck is not None:
+            precheck(estimate_step_cost(ROLE_KEY_SYNTHESIS))
+        synthesis_prompt = _compose_master_synthesis_prompt(
+            user_prompt, strategic_context, coordinator_output
+        )
+        t1 = perf_counter()
+        synth_run = await synth_agent.run(synthesis_prompt, deps=master_deps)
+        synth_latency = int((perf_counter() - t1) * 1000)
+        final_artifact = strip_wrapping_fence(_extract_output_text(synth_run)).strip()
+        # Master steps use a collision-free index space vs the leaf delegation
+        # steps (which occupy 1..len(artifacts)): plan=0, synthesis=len+1.
+        synthesis_index = len(coordinator_output.artifacts) + 1
+        await self._bill(
+            deps,
+            model=synth_model,
+            run_result=synth_run,
+            phase="synthesis",
+            step_index=synthesis_index,
+            latency_ms=synth_latency,
+        )
+
+        # 4. Soft domain-quality check (Wave-1: flag only; retry loop → Wave-2).
+        passed, notes = _master_quality_check(final_artifact)
+        return _MasterRunResult(
+            output=MasterResponse(
+                summary=coordinator_output.summary,
+                final_artifact_markdown=final_artifact,
+                domain_quality_passed=passed,
+                domain_quality_notes=notes,
+                coordinator_output=coordinator_output,
+                confidence=coordinator_output.confidence,
+            )
+        )
+
+    async def _bill(
+        self,
+        deps: Any,
+        *,
+        model: Any,
+        run_result: Any,
+        phase: str,
+        step_index: int,
+        latency_ms: int,
+    ) -> None:
+        """Bill one Master LLM call through the ctx-aware ``deps.master_recorder``."""
+        recorder = getattr(deps, "master_recorder", None)
+        if recorder is None:
+            return
+        in_tok, out_tok = _extract_usage(run_result)
+        await recorder(
+            MasterCallBilling(
+                parent_task_id=deps.task_id,
+                cell_id=deps.cell_id,
+                user_id=deps.user_id,
+                vertical_tag=self._vertical_tag,
+                phase=phase,
+                step_index=step_index,
+                provider_slug=getattr(model, "_last_provider_slug", None) or "",
+                model_name=getattr(model, "_last_model_name", None) or "",
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                latency_ms=latency_ms,
+            )
+        )
+
+
+def resolve_master(
+    vertical: str | None,
+    *,
+    llm_router: LLMRouter,
+    workspace_id: UUID | None = None,
+) -> MasterAgent | None:
+    """Build the Master-Agent for ``vertical`` if a master-prompt exists, else None.
+
+    A vertical without a ``masters/<vertical>.md`` prompt (or the horizontal
+    ``None``) runs single-layer — the dispatcher falls back to the plain
+    ``PlanExecutingCoordinator``.
+    """
+    if not vertical:
+        return None
+    try:
+        master_prompt = load_master_prompt(vertical)
+    except RolePromptParseError:
+        return None
+    return MasterAgent(
+        vertical_tag=vertical,
+        llm_router=llm_router,
+        workspace_id=workspace_id,
+        master_prompt=master_prompt,
+    )
+
+
 def _router_supports_native_tools(llm_router: Any, role_key: str) -> bool:
     """Defensively ask the router whether ``role_key`` would run on a tool-capable
     provider (DeepSeek). Returns False for routers without the predicate (e.g. the
@@ -568,7 +919,24 @@ async def dispatch_task(
     """
     publisher = sse_publisher or get_sse_publisher()
     slugs = available_agent_slugs or list(_DEFAULT_LEAF_SPECS)
-    coord = coordinator or PlanExecutingCoordinator(llm_router=llm_router)
+    # AC-W1-3: a vertical cell (vertical_template_slug set + a master-prompt
+    # present) routes through a Master-Agent (CEO → Coordinator COO); horizontal
+    # cells keep the single-layer Coordinator. A caller-injected ``coordinator``
+    # (unit tests) overrides detection. ``master_step_recorder`` is wired only on
+    # the Master path so the orchestrator bills the Master's own LLM calls.
+    master_step_recorder: MasterStepRecorder | None = None
+    coord: Any
+    if coordinator is not None:
+        coord = coordinator
+    else:
+        cell = await session.get(Cell, task.cell_id)
+        vertical = getattr(cell, "vertical_template_slug", None) if cell is not None else None
+        master = resolve_master(vertical, llm_router=llm_router)
+        if master is not None:
+            coord = master
+            master_step_recorder = record_master_call_step
+        else:
+            coord = PlanExecutingCoordinator(llm_router=llm_router)
 
     # DeepSeek active → native tool-call path (rate-limited); else scripted.
     native_enabled = _router_supports_native_tools(llm_router, "researcher")
@@ -606,12 +974,15 @@ async def dispatch_task(
         task_id=task.id,
         cell_id=task.cell_id,
         user_id=task.initiated_by_user_id,
-        coordinator_agent=coord,  # type: ignore[arg-type]  # PlanExecutingCoordinator is structurally compatible (.run)
+        # PlanExecutingCoordinator / MasterAgent are structurally compatible (.run);
+        # ``coord`` is typed Any after vertical detection so no cast is needed.
+        coordinator_agent=coord,
         user_prompt=user_prompt,
         available_agent_slugs=slugs,
         leaf_runner=leaf_runner,
         sse_publisher=publisher,
         session=session,
+        master_step_recorder=master_step_recorder,
     )
 
 
@@ -619,6 +990,7 @@ __all__ = [
     "CREDIT_PER_INPUT_TOKEN",
     "CREDIT_PER_OUTPUT_TOKEN",
     "WEB_SEARCH_MAX_RESULTS",
+    "MasterAgent",
     "PlanExecutingCoordinator",
     "StepBilling",
     "StepRecorder",
@@ -629,5 +1001,7 @@ __all__ = [
     "fetch_research_context",
     "normalize_artifact_markdown",
     "record_delegation_step",
+    "record_master_call_step",
+    "resolve_master",
     "strip_wrapping_fence",
 ]

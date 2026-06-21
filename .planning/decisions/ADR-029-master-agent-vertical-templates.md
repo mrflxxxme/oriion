@@ -1,10 +1,33 @@
 # ADR-029: Master-Agent layer для vertical-templates
 
-- **Status:** Proposed
-- **Date:** 2026-05-15
+- **Status:** Accepted (2026-06-19 — implemented in Phase 01.2, session `pedantic-satoshi-8ced82`)
+- **Date:** 2026-05-15 (Proposed) → 2026-06-19 (Accepted)
 - **Deciders:** Founder, Tech Lead (architect AI-role)
 - **Supersedes:** N/A
 - **Superseded by:** N/A
+
+> **Implementation addendum (Phase 01.2, 2026-06-19).** Accepted + implemented for the
+> **Marketing-agency РФ** reference vertical with three code-reality adaptations of the original
+> sketch (grill 2026-06-19):
+> 1. **2 physical task levels, not 3.** The Coordinator runs *inside* the Master's single
+>    orchestration run (recorded as `task_steps`, `step_type='llm_call'` for the Master's own plan +
+>    synthesis calls; leaf specialists are child `Task` rows under the Master task). This keeps ONE
+>    budget accumulator → the 50-credit per-task cap covers the Master + children **aggregate**
+>    (R-32/R-04). `task.total_cost_credits` (orchestrator step-sum) is the single cost authority;
+>    `rollup_task_cost` is NOT used on the Master path (it would double-count steps + lineage
+>    children). A true 3-level chain + unified rollup is deferred to Wave-2 (deeper trees).
+> 2. **`MasterAgent` is a thin orchestration object** (`runtime/dispatch.py`), mirroring
+>    `PlanExecutingCoordinator` — not a Pydantic-AI Agent. It resolves the vertical from
+>    `Cell.vertical_template_slug`; `cell.get_coordinator()` is realized as `resolve_master(...)` in
+>    the dispatch layer. The Coordinator→Master boundary **reuses `CoordinatorOutput`** (no separate
+>    envelope); the Master's own user-facing output is `MasterResponse`.
+> 3. **Split model (refines the W1 "DeepSeek-R1" line):** the structured **plan** call uses
+>    `deepseek-chat` (`role_key='master'`) because R1 emits reasoning prose that breaks fenced-JSON
+>    (the same reason R1 was pulled off the Coordinator, ADR-032); the free-text **synthesis** call
+>    uses `deepseek-reasoner`/R1 (`role_key='master_synthesis'`). `role_category` reuses
+>    `'coordinator'` (the CHECK lacks `'master'`; adding it is a fast-follow). Domain-quality check
+>    is a soft flag in Wave-1 (retry loop → Wave-2). Master prompt ships `status: draft` (AI
+>    baseline); promotion to `reviewed` is the founder evaluator run (ADR-026).
 
 ## Context
 
