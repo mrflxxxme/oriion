@@ -46,7 +46,7 @@ class AgentArchetype(Base):
     __table_args__ = (
         CheckConstraint(
             "role_category IN ('coordinator','researcher','writer','analyzer',"
-            "'validator','communicator')",
+            "'validator','communicator','master')",
             name="agent_archetypes_role_category_chk",
         ),
         CheckConstraint(

@@ -40,10 +40,10 @@ async def ensure_agency_marketing_ru_seed(session: AsyncSession) -> tuple[list[U
     # Horizontal specialists (+ coordinator) are reused verbatim.
     horizontal_ids, _ = await ensure_productivity_core_seed(session)
 
-    # The Master archetype — role_category reuses 'coordinator' (the schema CHECK
-    # has no 'master'; adding it is a fast-follow). The actual per-call model is
-    # chosen by role_key in LLMGatewayModel (master→chat, master_synthesis→R1);
-    # model_name here is catalog metadata only.
+    # The Master archetype — role_category='master' (added to the schema CHECK in
+    # agents_0004). The actual per-call model is chosen by role_key in
+    # LLMGatewayModel (master→chat, master_synthesis→R1); model_name here is
+    # catalog metadata only.
     master_stmt = select(AgentArchetype).where(
         AgentArchetype.vertical_slug == VERTICAL_SLUG,
         AgentArchetype.slug == MASTER_SLUG,
@@ -55,7 +55,7 @@ async def ensure_agency_marketing_ru_seed(session: AsyncSession) -> tuple[list[U
             slug=MASTER_SLUG,
             vertical_slug=VERTICAL_SLUG,
             display_name="Master «Маркетинговое агентство РФ»",
-            role_category="coordinator",  # CHECK has no 'master' — reuse (AC-W1-3)
+            role_category="master",  # added to the CHECK in agents_0004
             prompt_version=PROMPT_VERSION,
             model_provider_slug="deepseek",
             model_name="deepseek-chat",

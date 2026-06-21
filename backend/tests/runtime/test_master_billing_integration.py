@@ -61,13 +61,13 @@ async def _seed(session: AsyncSession) -> tuple[UUID, UUID, UUID, UUID]:
         ),
         {"id": str(cell_id), "ws": str(workspace_id), "v": _VERTICAL},
     )
-    # Master archetype under the vertical (role_category reuses 'coordinator').
+    # Master archetype under the vertical (role_category='master', agents_0004).
     await session.execute(
         text(
             "INSERT INTO agents.agent_archetypes "
             "(id, slug, vertical_slug, display_name, role_category, prompt_version, "
             " model_provider_slug, model_name) "
-            "VALUES (:id, 'master', :v, 'Master', 'coordinator', 'v1', 'deepseek', 'deepseek-chat')"
+            "VALUES (:id, 'master', :v, 'Master', 'master', 'v1', 'deepseek', 'deepseek-chat')"
         ),
         {"id": str(master_arc_id), "v": _VERTICAL},
     )
