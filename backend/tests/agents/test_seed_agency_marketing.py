@@ -22,7 +22,7 @@ def _arc(slug: str, vertical: str = "horizontal") -> AgentArchetype:
         slug=slug,
         vertical_slug=vertical,
         display_name=slug.title(),
-        role_category="coordinator" if slug in ("coordinator", "master") else slug,
+        role_category="master" if slug == "master" else slug,
         prompt_version="0.1.0",
         model_provider_slug="deepseek",
         model_name="deepseek-chat",
@@ -43,7 +43,7 @@ async def test_seed_fresh_inserts_master_and_reuses_horizontal() -> None:
     assert len(masters) == 1
     master = masters[0]
     assert master.vertical_slug == "agency_marketing_ru"
-    assert master.role_category == "coordinator"  # CHECK has no 'master' — reuse
+    assert master.role_category == "master"  # added to the CHECK in agents_0004
     assert master.status == "draft"  # AI baseline; founder evaluator run → 'reviewed'
     assert master.tools_allowed == []
 

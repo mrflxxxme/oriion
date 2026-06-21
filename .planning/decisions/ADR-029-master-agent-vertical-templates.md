@@ -24,8 +24,9 @@
 > 3. **Split model (refines the W1 "DeepSeek-R1" line):** the structured **plan** call uses
 >    `deepseek-chat` (`role_key='master'`) because R1 emits reasoning prose that breaks fenced-JSON
 >    (the same reason R1 was pulled off the Coordinator, ADR-032); the free-text **synthesis** call
->    uses `deepseek-reasoner`/R1 (`role_key='master_synthesis'`). `role_category` reuses
->    `'coordinator'` (the CHECK lacks `'master'`; adding it is a fast-follow). Domain-quality check
+>    uses `deepseek-reasoner`/R1 (`role_key='master_synthesis'`). `role_category='master'`
+>    (added to the `agent_archetypes` CHECK in migration `agents_0004`, the 01.2 fast-follow;
+>    initially reused `'coordinator'`). Domain-quality check
 >    is a soft flag in Wave-1 (retry loop → Wave-2). Master prompt ships `status: draft` (AI
 >    baseline); promotion to `reviewed` is the founder evaluator run (ADR-026).
 
