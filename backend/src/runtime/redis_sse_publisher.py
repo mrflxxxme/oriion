@@ -108,6 +108,19 @@ class RedisSSEPublisher:
         # task lifetime + a replay window, then self-cleans.
         await client.expire(key, self._stream_ttl)
 
+    async def aclose(self) -> None:
+        """Close the lazily-created shared publish client.
+
+        Required by the Dramatiq worker, which builds a fresh publisher per
+        message (per-loop) and must release the redis connection at message end
+        so it never outlives its ``asyncio.run`` loop (the cross-loop reuse that
+        raises ``Event loop is closed`` on the 2nd message). No-op for an
+        injected client — the test owns that lifecycle.
+        """
+        if self._injected_client is None and self._shared_client is not None:
+            await self._shared_client.aclose()
+            self._shared_client = None
+
     async def subscribe(self, task_id: UUID) -> AsyncIterator[TaskStreamEvent]:
         key = _stream_key(task_id)
         # Dedicated client per generator in production; reuse the injected one
