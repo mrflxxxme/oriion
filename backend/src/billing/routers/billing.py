@@ -98,7 +98,7 @@ async def get_subscription(
 ) -> SubscriptionResponse:
     sub = await SubscriptionRepository(db).get_active_by_cell(cell_id)
     if sub is None:
-        raise SubscriptionNotFound(f"no active subscription for cell {cell_id}")
+        raise SubscriptionNotFound("no active subscription for the current cell")
     return _subscription_to_response(sub)
 
 

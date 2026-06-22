@@ -15,6 +15,7 @@ TaskStreamEventType = Literal[
     "task.step_completed",
     "task.delegation_started",
     "task.delegation_completed",
+    "task.budget_warning",
     "task.completed",
     "task.cancelled",
     "task.failed",

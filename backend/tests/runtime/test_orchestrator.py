@@ -17,6 +17,8 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import BaseModel
 from src.agents.tools.delegate import DelegateInput, DelegateResult
+from src.billing.exceptions import CellQuotaExceeded
+from src.billing.services.quota_service import QuotaStatus
 from src.runtime.orchestrator import (
     OrchestratorContext,
     estimate_step_cost,
@@ -468,3 +470,87 @@ async def test_cancel_mid_run_ends_cancelled_and_stops_further_steps(
     assert "task.cancelled" in types
     assert "task.completed" not in types
     mock_emit.emit_task_cancelled.assert_awaited_once()
+
+
+# ── AC-01.3.5/.6: quota_admission seam wiring ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_quota_admission_hard_block_fails_task(mock_emit: Any) -> None:
+    """A quota_admission that raises CellQuotaExceeded fails the task BEFORE the
+    Coordinator runs, emitting task.failed with the billing code (AC-01.3.5)."""
+    task_id = uuid4()
+    task = _build_fake_task(task_id)
+    session = _StubSession(task=task)
+    publisher = InProcessSSEPublisher()
+    agent = _FakeAgent()  # must NOT run — quota blocks first
+
+    async def _blocking_quota(_session: Any, _cell_id: UUID) -> QuotaStatus:
+        raise CellQuotaExceeded("cell over hard cap")
+
+    async def _noop_leaf(_inp: DelegateInput, _ctx: OrchestratorContext) -> DelegateResult:
+        raise AssertionError("leaf_runner should not fire when quota blocks admission")
+
+    with pytest.raises(CellQuotaExceeded):
+        await execute_agent_task(
+            task_id=task_id,
+            cell_id=uuid4(),
+            user_id=uuid4(),
+            coordinator_agent=agent,  # type: ignore[arg-type]
+            user_prompt="p",
+            available_agent_slugs=["researcher"],
+            leaf_runner=_noop_leaf,
+            sse_publisher=publisher,
+            session=session,  # type: ignore[arg-type]
+            quota_admission=_blocking_quota,
+        )
+
+    assert task.status == "failed"
+    assert agent.run_calls == []  # Coordinator never ran
+    drained = publisher._drain.get(task_id, [])
+    failed = [ev for ev in drained if ev.event_type == "task.failed"]
+    assert len(failed) == 1
+    assert failed[0].payload["error_code"] == "billing.cell_quota_exceeded"
+    mock_emit.emit_task_failed.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_quota_admission_soft_warn_emits_warning_and_succeeds(mock_emit: Any) -> None:
+    """A soft-cap quota status emits task.budget_warning but does NOT block."""
+    task_id = uuid4()
+    task = _build_fake_task(task_id)
+    session = _StubSession(task=task)
+    publisher = InProcessSSEPublisher()
+    agent = _FakeAgent()
+
+    async def _soft_quota(_session: Any, _cell_id: UUID) -> QuotaStatus:
+        return QuotaStatus(
+            enforced=True,
+            soft_warn=True,
+            period_usage=Decimal("450"),
+            soft_cap=Decimal("450"),
+            hard_cap=Decimal("600"),
+        )
+
+    async def _noop_leaf(_inp: DelegateInput, _ctx: OrchestratorContext) -> DelegateResult:
+        raise AssertionError("no delegation in this scenario")
+
+    await execute_agent_task(
+        task_id=task_id,
+        cell_id=uuid4(),
+        user_id=uuid4(),
+        coordinator_agent=agent,  # type: ignore[arg-type]
+        user_prompt="p",
+        available_agent_slugs=["researcher"],
+        leaf_runner=_noop_leaf,
+        sse_publisher=publisher,
+        session=session,  # type: ignore[arg-type]
+        quota_admission=_soft_quota,
+    )
+
+    assert task.status == "succeeded"
+    types = [ev.event_type for ev in publisher._drain.get(task_id, [])]
+    assert types == ["task.started", "task.budget_warning", "task.completed"]
+    warn = next(ev for ev in publisher._drain[task_id] if ev.event_type == "task.budget_warning")
+    assert warn.payload["reason"] == "cell_soft_cap"
+    assert warn.payload["period_usage_credits"] == "450"
