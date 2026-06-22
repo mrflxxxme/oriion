@@ -46,9 +46,10 @@ Founder-process: bootstrap-from-worktree + dual-tree guard → grill (6 forks vi
 - **Adversarial audit (3 lenses):** 0 P0 / 0 P1 — SOUND / SECURE / NO-REGRESSIONS. Caught + fixed a **real bug** (soft-warn SSE `task.budget_warning` wasn't in the `TaskStreamEventType` Literal → would crash the soft-cap branch in prod; +2 orchestrator seam tests) + dropped cell_id from the 404 body. Deferred-as-mitigated: `start_trial` TOCTOU, quota no-op for sub-less cells, BYOK-excluded-from-caps, subscriptions column-grant (→ Wave-2).
 - **9 AC-01.3.x green** — see [`phases/01.3-billing.md`](./roadmap/wave-1-core-mvp/phases/01.3-billing.md).
 - **Billing-инвариант сохранён:** step-sum = cost authority (no `rollup_task_cost`); 01.2 cost-authority suites still green.
-- **Live-валидация — НЕ выполнена** (founder-action; Docker daemon up but `backend/.env`/`DEEPSEEK_API_KEY` absent from the worktree).
+- **Live-валидация — ✅ DONE (2026-06-23, funded DeepSeek):** Master in-process golden **7/7**; **worker-path billing golden** (Dramatiq + RLS-billing) — Trial **500** live, worker run `succeeded` cost **4.5678** (3 debits persisted, balance 500→495.43), per-day cap → `task.failed` `billing.daily_quota_exceeded` at admission. **01.3 billing is live-proven end-to-end (trial+debit+cap)** via `scripts/live_golden_worker_billing.py` + `live_cap_check.py`.
+- **Worker-infra finding (pre-existing 01.2, not 01.3):** redis SSE client is a process-global singleton bound to the first `asyncio.run()` loop → 2nd dispatched message crashes `Event loop is closed` on Windows-Proactor (Linux tolerates; Redis-SSE proven on Linux PR #64/#65). Recreate it per message like the DB engine. See `[[teamly-worker-asyncio-loop-redis-finding]]`.
 - The PR's GitHub Actions (ci-backend / ci-security) is the binding gate at founder-merge.
-- **NOT run this session:** F1-A Master worker-path live-golden (`scripts/live_golden_master.py`) — needs `backend/.env` with `DEEPSEEK_API_KEY` (absent); F1-B ADR-026 evaluator harness (separate Phase 01.2-eval).
+- **NOT run:** Master-through-worker (needs vertical-cell provisioning + the worker redis fix; Master contract proven in-process); F1-B ADR-026 evaluator (separate Phase 01.2-eval).
 
 ## Next actions (founder)
 
