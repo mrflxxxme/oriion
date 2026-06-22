@@ -37,6 +37,14 @@ class PlanNotFound(BillingError):
         self.slug = slug
 
 
+class SubscriptionNotFound(BillingError):
+    """No active subscription for the cell (404)."""
+
+    code = "billing.subscription_not_found"
+    status_code = 404
+    title = "Subscription not found"
+
+
 class CellQuotaExceeded(BillingError):
     """Per-cell credit cap (period hard-cap) reached — new tasks blocked.
 

@@ -33,6 +33,8 @@ from src.agents.exceptions import AgentsError
 from src.agents.routers.archetypes import router as archetypes_router
 from src.agents.routers.instances import router as agent_instances_router
 from src.agents.routers.teams import router as teams_router
+from src.billing.exceptions import BillingError
+from src.billing.routers import router as billing_router
 from src.iam.exceptions import IamError, RateLimitExceeded
 from src.iam.routers.auth import router as auth_router
 from src.iam.routers.me import router as me_router
@@ -192,6 +194,9 @@ app.include_router(archetypes_router, prefix="/api/v1")
 app.include_router(agent_instances_router, prefix="/api/v1")
 app.include_router(teams_router, prefix="/api/v1")
 
+# billing (Phase 01.3 wiring)
+app.include_router(billing_router, prefix="/api/v1")
+
 # tasks (Phase 00.5b Commit 6 wiring)
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(task_stream_router, prefix="/api/v1")
@@ -230,6 +235,24 @@ async def iam_error_handler(request: Request, exc: IamError) -> JSONResponse:
 
 @app.exception_handler(TasksError)
 async def tasks_error_handler(request: Request, exc: TasksError) -> JSONResponse:
+    body: dict[str, object] = {
+        "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
+        "title": exc.title,
+        "status": exc.status_code,
+        "code": exc.code,
+    }
+    if exc.detail:
+        body["detail"] = exc.detail
+    body["instance"] = str(request.url)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        media_type="application/problem+json",
+    )
+
+
+@app.exception_handler(BillingError)
+async def billing_error_handler(request: Request, exc: BillingError) -> JSONResponse:
     body: dict[str, object] = {
         "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
         "title": exc.title,
