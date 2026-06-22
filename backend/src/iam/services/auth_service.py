@@ -31,6 +31,10 @@ from src.agents.services.team_provisioning_service import (
     TeamProvisioning,
 )
 from src.audit.services.audit_service import emit_audit_event
+from src.billing.services.subscription_service import (
+    NULL_TRIAL_PROVISIONING,
+    TrialProvisioning,
+)
 from src.iam import events
 from src.iam.exceptions import (
     ConsentMissing,
@@ -99,6 +103,7 @@ class AuthService:
         refresh_ttl_seconds: int,
         access_ttl_seconds: int,
         team_provisioning_service: TeamProvisioning = NULL_TEAM_PROVISIONING,
+        trial_provisioning_service: TrialProvisioning = NULL_TRIAL_PROVISIONING,
     ) -> None:
         # Session is passed in so audit_log inserts + provision_initial_workspace
         # share the request's outer TX with the user / refresh-token writes.
@@ -109,6 +114,10 @@ class AuthService:
         # team (AC1); unit tests inherit the NullTeamProvisioningService default
         # (a silent no-op), so register() needs no `is not None` branch.
         self._team_provisioning_service = team_provisioning_service
+        # AC-01.3.3: eager Trial grant on first cell provisioning. Same
+        # Null-object seam — unit tests get the no-op default; production
+        # wiring (iam/deps.py) supplies the real TrialProvisioningService.
+        self._trial_provisioning_service = trial_provisioning_service
         self._user_repo = user_repo
         self._session_repo = session_repo
         self._refresh_repo = refresh_repo
@@ -208,6 +217,15 @@ class AuthService:
             await self._team_provisioning_service.provision_team(
                 preset_slug="productivity-core",
                 cell_id=provision.cell_id,
+                user_id=user.id,
+            )
+            # AC-01.3.3: grant the 14-day Trial subscription + 500 credits.
+            # Reuses the same tenant-GUC block — the billing.subscriptions +
+            # credit_transactions INSERTs need current_cell_id() to pass RLS
+            # WITH CHECK. Idempotent on the register replay path.
+            await self._trial_provisioning_service.grant_trial(
+                cell_id=provision.cell_id,
+                workspace_id=provision.workspace_id,
                 user_id=user.id,
             )
 
