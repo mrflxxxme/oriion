@@ -42,7 +42,8 @@ Founder-process: bootstrap-from-worktree + dual-tree guard → grill (6 forks vi
 
 ## Verification state
 
-- **CI-equivalent, all green (local):** `ruff check src tests` + `ruff format --check src tests` ✓ (333) · `mypy --strict src` **175 files** ✓ · unit `pytest -m "not integration and not live"` **744 passed, 1 skipped** · integration `pytest -m "integration and not live"` **40 passed** (real testcontainers PG; +11 billing incl. RLS-isolation + register→trial e2e) · per-module **billing 92% / iam 87% / llm_gateway 89% / runtime 86%** (≥85) · `bandit -r src` **0 issues**.
+- **CI-equivalent, all green (local):** `ruff check src tests` + `ruff format --check src tests` ✓ (333) · `mypy --strict src` **175 files** ✓ · unit `pytest -m "not integration and not live"` **746 passed, 1 skipped** · integration `pytest -m "integration and not live"` **40 passed** (real testcontainers PG; +11 billing incl. RLS-isolation + register→trial e2e) · per-module **billing 92% / iam 87% / llm_gateway 89% / runtime 86%** (≥85) · `bandit -r src` **0 issues**.
+- **Adversarial audit (3 lenses):** 0 P0 / 0 P1 — SOUND / SECURE / NO-REGRESSIONS. Caught + fixed a **real bug** (soft-warn SSE `task.budget_warning` wasn't in the `TaskStreamEventType` Literal → would crash the soft-cap branch in prod; +2 orchestrator seam tests) + dropped cell_id from the 404 body. Deferred-as-mitigated: `start_trial` TOCTOU, quota no-op for sub-less cells, BYOK-excluded-from-caps, subscriptions column-grant (→ Wave-2).
 - **9 AC-01.3.x green** — see [`phases/01.3-billing.md`](./roadmap/wave-1-core-mvp/phases/01.3-billing.md).
 - **Billing-инвариант сохранён:** step-sum = cost authority (no `rollup_task_cost`); 01.2 cost-authority suites still green.
 - **Live-валидация — НЕ выполнена** (founder-action; Docker daemon up but `backend/.env`/`DEEPSEEK_API_KEY` absent from the worktree).
