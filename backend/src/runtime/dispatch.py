@@ -83,6 +83,7 @@ from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrappin
 from src.runtime.orchestrator import (
     MasterStepRecorder,
     OrchestratorContext,
+    QuotaAdmissionCheck,
     estimate_step_cost,
     execute_agent_task,
 )
@@ -908,6 +909,7 @@ async def dispatch_task(
     web_search_tool: WebSearchTool | None = None,
     tool_rate_limiter: ToolRateLimiter | None = None,
     step_recorder: StepRecorder | None = None,
+    quota_admission: QuotaAdmissionCheck | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
@@ -986,6 +988,7 @@ async def dispatch_task(
         sse_publisher=publisher,
         session=session,
         master_step_recorder=master_step_recorder,
+        quota_admission=quota_admission,
     )
 
 

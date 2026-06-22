@@ -28,6 +28,7 @@ from src._shared.config import get_settings
 from src._shared.db.redis import get_redis_client
 from src._shared.db.rls import set_tenant_context
 from src._shared.middleware.tenant_context import _resolve_tenant_ids
+from src.billing.services.quota_service import enforce_quota_admission
 from src.llm_gateway.factory import build_llm_router
 from src.llm_gateway.services.router_service import LLMRouter
 from src.mcp.tools.rate_limit import ToolRateLimiter
@@ -102,6 +103,9 @@ async def run_task_dispatch(
                 # Redis. dispatch_task only uses it on the DeepSeek (native
                 # tool-call) path; the scripted-failover path ignores it.
                 tool_rate_limiter=tool_rate_limiter,
+                # AC-01.3.5/.6: real per-cell + per-day quota gate in the worker
+                # (the orchestrator's default is None ⇒ no-op for unit tests).
+                quota_admission=enforce_quota_admission,
             )
         except Exception:
             logger.exception("runtime.dispatch.actor.failed", task_id=str(task_id))
