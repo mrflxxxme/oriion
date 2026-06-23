@@ -4,7 +4,8 @@ Phase 00.2.5 anchor test. Verifies that the stub→real swap in iam +
 multitenancy actually causes:
 
   * `provision_initial_workspace` to INSERT workspace + cell rows and
-    materialize the per-cell schema (memory_entries table + HNSW index).
+    materialize the per-cell `cell_<uuid>` schema (empty since Phase 01.4 —
+    memory now lives in the single `memory` schema, ADR-011 Wave-1).
   * `emit_audit_event` to INSERT audit_log rows inside the request's
     outer TX (instead of falling back to structlog-only).
   * The token-issue / revocation chain to persist refresh_token + session
