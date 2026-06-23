@@ -167,3 +167,79 @@ async def test_summarizer_returns_agent_text() -> None:
     summarizer = LLMConversationSummarizer(cell_id=uuid4(), agent=_FakeSummAgent("Резюме диалога."))
     out = await summarizer.summarize(["сообщение один", "сообщение два"])
     assert out == "Резюме диалога."
+
+
+# ── build-agent (production path) + .data fallback coverage ────────────────
+
+
+def _bare_extractor(**over: Any) -> MemoryExtractor:
+    kw: dict[str, Any] = {
+        "session": object(),
+        "cell_id": uuid4(),
+        "user_id": uuid4(),
+        "task_id": uuid4(),
+        "workspace_id": uuid4(),
+        "cell_memory": _FakeCellMemory(),
+        "user_prompt": "p",
+    }
+    kw.update(over)
+    return MemoryExtractor(**kw)  # type: ignore[arg-type]
+
+
+def test_extractor_build_agent_requires_router_or_agent() -> None:
+    with pytest.raises(ValueError, match="llm_router or an injected agent"):
+        _bare_extractor(llm_router=None, agent=None)._build_agent()
+
+
+def test_extractor_build_agent_from_router() -> None:
+    """Production path: build a real Agent from the router (no network at build)."""
+    agent, model = _bare_extractor(llm_router=object())._build_agent()
+    assert agent is not None
+    assert model is not None
+
+
+def test_summarizer_build_agent_requires_router_or_agent() -> None:
+    with pytest.raises(ValueError, match="llm_router or an injected agent"):
+        LLMConversationSummarizer(cell_id=uuid4())._build_agent()
+
+
+def test_summarizer_build_agent_from_router() -> None:
+    assert (
+        LLMConversationSummarizer(cell_id=uuid4(), llm_router=object())._build_agent() is not None
+    )
+
+
+class _DataRun:
+    """A run exposing ``.data`` (older pydantic-ai) with ``.output`` None."""
+
+    output = None
+
+    def __init__(self, data: Any) -> None:
+        self.data = data
+
+    def usage(self) -> _FakeUsage:
+        return _FakeUsage(1, 1)
+
+
+@pytest.mark.asyncio
+async def test_extract_reads_data_when_output_none() -> None:
+    class _DataAgent:
+        model = _FakeModel()
+
+        async def run(self, _p: str, *, deps: Any) -> _DataRun:
+            return _DataRun(MemoryExtraction(should_remember=False))
+
+    cost, _i, _o = await _bare_extractor(agent=_DataAgent(), recorder=_Recorder()).extract(
+        "x", step_index=1
+    )
+    assert cost == Decimal("0.5")  # verdict parsed from the .data fallback
+
+
+@pytest.mark.asyncio
+async def test_summarizer_reads_data_when_output_none() -> None:
+    class _DataAgent:
+        async def run(self, _p: str, *, deps: Any) -> _DataRun:
+            return _DataRun("резюме из data")
+
+    out = await LLMConversationSummarizer(cell_id=uuid4(), agent=_DataAgent()).summarize(["m"])
+    assert out == "резюме из data"

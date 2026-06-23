@@ -126,6 +126,7 @@ async def test_provision_team_routes_marketing_preset_through_vertical_seed() ->
             Result(scalar=horizontal_preset),
             Result(scalar=master),
             Result(scalar=marketing_preset),  # seed: marketing preset found
+            Result(scalar=master),  # seed memory_curator found (idempotent)
             Result(scalar=marketing_preset),  # _load_preset
             Result(scalar_list=existing_instances),  # all archetypes already provisioned
         ]
