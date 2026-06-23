@@ -189,12 +189,12 @@ jobs:
           uv run pytest tests/mcp          --cov=src/mcp          --cov-fail-under=85 -q -m "not integration"
           # Phase 00.5b Commit 3: extend the per-module loop with the
           # bounded-contexts that gained surface during Phase 00.5a/00.5b.
-          # billing — covered by tests/llm_gateway (no tests/billing
-          #   subtree; src/billing/models.py is exercised through the
-          #   llm_gateway.services.billing_service tests, which is the
-          #   sanctioned cross-context model import per ADR-024 §3
-          #   amendment landing in Phase 00.5b Commit 8).
-          uv run pytest tests/llm_gateway  --cov=src/billing      --cov-fail-under=85 -q -m "not integration"
+          # billing — dedicated tests/billing subtree (Phase 01.3). Billing is a
+          #   DB/RLS-bound context: its correctness (RLS isolation, ledger SUM,
+          #   per-cell/per-day caps, idempotent trial grant, the register→trial
+          #   hook, BYOK skip-debit) is proven by real-PG integration, so the
+          #   gate runs the full subtree (unit + integration, exclude live).
+          uv run pytest tests/billing      --cov=src/billing      --cov-fail-under=85 -q -m "not live"
           # Phase 00.6 Commit 12 (AC13 strict honor): tests/tasks/ +
           # tests/runtime/ unit tests landed Commits 10-11 (95.82% src/tasks +
           # 94.92% src/runtime). F-TR-M1/M2 audit closure: test_cancel_cascade.py

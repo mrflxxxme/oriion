@@ -14,7 +14,9 @@ accrue in THIS process's registry, scraped separately from the web tier), and
 
 from __future__ import annotations
 
+import asyncio
 import os
+import sys
 
 import structlog
 
@@ -22,6 +24,15 @@ from src._shared.config import Settings, get_settings
 from src._shared.logging import configure_structlog
 from src._shared.observability import register_default_metrics
 from src.runtime.queue.broker import configure_broker
+
+# Windows dev only: the worker runs each task orchestration via asyncio.run() in a
+# Dramatiq worker thread. Windows' default Proactor loop hangs redis-asyncio I/O
+# (the SSE-publish xadd) in that context; the Selector loop is thread-safe and
+# redis-asyncio-compatible. No-op on Linux/macOS (prod), where Selector/uvloop is
+# already the default — so it only unblocks running the worker locally on Windows.
+# Set before any event loop is created. (mypy skips this branch off-win32.)
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _logger = structlog.get_logger(__name__)
 

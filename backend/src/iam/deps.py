@@ -15,6 +15,7 @@ from src._shared.config import Settings, get_settings
 from src._shared.db.redis import get_redis
 from src._shared.db.session import get_db
 from src.agents.services.team_provisioning_service import TeamProvisioningService
+from src.billing.services.subscription_service import TrialProvisioningService
 from src.iam.middleware import get_token_service
 from src.iam.repositories.consent_repository import ConsentRepository
 from src.iam.repositories.email_verification_repository import (
@@ -83,4 +84,5 @@ def get_auth_service(
         refresh_ttl_seconds=settings.refresh_ttl_seconds,
         access_ttl_seconds=settings.jwt_access_ttl_seconds,
         team_provisioning_service=TeamProvisioningService(db),
+        trial_provisioning_service=TrialProvisioningService(db),
     )

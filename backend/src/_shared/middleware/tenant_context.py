@@ -110,3 +110,20 @@ async def get_tenant_db_session(
         user_id=auth.user.id,
     ) as scoped:
         yield scoped
+
+
+async def get_current_cell_id(
+    db: AsyncSession = Depends(get_tenant_db_session),
+) -> UUID:
+    """Resolved current-cell UUID from the RLS GUC set by get_tenant_db_session.
+
+    For routers that operate on "my current cell" without a ``cell_id`` path
+    param (Wave-0 single-cell). FastAPI caches the ``get_tenant_db_session``
+    dependency per request, so this reads the same scoped session.
+    """
+    value = (await db.execute(text("SELECT _shared.current_cell_id()"))).scalar_one()
+    if value is None:
+        raise TenantContextMissingError(
+            "no current cell in tenant context — Wave-0 invariant violation"
+        )
+    return UUID(str(value))

@@ -1,11 +1,17 @@
 """Atomic 3-currency cost ledger writer.
 
-Per llm-gateway invariant #7 (README.md), ``record_llm_cost`` MUST write
-both ``llm_gateway.llm_usage_log`` and ``billing.credit_transactions`` in
-the same transaction so the sum-check invariant holds:
+Per llm-gateway invariant #7 (README.md), ``record_llm_cost`` writes
+``llm_gateway.llm_usage_log`` always, and ``billing.credit_transactions``
+for MANAGED usage, in the same transaction so the sum-check invariant holds:
 
-    SUM(credit_transactions.amount_rub) == SUM(llm_usage_log.cost_rub)
+    SUM(credit_transactions.amount_rub)
+        == SUM(llm_usage_log.cost_rub WHERE byok_key_id IS NULL)
     per cell
+
+BYOK plumbing (Phase 01.3): when ``byok_key_id`` is set the customer's own
+provider key paid for the call directly, so NO platform credits are consumed
+— the credit_transactions debit is skipped (the usage_log audit row is still
+written, tagged with byok_key_id). Hence the sum-check is debit-/managed-scoped.
 
 Wave 0 invariant: 1 credit = 1 RUB (per contracts/billing/README.md), so
 ``amount_credits = amount_rub``. Wave 2+ swaps this via the pricing_table.
@@ -119,32 +125,36 @@ async def record_llm_cost(
     # Flush so usage_row.id is materialized (used as payload reference).
     await session.flush()
 
-    # 2) billing.credit_transactions row — atomic partner. 1 credit = 1 RUB.
-    amount_credits = cost_rub
-    balance_after = await _running_balance_after_debit(session, cell_id, cost_rub)
+    # 2) billing.credit_transactions row — atomic partner for MANAGED usage.
+    #    1 credit = 1 RUB. BYOK plumbing: a call paid by the customer's own
+    #    provider key consumes no platform credits, so the debit is skipped
+    #    (the usage_log row above already carries byok_key_id for audit).
+    if byok_key_id is None:
+        amount_credits = cost_rub
+        balance_after = await _running_balance_after_debit(session, cell_id, cost_rub)
 
-    tx_row = CreditTransaction(
-        cell_id=cell_id,
-        workspace_id=workspace_id,
-        user_id=user_id,
-        task_id=task_id,
-        transaction_type="debit",
-        amount_rub=cost_rub,
-        amount_credits=amount_credits,
-        balance_after_credits=balance_after,
-        fx_rate_usd_to_rub=fx_rate,
-        provider=provider,
-        model=model,
-        tokens_input=tokens_in,
-        tokens_output=tokens_out,
-        payload={
-            "llm_usage_log_id": usage_row.id,
-            "request_id": request_id,
-            "byok_key_id": str(byok_key_id) if byok_key_id else None,
-        },
-    )
-    session.add(tx_row)
-    await session.flush()
+        tx_row = CreditTransaction(
+            cell_id=cell_id,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            task_id=task_id,
+            transaction_type="debit",
+            amount_rub=cost_rub,
+            amount_credits=amount_credits,
+            balance_after_credits=balance_after,
+            fx_rate_usd_to_rub=fx_rate,
+            provider=provider,
+            model=model,
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+            payload={
+                "llm_usage_log_id": usage_row.id,
+                "request_id": request_id,
+                "byok_key_id": None,
+            },
+        )
+        session.add(tx_row)
+        await session.flush()
 
     # 3) cloudevent — log-only Wave 0 (transport: structlog tag).
     await gateway_events.emit_request_completed(

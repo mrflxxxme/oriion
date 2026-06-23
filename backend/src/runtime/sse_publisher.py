@@ -79,26 +79,38 @@ class InProcessSSEPublisher:
 _singleton: SSEPublisher | None = None
 
 
+def build_sse_publisher() -> SSEPublisher:
+    """Create a FRESH (non-singleton) publisher per the configured backend.
+
+    The Dramatiq worker builds one per message: its per-message ``asyncio.run``
+    loop must NOT reuse a process-global redis client bound to a dead loop
+    (raises ``Event loop is closed`` on the 2nd message). The worker closes the
+    redis publisher (``aclose``) at message end — mirrors the per-message engine.
+    The long-lived web tier keeps the cached ``get_sse_publisher`` singleton.
+    """
+    from src._shared.config import get_settings
+
+    settings = get_settings()
+    if settings.sse_backend == "redis":
+        from src.runtime.redis_sse_publisher import RedisSSEPublisher
+
+        return RedisSSEPublisher(
+            redis_url=settings.redis_url.get_secret_value(),
+            poll_fallback=settings.sse_redis_poll_fallback,
+        )
+    return InProcessSSEPublisher()
+
+
 def get_sse_publisher() -> SSEPublisher:
-    """Process-wide singleton accessor. Backend is chosen by Settings.sse_backend:
-    'inprocess' (default — deterministic CI + single-worker dev) keeps the
-    asyncio.Queue publisher; 'redis' selects the Redis-Streams publisher so events
-    cross process boundaries (out-of-process Dramatiq worker + gunicorn -w >1).
-    Tests can monkeypatch by binding a fresh publisher to the module attribute."""
+    """Process-wide singleton accessor (web tier — one event loop per process).
+    Backend chosen by Settings.sse_backend: 'inprocess' (default — deterministic
+    CI + single-worker dev) keeps the asyncio.Queue publisher; 'redis' selects the
+    Redis-Streams publisher so events cross process boundaries (out-of-process
+    Dramatiq worker + gunicorn -w >1). Tests can monkeypatch by binding a fresh
+    publisher to the module attribute."""
     global _singleton
     if _singleton is None:
-        from src._shared.config import get_settings
-
-        settings = get_settings()
-        if settings.sse_backend == "redis":
-            from src.runtime.redis_sse_publisher import RedisSSEPublisher
-
-            _singleton = RedisSSEPublisher(
-                redis_url=settings.redis_url.get_secret_value(),
-                poll_fallback=settings.sse_redis_poll_fallback,
-            )
-        else:
-            _singleton = InProcessSSEPublisher()
+        _singleton = build_sse_publisher()
     return _singleton
 
 

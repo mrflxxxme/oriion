@@ -33,6 +33,7 @@ from src._shared.observability.metrics import (
 )
 from src.agents.master import MasterCallBilling
 from src.agents.tools.delegate import CoordinatorDeps, DelegateInput, DelegateResult
+from src.billing.services.quota_service import QuotaStatus
 from src.llm_gateway.services.router_service import resolve_max_tokens
 from src.runtime.budget_guard import (
     DEFAULT_TASK_CAP_TCREDITS,
@@ -53,6 +54,12 @@ LeafRunner = Callable[[DelegateInput, "OrchestratorContext"], Awaitable[Delegate
 # Built by ``runtime.dispatch`` (it has the session); the orchestrator wraps it
 # into the ctx-aware ``CoordinatorDeps.master_recorder`` (budget + SSE).
 MasterStepRecorder = Callable[[AsyncSession, MasterCallBilling], Awaitable[Decimal]]
+
+# AC-01.3.5/.6: injected per-cell + per-day quota admission check. Optional seam
+# (default None ⇒ no-op) so the orchestrator's unit tests run against fake
+# sessions without a billing DB; the worker (runtime.queue.actor) wires the real
+# ``billing.services.quota_service.enforce_quota_admission``.
+QuotaAdmissionCheck = Callable[[AsyncSession, UUID], Awaitable[QuotaStatus]]
 
 # P1-D forward-estimate constants. Mirror runtime.dispatch.estimate_credits's
 # DeepSeek per-token T-credit rates (kept local to avoid the dispatch→
@@ -150,6 +157,7 @@ async def execute_agent_task(
     session: AsyncSession,
     budget_cap: Decimal = DEFAULT_TASK_CAP_TCREDITS,
     master_step_recorder: MasterStepRecorder | None = None,
+    quota_admission: QuotaAdmissionCheck | None = None,
 ) -> dict[str, Any]:
     """Run the Coordinator agent end-to-end + emit SSE event ledger.
 
@@ -290,6 +298,31 @@ async def execute_agent_task(
     # task.failed via SSE — subscribers exit cleanly instead of hanging,
     # and reserved budget is refunded before propagation.
     try:
+        # AC-01.3.5/.6: per-cell + per-day quota admission gate. No-op when the
+        # cell has no active subscription (cells created outside register —
+        # tests/fixtures). Raises CellQuotaExceeded / DailyQuotaExceeded (caught
+        # by the failure handler below → task.failed with the billing code) when
+        # the aggregate cap is already exhausted. Soft-cap emits a non-blocking
+        # warning. Note: admission-time only — a single admitted task can still
+        # overshoot the per-cell cap by at most one per-task budget (50); mid-task
+        # per-step per-cell enforcement is deferred (Wave-1 focused scope).
+        # Injected seam: None in unit tests (no billing DB), real check in the worker.
+        if quota_admission is not None:
+            quota = await quota_admission(session, cell_id)
+            if quota.soft_warn:
+                await sse_publisher.publish(
+                    TaskStreamEvent(
+                        event_type="task.budget_warning",
+                        task_id=task_id,
+                        payload={
+                            "reason": "cell_soft_cap",
+                            "period_usage_credits": str(quota.period_usage),
+                            "soft_cap_credits": str(quota.soft_cap),
+                            "hard_cap_credits": str(quota.hard_cap),
+                        },
+                    )
+                )
+
         # Pydantic-AI returns an AgentRunResult with .output (or .data,
         # depending on version) — defensive access keeps the bridge
         # version-tolerant.
@@ -337,9 +370,18 @@ async def execute_agent_task(
         # The runtime budget guard raises tasks.exceptions.BudgetExceeded
         # (code='tasks.budget_exceeded') — including for the Master aggregate cap.
         # (llm_gateway.budget_exceeded kept for the BYOK gateway-side variant.)
+        # AC-01.3.5/.6: the billing aggregate quotas (per-cell hard-cap +
+        # per-day kill-switch) share the budget_exceeded metric outcome; the
+        # task.failed SSE carries the specific billing.* code for the client.
         outcome = (
             "budget_exceeded"
-            if str(error_code) in ("tasks.budget_exceeded", "llm_gateway.budget_exceeded")
+            if str(error_code)
+            in (
+                "tasks.budget_exceeded",
+                "llm_gateway.budget_exceeded",
+                "billing.cell_quota_exceeded",
+                "billing.daily_quota_exceeded",
+            )
             else "failed"
         )
         _record_terminal_task_metrics(

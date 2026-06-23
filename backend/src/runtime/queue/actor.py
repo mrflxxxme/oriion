@@ -25,15 +25,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from src._shared.config import get_settings
-from src._shared.db.redis import get_redis_client
+from src._shared.db.redis import build_redis_client
 from src._shared.db.rls import set_tenant_context
 from src._shared.middleware.tenant_context import _resolve_tenant_ids
+from src.billing.services.quota_service import enforce_quota_admission
 from src.llm_gateway.factory import build_llm_router
 from src.llm_gateway.services.router_service import LLMRouter
 from src.mcp.tools.rate_limit import ToolRateLimiter
 from src.runtime.dispatch import dispatch_task
 from src.runtime.queue import broker  # noqa: F401 — installs the broker before @actor binds
-from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
+from src.runtime.redis_sse_publisher import RedisSSEPublisher
+from src.runtime.sse_publisher import SSEPublisher, build_sse_publisher
 from src.tasks.models import Task
 from src.tasks.services.task_service import TaskService
 
@@ -102,6 +104,9 @@ async def run_task_dispatch(
                 # Redis. dispatch_task only uses it on the DeepSeek (native
                 # tool-call) path; the scripted-failover path ignores it.
                 tool_rate_limiter=tool_rate_limiter,
+                # AC-01.3.5/.6: real per-cell + per-day quota gate in the worker
+                # (the orchestrator's default is None ⇒ no-op for unit tests).
+                quota_admission=enforce_quota_admission,
             )
         except Exception:
             logger.exception("runtime.dispatch.actor.failed", task_id=str(task_id))
@@ -119,8 +124,14 @@ async def _run_dispatch(task_id: UUID, user_id: UUID) -> None:
     connections to a dead loop) and run the dispatch."""
     settings = get_settings()
     bundle = build_llm_router(settings)
-    publisher = get_sse_publisher()
-    tool_rate_limiter = ToolRateLimiter(get_redis_client())
+    # Per-message redis resources bound to THIS asyncio.run loop. The process-
+    # global singletons (get_sse_publisher / get_redis_client) bind to the FIRST
+    # loop, so the 2nd dispatched message would raise "Event loop is closed" on
+    # redis I/O. We build + close them per message, mirroring the per-message
+    # engine below (AC-W1-1 Redis-SSE works across many tasks per worker process).
+    publisher = build_sse_publisher()
+    redis_client = build_redis_client()
+    tool_rate_limiter = ToolRateLimiter(redis_client)
     engine = create_async_engine(settings.database_url.get_secret_value(), poolclass=NullPool)
     try:
         maker = async_sessionmaker(
@@ -136,6 +147,9 @@ async def _run_dispatch(task_id: UUID, user_id: UUID) -> None:
                 tool_rate_limiter=tool_rate_limiter,
             )
     finally:
+        if isinstance(publisher, RedisSSEPublisher):
+            await publisher.aclose()
+        await redis_client.aclose()
         await engine.dispose()
 
 

@@ -11,7 +11,8 @@
 |---|---|---|---|---|
 | 01.1-retro | AC-W1 hardening pin block (async-dispatch, obs/IaC, billing-scaffold) | ✅ Complete | ADR-032/034/035/036 | — |
 | **01.2** | **Master-Agent core (ADR-029, AC-W1-3)** — `MasterAgent` base + Coordinator subordinate-mode retrofit (`StrategicContext` in/out) + `parent_task_id` chain + Marketing-agency РФ reference vertical end-to-end + evaluator-gate scaffold | ✅ **Code-complete (this PR)** | [ADR-029](../../decisions/ADR-029-master-agent-vertical-templates.md), [ADR-026](../../decisions/ADR-026-vertical-expertise-pipeline.md), [ADR-022](../../decisions/ADR-022-coordinator-wizard-llm-hybrid.md) | — |
-| 01.3 | Биллинг — T-кредиты ledger + Trial 14д/500 + Solo тариф + per-task/cell caps + BYOK plumbing + **ЮKassa test mode** | ⏳ Pending | [ADR-008](../../decisions/ADR-008-credits-billing.md) | live-flip → OQ-02/OQ-19 |
+| **01.3** | Биллинг core — T-кредиты ledger + Trial 14д/500 + Solo тариф + per-cell/per-day caps + BYOK plumbing + credit-rate API. **ЮKassa → focused follow-up 01.3b** (grill 2026-06-22) | ✅ **Code-complete** | [ADR-008](../../decisions/ADR-008-credits-billing.md), [01.3 spec](./phases/01.3-billing.md) | 01.3b live-flip → OQ-02/OQ-19 |
+| 01.3b | Биллинг ЮKassa test-mode top-up (payment-create + webhook→credit + idempotency) | ⏳ Pending | [ADR-008](../../decisions/ADR-008-credits-billing.md) | **GATED: OQ-02 + OQ-19** |
 | 01.4 | Memory — cell + role (двухуровневая, manual control) + conversation history (FIFO + summarization) | ⏳ Pending | [ADR-011](../../decisions/ADR-011-memory-2-level.md) | — |
 | 01.5 | Артефакты — Yjs документы + S3 ассеты + citeable `artifact://` URLs | ⏳ Pending | [ADR-012](../../decisions/ADR-012-artifacts.md) | — |
 | 01.6 | Security guardrails — input/output фильтр + capability sandboxing + DLP-сканер | ⏳ Pending | [ADR-014](../../decisions/ADR-014-security.md) | **до любого PII-surface** |

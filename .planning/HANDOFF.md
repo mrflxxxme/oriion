@@ -4,56 +4,60 @@
 
 ## Last updated
 
-- Date: 2026-06-19 (**Wave-1 kickoff — Phase 01.2 Master-Agent core, AC-W1-3**)
-- Session: `pedantic-satoshi-8ced82`
+- Date: 2026-06-22 (**Phase 01.3 — Billing core, ADR-008**)
+- Session: `kind-goldstine-ba713f`
 - Agent: @claude-opus
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. **Phase 01.1-retro = ✅ COMPLETE** (#58–66 merged). **Phase 01.2 (Master-Agent core) = ✅ code-complete + locally verified (this PR).**
-- **What this PR delivers:** the two-tier Master-Agent layer (ADR-029, AC-W1-3) — the foundation all Wave-1 verticals sit on — proven end-to-end with the **Marketing-agency РФ** reference vertical. ADR-029 flipped **Proposed → Accepted**. Wave-1 `PHASES.md` regenerated (dependency-first 01.2→01.12).
-- **Branch:** `claude/pedantic-satoshi-8ced82` (off `origin/main` = `1a90ba9`). Focused PR → `main` → founder-merge.
-- ⚠️ **Dual-tree guard (it bit twice this session):** canon `.planning/` is in the **worktree**; the outer `…/TEAMLY_RU/.planning` is stale. Anchor to `git rev-parse --show-toplevel`. (The ADR Explore agent read the stale tree → falsely reported ADR-033/036 "missing"; they exist in canon. A Master-prompt Write first landed in the stale tree → relocated.)
+- **Wave:** Wave 1 (Core MVP) — **in progress**. 01.1-retro ✅ · 01.2 Master-Agent core ✅ · **01.3 Billing core ✅ code-complete + locally verified (this PR).**
+- **What this PR delivers:** the billing **account layer** on top of the 01.2 cost-ledger — tariffs, idempotent Trial-14d/500 grant, balance/usage read API, per-cell + per-day caps (R-04), BYOK skip-debit plumbing, and the `/api/v1/billing/*` surface. **Focused-split scope** (grill 2026-06-22): enforced Trial+Solo; ЮKassa → follow-up **01.3b**; rollover/overage deferred.
+- **Branch:** `claude/kind-goldstine-ba713f` (off `origin/main` = `fcbeb2c`). Focused PR → `main` → founder-merge.
+- ⚠️ **Dual-tree guard:** canon `.planning/` is in the **worktree**; the outer `…/TEAMLY_RU/.planning` is stale. Anchor to `git rev-parse --show-toplevel`.
 
-## Active blockers (unchanged; none block 01.2)
+## Active blockers (none block 01.3 billing-core)
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
 | OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
-| OQ-02 | Юр.форма ООО vs ИП | Founder | НЕ блокирует тех.разработку; до ЮKassa (Phase 01.3) |
-| OQ-32 / OQ-33 | Telegram Business consent-UX + 152-ФЗ + РКН update | Founder + юрист | gates **Phase 01.11** (Business-API), NOT 01.2/01.9 |
+| OQ-02 | Юр.форма ООО vs ИП | Founder | gates **01.3b ЮKassa** live-flip |
+| OQ-19 | Открытие ЮKassa (5–10 дн) | Founder + бухгалтер | gates **01.3b ЮKassa** test→live |
+| OQ-32 / OQ-33 | Telegram Business consent-UX + 152-ФЗ + РКН | Founder + юрист | gates **Phase 01.11** |
 
-## What just happened — Phase 01.2 (2026-06-19)
+## What just happened — Phase 01.3 (2026-06-22)
 
-Founder-process: bootstrap-from-worktree + dual-tree guard → `/grill-me` (8 forks) → Plan-agent code-grounded design → execute (9 logical commits) → local CI + multiagent audit + gsd-verifier → exit ritual → focused PR.
+Founder-process: bootstrap-from-worktree + dual-tree guard → grill (6 forks via AskUserQuestion) → plan (pinned in-session) → execute (8 atomic commits) → local CI green → exit ritual → focused PR.
 
-**Implemented (ADR-029, AC-W1-3):**
-- `StrategicContext` (`agents/strategic_context.py`) + optional `CoordinatorDeps.{strategic_context, master_recorder}` (additive, default `None` → horizontal path byte-identical).
-- `PlanExecutingCoordinator.run` threads the strategic brief into the inner deps + prepends a domain preamble only when present (also fixes the previously-dropped depth fields).
-- `agents/master.py` — `MasterPlan` / `MasterResponse` / `MasterDeps` / `MasterCallBilling` + `build_master_{plan,synthesis}_agent` (split model: plan=deepseek-chat, synthesis=R1).
-- `runtime/dispatch.py` — `MasterAgent` orchestration object (CEO over the `PlanExecutingCoordinator` COO, reusing the same leaf runner) + `record_master_call_step` (`step_type='llm_call'`) + `resolve_master` (vertical detection via `Cell.vertical_template_slug`) + vertical-scoped `_resolve_archetype_id`.
-- `runtime/orchestrator.py` — optional `master_step_recorder` → ctx-aware `master_recorder` so the Master's plan+synthesis calls fold into the SAME `ctx.accumulated_cost`; the 50-credit per-task cap covers the **Master + children aggregate** (R-32/R-04). **2 physical task levels** (Coordinator runs inside the Master's single run as `task_steps`).
-- `router_service.py` — `master`/`master_synthesis` model + max-token entries.
-- `role_prompt_loader.py` — `load_master_prompt(masters/<vertical>.md)`; `scripts/sync_role_prompts.sh` now mirrors the `masters/` subdir recursively (CI `diff -rq` passes).
-- Marketing-agency seed (`agency_marketing_ru_v1.py` — Master archetype reusing the horizontal specialists) + provisioning wiring.
-- `contracts/role-prompts/masters/agency_marketing_ru.md` (AI baseline, `status: draft`) + `verticals/agency-marketing-ru/golden-dataset/` scaffold (methodology + 2 example tasks + 5 adversarial probes).
-- Cost authority reconciled (grill #7): `task.total_cost_credits` step-sum is the single source of truth; the Master path does NOT call `rollup_task_cost` (would double-count steps + lineage children — documented).
+**Grill decisions (2026-06-22):** Trial+Solo enforced (Команда catalog-only — multitenancy single-cell) · ЮKassa → focused follow-up 01.3b · caps per-cell hard-block + per-day kill-switch (overage-fee deferred) · BYOK plumbing-only · rollover deferred · credit-rate fixed-config + endpoint.
+
+**Implemented (ADR-008 Wave-1 slice):**
+- `billing/0002_plans.py` (catalog, no-RLS, seed 6 tiers) + `billing/0003_subscriptions.py` (RLS `sub_cell_isolation`, partial-unique one-active-per-cell).
+- `billing.models` `Plan`/`Subscription` + `billing/repositories/` + `billing/services/{subscription,balance,quota,credit_rate}_service.py` + `billing/exceptions.py` + `billing/schemas.py` + `billing/routers/billing.py`.
+- Trial grant wired into `iam.auth_service.register` via a `TrialProvisioning` Null-object port (mirrors `agents.TeamProvisioning`), inside register's existing `set_tenant_context` block; real impl in `iam/deps.py`.
+- Caps: `enforce_quota_admission` injected into `runtime/orchestrator.execute_agent_task` + `dispatch_task` as an optional `quota_admission` seam (default None ⇒ unit-test no-op); the **worker** (`runtime/queue/actor.py`) wires the real check. `Cell/DailyQuotaExceeded` → `task.failed`.
+- BYOK: `record_llm_cost` skips the credit-debit when `byok_key_id` is set (usage_log audit row kept); sum-check refined managed-only.
+- `main.py`: billing router + `BillingError` RFC-7807 handler. `_shared/middleware/tenant_context.get_current_cell_id` dep.
+- `tests/conftest.py`: `billing.plans` excluded from the `db_session_committed` TRUNCATE (seed reference table, like rbac).
+- CI: `src/billing` ≥85% per-module gate now runs `tests/billing -m "not live"` (was the stale `tests/llm_gateway` line).
 
 ## Verification state
 
-- **CI-equivalent, all green (local, post-audit-remediation):** `ruff check src tests` + `ruff format --check src tests` ✓ · `mypy --strict src` **163 files** ✓ · unit `pytest -m "not integration and not live"` **739 passed, 1 skipped** (cov **90.45%**) · per-module gates **agents 98% / runtime 87% / tasks 99% / billing 100%** (≥85) · integration `pytest -m "integration and not live"` **29 passed** (real testcontainers PG; +1 new Master-billing test) · `bandit -r src` **0 issues** · role-prompts drift `diff -rq` **DRIFT-OK** · tools-allowlist **OK**.
-- **Adversarial audit (Workflow, 17 agents, 5 lenses + goal-backward):** 0 P0 / 0 P1 / 5 P2 / 3 P3 — all addressed in `c157f50` (token rollup, Master pre-call budget gate, budget-metric label, dropped stale-zero field, AC-3.2 test + AC-3.6 wording). No correctness/security/regression defects.
-- **8 AC-W1-3.x green** — see [`phases/01.2-master-agent-core.md`](./roadmap/wave-1-core-mvp/phases/01.2-master-agent-core.md).
-- **Live-валидация — НЕ выполнена** (founder-action, нужен funded DeepSeek + dev stack) — see Next actions.
-- The PR's GitHub Actions (ci-backend / ci-frontend / ci-security) is the binding gate at founder-merge.
+- **CI-equivalent, all green (local):** `ruff check src tests` + `ruff format --check src tests` ✓ (333) · `mypy --strict src` **175 files** ✓ · unit `pytest -m "not integration and not live"` **746 passed, 1 skipped** · integration `pytest -m "integration and not live"` **40 passed** (real testcontainers PG; +11 billing incl. RLS-isolation + register→trial e2e) · per-module **billing 92% / iam 87% / llm_gateway 89% / runtime 86%** (≥85) · `bandit -r src` **0 issues**.
+- **Adversarial audit (3 lenses):** 0 P0 / 0 P1 — SOUND / SECURE / NO-REGRESSIONS. Caught + fixed a **real bug** (soft-warn SSE `task.budget_warning` wasn't in the `TaskStreamEventType` Literal → would crash the soft-cap branch in prod; +2 orchestrator seam tests) + dropped cell_id from the 404 body. Deferred-as-mitigated: `start_trial` TOCTOU, quota no-op for sub-less cells, BYOK-excluded-from-caps, subscriptions column-grant (→ Wave-2).
+- **9 AC-01.3.x green** — see [`phases/01.3-billing.md`](./roadmap/wave-1-core-mvp/phases/01.3-billing.md).
+- **Billing-инвариант сохранён:** step-sum = cost authority (no `rollup_task_cost`); 01.2 cost-authority suites still green.
+- **Live-валидация — ✅ DONE (2026-06-23, funded DeepSeek):** Master in-process golden **7/7**; **worker-path golden** (Dramatiq + **Redis-SSE** + RLS-billing) — Trial **500** live; worker run `succeeded` cost ~**5.06** (3 debits persisted, balance 500→~495); **Redis-SSE** `/stream` replayed 8 frames cross-process; per-day cap → `task.failed` `billing.daily_quota_exceeded` at admission. **01.3 billing live-proven end-to-end (trial+debit+cap)** via `scripts/live_golden_worker_billing.py` + `live_cap_check.py`.
+- **Worker-infra fix (pre-existing 01.2, not 01.3) — ✅ FIXED:** the worker rebuilt the DB engine per message but reused a process-global redis SSE client bound to the first `asyncio.run()` loop → 2nd message crashed `Event loop is closed`. Now builds+closes the redis SSE publisher/client per message (`build_sse_publisher`/`build_redis_client`/`aclose`) + Selector loop policy on Windows → enabled the Redis-SSE run above (unit-pinned `test_worker_sse_lifecycle`). **Residual:** local-Windows worker *intermittently* stalls on a 2nd task's redis publish (Windows-asyncio-redis flakiness; each golden runs against a fresh worker — definitive multi-task run → CI/Linux). See `[[teamly-worker-asyncio-loop-redis-finding]]`.
+- The PR's GitHub Actions (ci-backend / ci-security) is the binding gate at founder-merge.
+- **NOT run:** Master-through-worker (needs vertical-cell provisioning + the worker redis fix; Master contract proven in-process); F1-B ADR-026 evaluator (separate Phase 01.2-eval).
 
 ## Next actions (founder)
 
-1. **Merge** the focused PR (`claude/pedantic-satoshi-8ced82` → `main`).
-2. **Live golden** on funded DeepSeek (worker tract touched — green units insufficient, per memory `live-golden-async-dispatch-findings`): provision a Marketing-agency cell, `POST /tasks/{id}/run`, assert dispatch <1s, `task.completed` carries a real `MasterResponse.final_artifact_markdown`, `0 < total_cost_credits ≤ 50`, `/metrics` shows the +2 Master LLM calls.
-3. **Evaluator run** (ADR-026) → promote the Master prompt + archetype `draft → reviewed` (≥75% golden + 100% adversarial); materialize the remaining golden tasks toward 30 (founder domain-expertise step).
-4. Fast-follow (optional): add `'master'` to the `agent_archetypes.role_category` CHECK (currently reuses `'coordinator'`).
+1. **Merge** the focused PR (`claude/kind-goldstine-ba713f` → `main`).
+2. **Live golden (Docker + funded DeepSeek):** register a cell → `GET /api/v1/billing/balance` = 500 trial; run a task → debit + balance drops; drive over hard-cap → `task.failed` `billing.cell_quota_exceeded`. Create `backend/.env` with `DEEPSEEK_API_KEY` first.
+3. **OQ-02 (ООО/ИП) + OQ-19 (open ЮKassa)** → unblock **01.3b** ЮKassa test-mode top-up.
+4. Carry-over from 01.2 (still open): Master live-golden (F1-A) + ADR-026 evaluator promote (F1-B).
 
 ## Next phase
 
-**Phase 01.3 — Billing** (ADR-008): T-credit ledger + Trial-14d/500 + Solo tier + per-task/cell caps + BYOK plumbing + ЮKassa **test mode** (live-flip gated on OQ-02/OQ-19).
+**Phase 01.4 — Memory** (ADR-011): cell + role two-level memory (manual control) + conversation history (FIFO + summarization).

@@ -310,6 +310,10 @@ async def db_session_committed(db_engine: AsyncEngine) -> AsyncIterator[AsyncSes
         #   by migration `migrations/versions/rbac/0005_seed_built_in_roles.py`;
         #   wiping them breaks tests/rbac/test_seed_data.py + any test
         #   that LEFT JOINs from cell_members.role_id.
+        # * `billing.plans` — tariff catalog seeded by
+        #   `migrations/versions/billing/0002_plans.py`; a global reference
+        #   table (like the rbac seeds). Wiping it breaks every billing test
+        #   that resolves a plan (start_trial → PlanNotFound, etc.).
         #
         # Per-cell schemas (`cell_<uuid>`) are NOT in the schemaname filter
         # below — they're created on-demand by `provision_cell_schema` and
@@ -324,6 +328,7 @@ async def db_session_committed(db_engine: AsyncEngine) -> AsyncIterator[AsyncSes
                     "   AND tablename NOT LIKE 'alembic_%' "
                     "   AND NOT (schemaname = 'rbac' AND tablename IN "
                     "            ('permissions','system_roles','role_permissions'))"
+                    "   AND NOT (schemaname = 'billing' AND tablename = 'plans')"
                 )
             )
             qualified = [row[0] for row in tables.all()]

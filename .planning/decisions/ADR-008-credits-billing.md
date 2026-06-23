@@ -2,6 +2,25 @@
 
 - **Status:** Accepted
 
+## Implementation status — Phase 01.3 (2026-06-22, session `kind-goldstine-ba713f`)
+
+Wave-1 slice **implemented** (focused split per grill 2026-06-22 — see
+[`phases/01.3-billing.md`](../roadmap/wave-1-core-mvp/phases/01.3-billing.md)):
+
+- ✅ **Tariff catalog** seeded (all 6 tiers, `billing.plans`). **Enforced: Trial + Solo only**
+  (single-cell); Команда/Enterprise = catalog rows (multi-cell provisioning not built → enforcement
+  is a follow-up).
+- ✅ **Credit-rate** = fixed config (`1 credit = 1 RUB`, role-multiplier 1×, FX from env) published at
+  `GET /api/v1/billing/credit-rate`. The «≈₽10» line is a marketing anchor (avg task cost), not the
+  unit value. Live ЦБ FX feed → Wave 2.
+- ✅ **Caps:** per-task 50/100 (existing) + **per-cell** soft-warn→hard-block + **per-day** hard
+  kill-switch (R-04, configurable per-tier seed). **Overage-fee billing (+%) deferred** — Wave 1
+  hard-blocks instead of charging.
+- ✅ **BYOK = plumbing only** (skip credit-debit + audit row + `byok_allowed` catalog flag); per-call
+  platform-fee metering + live flag-enforcement → follow-up.
+- ⏳ **Rollover/expiry** (50% / ≤1mo / 60-day) **deferred** (needs a periodic job).
+- ⏳ **ЮKassa** → focused follow-up **01.3b** (test-mode top-up; live-flip gated OQ-02/OQ-19).
+
 ## Decision
 
 ### Tariff matrix
