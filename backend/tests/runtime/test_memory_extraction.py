@@ -101,9 +101,12 @@ async def test_extract_writes_entries_and_bills_when_should_remember() -> None:
     cell_memory = _FakeCellMemory()
     recorder = _Recorder(cost=Decimal("0.7"))
 
-    cost = await _extractor(agent, recorder, cell_memory).extract("Итоговый отчёт.", step_index=5)
+    cost, in_tok, out_tok = await _extractor(agent, recorder, cell_memory).extract(
+        "Итоговый отчёт.", step_index=5
+    )
 
     assert cost == Decimal("0.7")
+    assert (in_tok, out_tok) == (80, 40)  # tokens returned for the task rollup
     # both entries persisted to cell memory, tagged source='filter_agent'
     assert len(cell_memory.added) == 2
     assert all(a["source"] == "filter_agent" for a in cell_memory.added)
@@ -126,7 +129,9 @@ async def test_extract_bills_but_writes_nothing_when_not_should_remember() -> No
     cell_memory = _FakeCellMemory()
     recorder = _Recorder()
 
-    cost = await _extractor(agent, recorder, cell_memory).extract("x", step_index=3)
+    cost, _in_tok, _out_tok = await _extractor(agent, recorder, cell_memory).extract(
+        "x", step_index=3
+    )
 
     assert cost == Decimal("0.5")
     assert cell_memory.added == []  # nothing remembered

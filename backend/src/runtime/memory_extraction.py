@@ -48,16 +48,13 @@ from src.llm_gateway.pydantic_ai_model import LLMGatewayModel
 from src.llm_gateway.services.router_service import LLMRouter
 from src.memory.services.memory_service import CellMemoryService
 from src.runtime.dispatch import _extract_usage, record_memory_call_step
+from src.runtime.orchestrator import MemoryExtractionHook
 
 logger = structlog.get_logger(__name__)
 
 # Session-bound biller for one curator LLM call (defaults to the real-ledger
 # ``record_memory_call_step``; unit tests inject a no-DB fake).
 MemoryStepRecorder = Callable[[AsyncSession, MemoryCallBilling], Awaitable[Decimal]]
-
-# The orchestrator's post-success hook: (final deliverable, collision-free step
-# index) → the billed cost in credits (folded into ctx.accumulated_cost).
-MemoryExtractionHook = Callable[[str, int], Awaitable[Decimal]]
 
 
 def _compose_extraction_prompt(user_prompt: str, deliverable: str) -> str:
@@ -111,8 +108,10 @@ class MemoryExtractor:
         )
         return build_memory_extraction_agent(model=model), model
 
-    async def extract(self, deliverable: str, step_index: int) -> Decimal:
-        """Run the filter-agent, persist any entries, bill the call. Returns cost.
+    async def extract(self, deliverable: str, step_index: int) -> tuple[Decimal, int, int]:
+        """Run the filter-agent, persist any entries, bill the call.
+
+        Returns ``(cost, input_tokens, output_tokens)`` for the task rollup.
 
         Entries are written BEFORE the billing step so the orchestrator's
         best-effort swallow keeps ``task.total_cost == SUM(steps)``: the cost is
@@ -170,7 +169,7 @@ class MemoryExtractor:
             should_remember=verdict.should_remember,
             entries=len(verdict.entries) if verdict.should_remember else 0,
         )
-        return cost
+        return cost, input_tokens, output_tokens
 
 
 def build_memory_extraction_hook(
@@ -200,7 +199,7 @@ def build_memory_extraction_hook(
         llm_router=llm_router,
     )
 
-    async def _hook(deliverable: str, step_index: int) -> Decimal:
+    async def _hook(deliverable: str, step_index: int) -> tuple[Decimal, int, int]:
         return await extractor.extract(deliverable, step_index)
 
     return _hook

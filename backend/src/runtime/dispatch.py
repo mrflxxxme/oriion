@@ -83,6 +83,7 @@ from src.multitenancy.models import Cell
 from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
 from src.runtime.orchestrator import (
     MasterStepRecorder,
+    MemoryExtractionHook,
     OrchestratorContext,
     QuotaAdmissionCheck,
     estimate_step_cost,
@@ -965,6 +966,7 @@ async def dispatch_task(
     tool_rate_limiter: ToolRateLimiter | None = None,
     step_recorder: StepRecorder | None = None,
     quota_admission: QuotaAdmissionCheck | None = None,
+    memory_extraction: MemoryExtractionHook | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
@@ -1044,6 +1046,7 @@ async def dispatch_task(
         session=session,
         master_step_recorder=master_step_recorder,
         quota_admission=quota_admission,
+        memory_extraction=memory_extraction,
     )
 
 
