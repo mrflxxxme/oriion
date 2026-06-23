@@ -1,15 +1,19 @@
 """Integration: multitenancy.provision_cell_schema(uuid) SQL function.
 
-Requires real Postgres with pgvector + migrations applied. Asserts:
-  * The function returns a stable schema name (`cell_<uuid_underscored>`).
-  * cell_<uuid>.memory_entries table exists with the expected columns.
-  * The HNSW index on `embedding` exists.
-  * pgvector `<->` query returns neighbors after a sample INSERT (AC5).
+Requires real Postgres with migrations applied. Since Phase 01.4 (ADR-011
+Wave-1) memory lives in a single `memory` schema (RLS by cell_id), so the
+provisioner creates ONLY an empty `cell_<uuid>` schema — the dead per-cell
+`memory_entries` placeholder was removed (migration
+`multitenancy/0006_provision_cell_schema_drop_memory`). Asserts:
+  * the function returns a stable schema name (`cell_<uuid_underscored>`);
+  * the schema exists but carries NO `memory_entries` table;
+  * the function stays idempotent.
+
+The pgvector ANN smoke now lives against the single `memory` schema in
+`tests/memory/test_memory_integration.py` (embedding round-trip).
 
 Note: the <30s provisioning SLO (AC2) is a perf target, not a correctness
-property — a wall-clock assertion here is flaky under CI runner contention, so
-it is tracked as a perf SLI elsewhere and intentionally not asserted in this
-functional test.
+property — tracked as a perf SLI elsewhere, intentionally not asserted here.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-async def test_provision_cell_schema_creates_schema_and_index(
+async def test_provision_cell_schema_creates_empty_schema(
     db_session: AsyncSession,
 ) -> None:
     cell_id = uuid4()
@@ -35,10 +39,16 @@ async def test_provision_cell_schema_creates_schema_and_index(
         {"cell_id": str(cell_id)},
     )
     schema_name = result.scalar()
-
     assert schema_name == expected_schema
 
-    # memory_entries table exists with expected columns.
+    # The schema exists ...
+    schema_exists = await db_session.execute(
+        text("SELECT 1 FROM information_schema.schemata WHERE schema_name = :s"),
+        {"s": schema_name},
+    )
+    assert schema_exists.scalar() == 1
+
+    # ... but the dead per-cell memory_entries placeholder is NOT created.
     cols_result = await db_session.execute(
         text(
             "SELECT column_name FROM information_schema.columns "
@@ -46,28 +56,7 @@ async def test_provision_cell_schema_creates_schema_and_index(
         ),
         {"s": schema_name},
     )
-    cols = {r[0] for r in cols_result.all()}
-    assert {
-        "id",
-        "content",
-        "embedding",
-        "embedding_provider",
-        "embedding_model",
-        "embedding_dim",
-        "metadata",
-        "created_at",
-    } <= cols
-
-    # HNSW index present.
-    idx_result = await db_session.execute(
-        text(
-            "SELECT indexname FROM pg_indexes "
-            "WHERE schemaname = :s AND tablename = 'memory_entries'"
-        ),
-        {"s": schema_name},
-    )
-    indexes = {r[0] for r in idx_result.all()}
-    assert "memory_entries_embedding_hnsw_idx" in indexes
+    assert cols_result.first() is None, "per-cell memory_entries should no longer be provisioned"
 
 
 @pytest.mark.asyncio
@@ -82,42 +71,3 @@ async def test_provision_cell_schema_idempotent(db_session: AsyncSession) -> Non
         {"c": str(cell_id)},
     )
     assert r1.scalar() == r2.scalar()
-
-
-@pytest.mark.asyncio
-async def test_pgvector_nearest_neighbor_query(db_session: AsyncSession) -> None:
-    """After provisioning, vector ANN search returns rows (AC5 smoke)."""
-    cell_id = uuid4()
-    res = await db_session.execute(
-        text("SELECT multitenancy.provision_cell_schema(:c)"),
-        {"c": str(cell_id)},
-    )
-    schema_name = res.scalar()
-
-    # Insert two rows with 1024-dim unit-like embeddings. NOTE: pgvector's
-    # cosine distance is undefined for zero vectors (||v|| = 0) — they're
-    # silently excluded from ANN results. So each row must have non-zero
-    # magnitude; we set the i-th component to 1.0 and leave the rest at 0.0.
-    for i in (0, 1):
-        vec = ", ".join(["1.0" if j == i else "0.0" for j in range(1024)])
-        await db_session.execute(
-            text(
-                f'INSERT INTO "{schema_name}".memory_entries '
-                "(content, embedding, embedding_provider, embedding_model, embedding_dim) "
-                f"VALUES (:c, '[{vec}]'::vector, 'test', 'test', 1024)"
-            ),
-            {"c": f"row-{i}"},
-        )
-
-    # ANN ordering on the cosine operator. Query vector matches row-1 exactly.
-    query_vec = ", ".join(["1.0" if j == 1 else "0.0" for j in range(1024)])
-    res = await db_session.execute(
-        text(
-            f'SELECT content FROM "{schema_name}".memory_entries '
-            f"ORDER BY embedding <=> '[{query_vec}]'::vector LIMIT 2"
-        )
-    )
-    rows = [r[0] for r in res.all()]
-    assert len(rows) == 2
-    # The vector matching exactly should come first.
-    assert rows[0] == "row-1"
