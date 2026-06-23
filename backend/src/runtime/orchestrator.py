@@ -493,10 +493,12 @@ async def execute_agent_task(
                 )
             )
         except Exception as exc:  # housekeeping must never fail a succeeded task
+            # SECURITY: log the exception TYPE only — never str(exc), which could
+            # echo deliverable/entry content from an upstream validation error.
             logger.warning(
                 "runtime.memory_extraction.failed",
                 task_id=str(task_id),
-                error=str(exc),
+                error_type=type(exc).__name__,
             )
 
     # Cost rollup + completion stamp.

@@ -864,7 +864,10 @@ class MasterAgent:
         synth_latency = int((perf_counter() - t1) * 1000)
         final_artifact = strip_wrapping_fence(_extract_output_text(synth_run)).strip()
         # Master steps use a collision-free index space vs the leaf delegation
-        # steps (which occupy 1..len(artifacts)): plan=0, synthesis=len+1.
+        # steps (which occupy 1..len(artifacts)): plan=0, synthesis=len+1. NOTE
+        # (01.4b): post-task memory extraction reserves len+2 (see
+        # orchestrator.execute_agent_task) — keep synthesis at len+1 so the
+        # (task_id, step_index) unique key holds across the leaf+Master+memory steps.
         synthesis_index = len(coordinator_output.artifacts) + 1
         await self._bill(
             deps,

@@ -99,7 +99,8 @@ class MemoryCuratorDeps:
 class MemoryCallBilling:
     """Everything the recorder needs to bill + persist one curator LLM call.
 
-    Persisted as a ``task_steps`` row (``step_type='memory_extraction'``) on the
+    Persisted as a ``task_steps`` row (``step_type='llm_call'`` — the step CHECK
+    has no 'memory_extraction' value, so the phase lives in ``input_jsonb``) on the
     task under the seeded ``memory_curator`` archetype FK, so the per-task
     step-sum (the cost authority) includes the auto-extraction overhead —
     parallels ``MasterCallBilling`` for the Master's own plan/synthesis calls.
