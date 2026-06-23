@@ -142,6 +142,9 @@ ignore = [
 # plan-execution sub-prompt chaining), not code-style noise — same rationale
 # as the canned_pydantic_ai fixture above.
 "src/runtime/dispatch.py" = ["RUF001"]
+# 01.4b: memory_curator.py carries the RU LLM-facing filter/summarizer system
+# prompts — intentional content, same rationale as dispatch.py above.
+"src/agents/memory_curator.py" = ["RUF001"]
 # Phase 00.6 PR-B: demo_market_brief carries the RU demo prompt + RU-facing
 # docstring (gate evidence collector) — intentional content, not style noise.
 "scripts/*.py" = ["RUF001", "RUF002", "RUF003"]
