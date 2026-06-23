@@ -45,6 +45,8 @@ from src.llm_gateway.routers.embeddings import router as embeddings_router
 from src.llm_gateway.routers.providers import router as providers_router
 from src.llm_gateway.routers.usage import router as usage_router
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
+from src.memory.exceptions import MemoryError
+from src.memory.routers import router as memory_router
 from src.multitenancy.exceptions import MultitenancyError
 from src.multitenancy.routers.cells import router as cells_router
 from src.multitenancy.routers.cells import workspace_cells_router
@@ -197,6 +199,9 @@ app.include_router(teams_router, prefix="/api/v1")
 # billing (Phase 01.3 wiring)
 app.include_router(billing_router, prefix="/api/v1")
 
+# memory (Phase 01.4 wiring)
+app.include_router(memory_router, prefix="/api/v1")
+
 # tasks (Phase 00.5b Commit 6 wiring)
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(task_stream_router, prefix="/api/v1")
@@ -253,6 +258,24 @@ async def tasks_error_handler(request: Request, exc: TasksError) -> JSONResponse
 
 @app.exception_handler(BillingError)
 async def billing_error_handler(request: Request, exc: BillingError) -> JSONResponse:
+    body: dict[str, object] = {
+        "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
+        "title": exc.title,
+        "status": exc.status_code,
+        "code": exc.code,
+    }
+    if exc.detail:
+        body["detail"] = exc.detail
+    body["instance"] = str(request.url)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        media_type="application/problem+json",
+    )
+
+
+@app.exception_handler(MemoryError)
+async def memory_error_handler(request: Request, exc: MemoryError) -> JSONResponse:
     body: dict[str, object] = {
         "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
         "title": exc.title,
