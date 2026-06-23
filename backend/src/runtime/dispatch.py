@@ -63,6 +63,7 @@ from src.agents.master import (
     build_master_plan_agent,
     build_master_synthesis_agent,
 )
+from src.agents.memory_curator import MemoryCallBilling
 from src.agents.models import AgentArchetype
 from src.agents.researcher import ResearcherDeps, build_researcher_agent
 from src.agents.services.role_prompt_loader import load_master_prompt
@@ -291,6 +292,60 @@ async def record_master_call_step(session: AsyncSession, billing: MasterCallBill
         agent_archetype_id=archetype_id,
         step_type="llm_call",
         input_jsonb={"phase": billing.phase},
+        output_jsonb={
+            "input_tokens": billing.input_tokens,
+            "output_tokens": billing.output_tokens,
+            "provider": billing.provider_slug,
+            "model": billing.model_name,
+            "request_id": request_id,
+        },
+        status="succeeded",
+        cost_credits=cost_rub,
+    )
+    step.started_at = now
+    step.completed_at = now
+    session.add(step)
+    await session.flush()
+    return cost_rub
+
+
+async def record_memory_call_step(session: AsyncSession, billing: MemoryCallBilling) -> Decimal:
+    """Bill + persist one memory-curator LLM call (filter / summary) — 01.4b.
+
+    Parallels ``record_master_call_step`` for the curator's own call: writes a
+    ``task_steps`` row (``step_type='llm_call'`` — the step CHECK has no
+    'memory_extraction' value, so the phase lives in ``input_jsonb`` instead)
+    under the seeded ``memory_curator`` archetype, so the per-task step-sum (the
+    cost authority) includes the auto-extraction overhead.
+
+    The archetype + workspace are resolved BEFORE the ledger write so a missing
+    ``memory_curator`` seed raises cleanly (the orchestrator runs this
+    best-effort + swallows — this ordering avoids an orphan ledger debit).
+    """
+    workspace_id = await _resolve_workspace_id(session, billing.cell_id)
+    archetype_id = await _resolve_archetype_id(session, "memory_curator")
+    request_id = uuid4().hex
+    _cost_usd, cost_rub = await record_llm_cost(
+        session,
+        workspace_id=workspace_id,
+        cell_id=billing.cell_id,
+        user_id=billing.user_id,
+        task_id=billing.parent_task_id,
+        provider=billing.provider_slug,
+        model=billing.model_name,
+        tokens_in=billing.input_tokens,
+        tokens_out=billing.output_tokens,
+        latency_ms=billing.latency_ms,
+        status="success",
+        request_id=request_id,
+    )
+    now = datetime.now(UTC)
+    step = TaskStep(
+        task_id=billing.parent_task_id,
+        step_index=billing.step_index,
+        agent_archetype_id=archetype_id,
+        step_type="llm_call",
+        input_jsonb={"phase": billing.phase, "kind": "memory_extraction"},
         output_jsonb={
             "input_tokens": billing.input_tokens,
             "output_tokens": billing.output_tokens,
@@ -1008,6 +1063,7 @@ __all__ = [
     "normalize_artifact_markdown",
     "record_delegation_step",
     "record_master_call_step",
+    "record_memory_call_step",
     "resolve_master",
     "strip_wrapping_fence",
 ]
