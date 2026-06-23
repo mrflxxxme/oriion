@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from src.memory.services.conversation_service import (
+    ConversationHistoryService,
+    ConversationSummarizer,
+)
 from src.memory.services.embedder import Embedder, GatewayEmbedder, build_gateway_embedder
 from src.memory.services.memory_service import CellMemoryService
 from src.memory.services.role_memory_service import RoleMemoryService
 
 __all__ = [
     "CellMemoryService",
+    "ConversationHistoryService",
+    "ConversationSummarizer",
     "Embedder",
     "GatewayEmbedder",
     "RoleMemoryService",

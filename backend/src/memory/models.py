@@ -12,7 +12,7 @@ from datetime import datetime
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, CheckConstraint, Index, Text, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Identity, Index, Integer, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -71,6 +71,37 @@ class MemoryEntry(Base):
     created_by_user_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("now()"))
+
+
+class ConversationMessage(Base):
+    """One message in a per agent-instance conversation log (ADR-011 Wave-1).
+
+    Immutable + append-only. ``seq`` (IDENTITY) gives stable FIFO ordering even
+    when several messages are appended in one transaction (``created_at`` =
+    transaction time and would tie).
+    """
+
+    __tablename__ = "conversation_history"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('user','agent','system')",
+            name="conversation_history_role_check",
+        ),
+        Index("ix_conversation_cell_agent_seq", "cell_id", "agent_id", "seq"),
+        {"schema": "memory"},
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
+    cell_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    workspace_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    agent_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=text("now()"))
 
 
 class RoleMemoryEntry(Base):
