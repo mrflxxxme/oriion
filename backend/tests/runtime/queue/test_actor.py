@@ -173,6 +173,41 @@ async def test_commits_failed_state_and_reraises() -> None:
     assert session.commits == 2
 
 
+# ── run_task_dispatch: wires the real memory-extraction hook (01.4b) ───────
+
+
+@pytest.mark.asyncio
+async def test_wires_memory_extraction_hook() -> None:
+    """The worker builds + forwards the post-task memory_extraction hook so the
+    orchestrator runs auto-extraction on success (mirrors quota_admission)."""
+    session = _FakeSession()
+    captured: dict[str, Any] = {}
+
+    async def fake_dispatch(**kwargs: Any) -> dict[str, Any]:
+        captured.update(kwargs)
+        return {}
+
+    task = SimpleNamespace(
+        id=uuid4(), status="queued", cell_id=uuid4(), input_jsonb={"prompt": "p"}
+    )
+    ran = await run_task_dispatch(
+        session=session,  # type: ignore[arg-type]
+        task_id=task.id,
+        user_id=uuid4(),
+        router=object(),  # type: ignore[arg-type]
+        publisher=object(),  # type: ignore[arg-type]
+        resolve_tenant=_resolve_fixed,
+        load_task=lambda _s, _t: _ready(task),
+        dispatch=fake_dispatch,
+    )
+
+    assert ran is True
+    # the hook is forwarded + callable (the orchestrator invokes it on success),
+    # alongside the quota gate.
+    assert callable(captured["memory_extraction"])
+    assert captured["quota_admission"] is not None
+
+
 async def _ready(value: Any) -> Any:
     """Wrap a value in an awaitable so a lambda can stand in for an async loader."""
     return value
