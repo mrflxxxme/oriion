@@ -127,3 +127,20 @@ async def get_current_cell_id(
             "no current cell in tenant context — Wave-0 invariant violation"
         )
     return UUID(str(value))
+
+
+async def get_current_workspace_id(
+    db: AsyncSession = Depends(get_tenant_db_session),
+) -> UUID:
+    """Resolved current-workspace UUID from the RLS GUC (sibling of cell_id).
+
+    Used by writers that persist a ``workspace_id`` column (e.g. memory
+    entries) without threading it through the handler signature. Reads the same
+    request-cached scoped session set by ``get_tenant_db_session``.
+    """
+    value = (await db.execute(text("SELECT _shared.current_workspace_id()"))).scalar_one()
+    if value is None:
+        raise TenantContextMissingError(
+            "no current workspace in tenant context — Wave-0 invariant violation"
+        )
+    return UUID(str(value))

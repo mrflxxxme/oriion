@@ -90,6 +90,47 @@ PATCH  /api/cells/<id>/knowledge/<entry_id>    # move category, edit
 DELETE /api/cells/<id>/knowledge/<entry_id>
 ```
 
+## Wave-1 implementation status (Phase 01.4, 2026-06-23)
+
+Implemented in Phase 01.4 (session `dazzling-shamir-c26b51`), with two grounded
+amendments to this ADR:
+
+- **Embedding model — YandexGPT 256-dim, not 1024 (grill Q1).** Yandex text
+  embeddings (`text-search-doc` / `text-search-query`) are **256-dim**; the
+  "1024-dim YandexGPT" above was wrong. GigaChat embeddings are currently
+  `NotImplementedError`. The dimension is a single source of truth
+  (`src.memory.models.MEMORY_EMBEDDING_DIM = 256`); the embedder is asymmetric
+  (doc model for stored entries, query model for searches) behind an injectable
+  port. Changing the dim later = re-embed + reindex migration.
+- **Storage — single `memory` schema + `cell_id` + RLS, not per-cell schemas
+  (grill Q3).** `memory.memory_entries` / `memory.role_memory_entries` /
+  `memory.conversation_history` are FORCE-RLS via `_shared.current_cell_id()`
+  (mirrors billing/iam/tasks), with HNSW `vector_cosine_ops`. This
+  **supersedes** the unused 1024-dim per-cell `cell_<uuid>.memory_entries`
+  placeholder created by `multitenancy/0004_provision_cell_schema_function`
+  (divergent + unused → cleanup chip).
+
+**Delivered:** cell memory + role memory (store/search/CRUD API, RLS,
+embed-on-store, advisory soft caps 500/cell·200/role) + conversation history
+(FIFO N=50 + summarize-on-overflow **seam**) + the manual «запомни» trigger.
+Conversation summaries are stored as `memory_entries` with
+`kind='conversation_summary'` (as specified above).
+
+**Deferred → `01.4b — memory auto-extraction`:** the **automatic** filter-agent
+(lite-LLM extraction after each task) + the **LLM conversation summarizer** +
+their orchestrator/worker post-task wiring + a `memory_curator` archetype seed +
+live worker validation. The summarizer is an injected port (ready for 01.4b).
+Reason: the auto-trigger needs a NOT-NULL `task_steps.agent_archetype_id` seed +
+an orchestrator hot-path change + flaky-on-Windows live validation — a
+focused-split (`[[infra-pr-scope-prefers-focused-splits]]`).
+
+**Deferred (later waves, per this ADR):** RAG-inject into agent prompts (grill
+Q4), the «Что помнит [агент]» view/edit/delete UI panel (grill Q6 → `01.4-ui`),
+the 90-day conversation-history retention sweep + >1yr auto-archive, and Wave-2
+persistent-across-sessions / Wave-3 PARA «Знания команды».
+
+Phase doc: [`phases/01.4-memory.md`](../roadmap/wave-1-core-mvp/phases/01.4-memory.md).
+
 ## Links
 
 - Risks: [R-05](../risks/REGISTER.md), [R-19](../risks/REGISTER.md), [R-20](../risks/REGISTER.md)
