@@ -28,6 +28,7 @@ from src.agents.seed_data.agency_marketing_ru_v1 import (
     PRESET_SLUG as AGENCY_MARKETING_PRESET_SLUG,
 )
 from src.agents.seed_data.agency_marketing_ru_v1 import ensure_agency_marketing_ru_seed
+from src.agents.seed_data.memory_curator_v1 import ensure_memory_curator_archetype
 from src.agents.seed_data.productivity_core_v1 import ensure_productivity_core_seed
 
 logger = structlog.get_logger(__name__)
@@ -73,6 +74,12 @@ class TeamProvisioningService:
             await ensure_agency_marketing_ru_seed(self._session)
         else:
             await ensure_productivity_core_seed(self._session)
+
+        # 01.4b: ensure the horizontal memory-curator archetype exists so the
+        # worker can bill auto-extraction steps (the NOT-NULL
+        # task_steps.agent_archetype_id FK) for any task in this cell. Not a team
+        # member → no agent_instance, not in any preset; idempotent like the seeds.
+        await ensure_memory_curator_archetype(self._session)
 
         preset = await self._load_preset(preset_slug)
 
