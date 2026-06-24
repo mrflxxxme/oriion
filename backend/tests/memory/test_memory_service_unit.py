@@ -51,7 +51,7 @@ class _FakeCellRepo:
     async def list_recent(self, cell_id: Any, *, limit: int, offset: int = 0) -> list[Any]:
         return []
 
-    async def delete_by_id(self, entry_id: Any) -> bool:
+    async def delete_by_id(self, entry_id: Any, *, cell_id: Any) -> bool:
         return self._delete_ok
 
 

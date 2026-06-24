@@ -377,6 +377,14 @@ def _extract_output_text(run_result: Any) -> str:
     return str(output)
 
 
+def _first_present(*values: int | None) -> int:
+    """First non-None value (honours a legitimate 0-token count), else 0."""
+    for value in values:
+        if value is not None:
+            return int(value)
+    return 0
+
+
 def _extract_usage(run_result: Any) -> tuple[int, int]:
     """Return ``(input_tokens, output_tokens)`` from an AgentRunResult.
 
@@ -391,13 +399,16 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     usage = usage_attr() if callable(usage_attr) else usage_attr
     if usage is None:
         return 0, 0
-    input_tokens = (
-        getattr(usage, "input_tokens", None) or getattr(usage, "request_tokens", None) or 0
+    # Prefer the canonical field by PRESENCE (is-not-None), not truthiness — a
+    # legitimate 0-token count must win over a stale deprecated alias on the same
+    # usage object (billing-token correctness).
+    input_tokens = _first_present(
+        getattr(usage, "input_tokens", None), getattr(usage, "request_tokens", None)
     )
-    output_tokens = (
-        getattr(usage, "output_tokens", None) or getattr(usage, "response_tokens", None) or 0
+    output_tokens = _first_present(
+        getattr(usage, "output_tokens", None), getattr(usage, "response_tokens", None)
     )
-    return int(input_tokens), int(output_tokens)
+    return input_tokens, output_tokens
 
 
 def build_leaf_runner(
