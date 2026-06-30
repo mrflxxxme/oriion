@@ -130,18 +130,36 @@ def _record_terminal_task_metrics(
     TASK_QUEUE_DEPTH.labels(cell_id=cell_label).dec()
 
 
+# Cap the filter-agent's deliverable input — bounds cost + context for tasks that
+# emit many/large artifacts (the filter only needs enough to spot durable facts).
+_MAX_DELIVERABLE_CHARS = 12000
+
+
 def _deliverable_text(output: Any) -> str:
-    """Filter-agent input (grill Q7): the Master's synthesized deliverable if
-    present, else the Coordinator summary, else a string fallback."""
+    """Filter-agent input (grill Q7): the task's final deliverable.
+
+    Master path → the synthesized ``final_artifact_markdown``. Horizontal path →
+    the Coordinator's artifacts (the actual work product), prefixed by its summary.
+    A live golden showed that feeding the summary ALONE leaves the filter nothing
+    durable to extract — the real content lives in the artifacts.
+    """
     if output is None:
         return ""
     final = getattr(output, "final_artifact_markdown", None)
     if isinstance(final, str) and final.strip():
         return final
+    parts: list[str] = []
     summary = getattr(output, "summary", None)
-    if isinstance(summary, str):
-        return summary
-    return str(output)
+    if isinstance(summary, str) and summary.strip():
+        parts.append(summary)
+    artifacts = getattr(output, "artifacts", None)
+    if isinstance(artifacts, list):
+        for artifact in artifacts:
+            body = getattr(artifact, "path_or_inline", None)
+            if isinstance(body, str) and body.strip():
+                parts.append(body)
+    text = "\n\n".join(parts) if parts else str(output)
+    return text[:_MAX_DELIVERABLE_CHARS]
 
 
 class OrchestratorContext:

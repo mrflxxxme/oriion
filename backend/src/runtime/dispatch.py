@@ -34,6 +34,7 @@ infra-PR follow-up.
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -392,22 +393,26 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     ``input_tokens``/``output_tokens`` (newer) or
     ``request_tokens``/``response_tokens`` (older). Defensive across both.
     """
-    # Pydantic-AI is migrating ``.usage`` from a method to a property (a live
-    # golden surfaced the deprecation warning). Handle BOTH so a version bump
-    # doesn't silently zero the token counts (billing-token correctness).
-    usage_attr = getattr(run_result, "usage", None)
-    usage = usage_attr() if callable(usage_attr) else usage_attr
-    if usage is None:
-        return 0, 0
-    # Prefer the canonical field by PRESENCE (is-not-None), not truthiness — a
-    # legitimate 0-token count must win over a stale deprecated alias on the same
-    # usage object (billing-token correctness).
-    input_tokens = _first_present(
-        getattr(usage, "input_tokens", None), getattr(usage, "request_tokens", None)
-    )
-    output_tokens = _first_present(
-        getattr(usage, "output_tokens", None), getattr(usage, "response_tokens", None)
-    )
+    # Pydantic-AI emits DeprecationWarnings both for the ``.usage`` METHOD form
+    # (now a property) AND for the ``request_tokens``/``response_tokens`` aliases
+    # (renamed to ``input_tokens``/``output_tokens``). A live golden surfaced that
+    # under pytest's filterwarnings=error these escalate to exceptions — failing a
+    # leaf delegation's billing, or (swallowed) silently dropping the memory step.
+    # Guard the WHOLE access; prefer the canonical field by PRESENCE (is-not-None,
+    # so a legitimate 0-token count wins over a stale alias). Handle both shapes so
+    # a version bump can't silently zero the billing tokens.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        usage_attr = getattr(run_result, "usage", None)
+        usage = usage_attr() if callable(usage_attr) else usage_attr
+        if usage is None:
+            return 0, 0
+        input_tokens = _first_present(
+            getattr(usage, "input_tokens", None), getattr(usage, "request_tokens", None)
+        )
+        output_tokens = _first_present(
+            getattr(usage, "output_tokens", None), getattr(usage, "response_tokens", None)
+        )
     return input_tokens, output_tokens
 
 
