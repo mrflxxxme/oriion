@@ -4,7 +4,7 @@
 
 ## Last updated
 
-- Date: 2026-06-24 (**Phase 01.4b — Memory auto-extraction, ADR-011 Wave-1 completion**)
+- Date: 2026-07-01 (**Phase 01.4b — Memory auto-extraction + 01.4 tail-free closeout, ADR-011 Wave-1**)
 - Session: `tender-clarke-a1cd06`
 - Agent: @claude-opus
 
@@ -40,12 +40,12 @@ Founder-process: F1 preflight (PR #71/#72 merged-check; Docker started by founde
 - **Live golden** (`scripts/live_golden_memory.py`, funded DeepSeek): **5/5**, GATE PASS, ~$0.001 — live `deepseek-chat` returns a parseable `MemoryExtraction` via PromptedOutput (rich → `should_remember=True` 5 typed entries; trivial → `should_remember=False`; summarizer → digest). In-process single-loop (Windows redis-per-loop / one-task-per-worker flake sidestepped; transport proven on Linux PR #64/#65 + `live_golden_worker_billing.py`).
 - **Adversarial audit (3 lenses, 3 independent reviewers, refute-by-default):** **0 P0 / 0 current-P1** — **SOUND / SECURE / NO-REGRESSIONS**. Fixes: content-safe failure log (`error_type` not `str(exc)`); `MemoryCallBilling` docstring (`step_type='llm_call'`); cross-file step-index contract note. 2 pre-existing P2/P3 (`_extract_usage` zero-token; `delete_by_id` defense-in-depth) → chip `task_e980ab7b`.
 - **8 AC-01.4b.x green** — see [`phases/01.4b-memory-auto-extraction.md`](./roadmap/wave-1-core-mvp/phases/01.4b-memory-auto-extraction.md). **01.4 now fully ✅** (AC-01.4.7 PARTIAL → ✅; AC-01.4.6 summarizer impl ✅).
-- **NOT run (deferred):** the conversation-turn **producer** (capture agent-turns during a task) + the Dramatiq+Redis **worker-transport** live golden on Windows (→ CI/Linux). The PR's GitHub Actions (ci-backend / ci-security) is the binding gate at founder-merge.
+- **Tail-free closeout (2026-07-01):** chip folded (`_extract_usage` 0-token precedence + `delete_by_id` cell filter); **worker-through live golden DONE** (`tests/runtime/test_memory_worker_live.py` — `run_task_dispatch` core vs live DeepSeek, in-process: succeeded + memory step billed THROUGH the worker path + step-sum invariant on REAL multi-agent data + best-effort resilience; surfaced + fixed the `_extract_usage` pydantic-ai deprecation escalation + `_deliverable_text` feeding the thin summary not the artifacts). **conversation-turn producer = DECIDED-DEFERRED to a future per-agent chat phase** (no chat surface; team-task turns have no unambiguous `agent_id`; team work is recorded in tasks/steps/artifacts). Only the Dramatiq+Redis worker *transport* live run stays on Linux. The PR's GitHub Actions (ci-backend / ci-security) is the binding gate at founder-merge.
 
 ## Next actions (founder)
 
 1. **Merge** the focused PR (`claude/tender-clarke-a1cd06` → `main`).
-2. **Carry-over follow-ups:** conversation-turn **producer** (so summarize-on-overflow fires in prod) · Windows worker-transport live golden → CI/Linux · `01.4-ui` («Что помнит [агент]» panel) · chip `task_e980ab7b` (`_extract_usage` zero-token + `delete_by_id` cell filter).
+2. **Genuinely-separate follow-ups (NOT 01.4 tails):** conversation-turn **producer** → future per-agent chat phase · `01.4-ui` («Что помнит [агент]» panel, grill Q6) · Dramatiq+Redis worker-*transport* live run → CI/Linux · ADR-011 later waves (RAG-inject, retention sweep, PARA).
 3. Still open: **01.3b ЮKassa** (OQ-02/OQ-19) · Master-**through-worker** live golden · F1-B ADR-026 evaluator.
 
 ## Next phase
