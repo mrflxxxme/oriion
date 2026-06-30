@@ -23,6 +23,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+import structlog
 from pydantic_ai import Agent
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,6 +48,8 @@ from src.tasks import events as tasks_events
 from src.tasks.exceptions import TaskCancelled
 from src.tasks.models import Task
 
+logger = structlog.get_logger(__name__)
+
 LeafRunner = Callable[[DelegateInput, "OrchestratorContext"], Awaitable[DelegateResult]]
 """Signature an orchestrator's leaf-dispatch callable must follow."""
 
@@ -60,6 +63,15 @@ MasterStepRecorder = Callable[[AsyncSession, MasterCallBilling], Awaitable[Decim
 # sessions without a billing DB; the worker (runtime.queue.actor) wires the real
 # ``billing.services.quota_service.enforce_quota_admission``.
 QuotaAdmissionCheck = Callable[[AsyncSession, UUID], Awaitable[QuotaStatus]]
+
+# AC-01.4.7: injected post-task memory auto-extraction hook (01.4b). Optional seam
+# (default None ⇒ no-op) so the orchestrator's unit tests run without an LLM; the
+# worker wires the real filter-agent via
+# ``runtime.memory_extraction.build_memory_extraction_hook``. Args: (final
+# deliverable text, collision-free step_index); returns (billed_cost, input_tokens,
+# output_tokens) — the cost folds into the per-task cap + step-sum, the tokens roll
+# into the task token totals (so cost + tokens stay consistent, like the Master).
+MemoryExtractionHook = Callable[[str, int], Awaitable[tuple[Decimal, int, int]]]
 
 # P1-D forward-estimate constants. Mirror runtime.dispatch.estimate_credits's
 # DeepSeek per-token T-credit rates (kept local to avoid the dispatch→
@@ -118,6 +130,38 @@ def _record_terminal_task_metrics(
     TASK_QUEUE_DEPTH.labels(cell_id=cell_label).dec()
 
 
+# Cap the filter-agent's deliverable input — bounds cost + context for tasks that
+# emit many/large artifacts (the filter only needs enough to spot durable facts).
+_MAX_DELIVERABLE_CHARS = 12000
+
+
+def _deliverable_text(output: Any) -> str:
+    """Filter-agent input (grill Q7): the task's final deliverable.
+
+    Master path → the synthesized ``final_artifact_markdown``. Horizontal path →
+    the Coordinator's artifacts (the actual work product), prefixed by its summary.
+    A live golden showed that feeding the summary ALONE leaves the filter nothing
+    durable to extract — the real content lives in the artifacts.
+    """
+    if output is None:
+        return ""
+    final = getattr(output, "final_artifact_markdown", None)
+    if isinstance(final, str) and final.strip():
+        return final
+    parts: list[str] = []
+    summary = getattr(output, "summary", None)
+    if isinstance(summary, str) and summary.strip():
+        parts.append(summary)
+    artifacts = getattr(output, "artifacts", None)
+    if isinstance(artifacts, list):
+        for artifact in artifacts:
+            body = getattr(artifact, "path_or_inline", None)
+            if isinstance(body, str) and body.strip():
+                parts.append(body)
+    text = "\n\n".join(parts) if parts else str(output)
+    return text[:_MAX_DELIVERABLE_CHARS]
+
+
 class OrchestratorContext:
     """Run-state shared across Coordinator → leaf delegations."""
 
@@ -142,6 +186,11 @@ class OrchestratorContext:
         # reconciles with task.total_cost_credits on the Master path).
         self.master_input_tokens = 0
         self.master_output_tokens = 0
+        # AC-01.4.7: the post-task memory-extraction call's tokens. Its cost folds
+        # into accumulated_cost; its tokens roll up here so task.total_*_tokens
+        # stays consistent with total_cost_credits (same contract as the Master).
+        self.memory_input_tokens = 0
+        self.memory_output_tokens = 0
 
 
 async def execute_agent_task(
@@ -158,6 +207,7 @@ async def execute_agent_task(
     budget_cap: Decimal = DEFAULT_TASK_CAP_TCREDITS,
     master_step_recorder: MasterStepRecorder | None = None,
     quota_admission: QuotaAdmissionCheck | None = None,
+    memory_extraction: MemoryExtractionHook | None = None,
 ) -> dict[str, Any]:
     """Run the Coordinator agent end-to-end + emit SSE event ledger.
 
@@ -436,6 +486,39 @@ async def execute_agent_task(
         await tasks_events.emit_task_cancelled(task_id=task_id, cascaded_to=[])
         return {"summary": "(cancelled)", "total_cost_credits": str(ctx.accumulated_cost)}
 
+    # AC-01.4.7 memory auto-extraction (01.4b). SUCCESS path only (grill Q4): run
+    # the injected filter-agent hook on the final deliverable BEFORE the cost
+    # rollup, so its billed cost folds into accumulated_cost (→ total_cost_credits,
+    # preserving total == SUM(steps)). The step index sits above the leaf (1..N) +
+    # Master synthesis (N+1) indices → collision-free under the unique
+    # (task_id, step_index) constraint. Best-effort: a housekeeping failure must
+    # NEVER flip a succeeded task to failed (grill Q5 — never reject), so the whole
+    # call is swallowed; cost folds only on a clean return (the extractor writes
+    # the task_step LAST, so a clean return guarantees the step exists).
+    if memory_extraction is not None:
+        try:
+            mem_cost, mem_in, mem_out = await memory_extraction(
+                _deliverable_text(output), len(ctx.leaf_outputs) + 2
+            )
+            ctx.accumulated_cost += mem_cost
+            ctx.memory_input_tokens += mem_in
+            ctx.memory_output_tokens += mem_out
+            await sse_publisher.publish(
+                TaskStreamEvent(
+                    event_type="task.step_completed",
+                    task_id=task_id,
+                    payload={"phase": "memory_extraction", "cost_credits": str(mem_cost)},
+                )
+            )
+        except Exception as exc:  # housekeeping must never fail a succeeded task
+            # SECURITY: log the exception TYPE only — never str(exc), which could
+            # echo deliverable/entry content from an upstream validation error.
+            logger.warning(
+                "runtime.memory_extraction.failed",
+                task_id=str(task_id),
+                error_type=type(exc).__name__,
+            )
+
     # Cost rollup + completion stamp.
     completed_at = datetime.now(UTC)
     duration_ms = int((completed_at - started_at).total_seconds() * 1000)
@@ -451,10 +534,14 @@ async def execute_agent_task(
         # AC-W1-3: token totals = leaf delegations + the Master's own plan/synthesis
         # calls, so they reconcile with total_cost_credits (cost includes both).
         task.total_input_tokens = (
-            sum(r.input_tokens for r in ctx.leaf_outputs) + ctx.master_input_tokens
+            sum(r.input_tokens for r in ctx.leaf_outputs)
+            + ctx.master_input_tokens
+            + ctx.memory_input_tokens
         )
         task.total_output_tokens = (
-            sum(r.tokens_used for r in ctx.leaf_outputs) + ctx.master_output_tokens
+            sum(r.tokens_used for r in ctx.leaf_outputs)
+            + ctx.master_output_tokens
+            + ctx.memory_output_tokens
         )
     refund_unused(ctx.accumulated_cost, reserved)
     _record_terminal_task_metrics(

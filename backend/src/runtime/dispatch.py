@@ -34,6 +34,7 @@ infra-PR follow-up.
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -63,6 +64,7 @@ from src.agents.master import (
     build_master_plan_agent,
     build_master_synthesis_agent,
 )
+from src.agents.memory_curator import MemoryCallBilling
 from src.agents.models import AgentArchetype
 from src.agents.researcher import ResearcherDeps, build_researcher_agent
 from src.agents.services.role_prompt_loader import load_master_prompt
@@ -82,6 +84,7 @@ from src.multitenancy.models import Cell
 from src.runtime.artifact_text import normalize_artifact_markdown, strip_wrapping_fence
 from src.runtime.orchestrator import (
     MasterStepRecorder,
+    MemoryExtractionHook,
     OrchestratorContext,
     QuotaAdmissionCheck,
     estimate_step_cost,
@@ -308,6 +311,60 @@ async def record_master_call_step(session: AsyncSession, billing: MasterCallBill
     return cost_rub
 
 
+async def record_memory_call_step(session: AsyncSession, billing: MemoryCallBilling) -> Decimal:
+    """Bill + persist one memory-curator LLM call (filter / summary) — 01.4b.
+
+    Parallels ``record_master_call_step`` for the curator's own call: writes a
+    ``task_steps`` row (``step_type='llm_call'`` — the step CHECK has no
+    'memory_extraction' value, so the phase lives in ``input_jsonb`` instead)
+    under the seeded ``memory_curator`` archetype, so the per-task step-sum (the
+    cost authority) includes the auto-extraction overhead.
+
+    The archetype + workspace are resolved BEFORE the ledger write so a missing
+    ``memory_curator`` seed raises cleanly (the orchestrator runs this
+    best-effort + swallows — this ordering avoids an orphan ledger debit).
+    """
+    workspace_id = await _resolve_workspace_id(session, billing.cell_id)
+    archetype_id = await _resolve_archetype_id(session, "memory_curator")
+    request_id = uuid4().hex
+    _cost_usd, cost_rub = await record_llm_cost(
+        session,
+        workspace_id=workspace_id,
+        cell_id=billing.cell_id,
+        user_id=billing.user_id,
+        task_id=billing.parent_task_id,
+        provider=billing.provider_slug,
+        model=billing.model_name,
+        tokens_in=billing.input_tokens,
+        tokens_out=billing.output_tokens,
+        latency_ms=billing.latency_ms,
+        status="success",
+        request_id=request_id,
+    )
+    now = datetime.now(UTC)
+    step = TaskStep(
+        task_id=billing.parent_task_id,
+        step_index=billing.step_index,
+        agent_archetype_id=archetype_id,
+        step_type="llm_call",
+        input_jsonb={"phase": billing.phase, "kind": "memory_extraction"},
+        output_jsonb={
+            "input_tokens": billing.input_tokens,
+            "output_tokens": billing.output_tokens,
+            "provider": billing.provider_slug,
+            "model": billing.model_name,
+            "request_id": request_id,
+        },
+        status="succeeded",
+        cost_credits=cost_rub,
+    )
+    step.started_at = now
+    step.completed_at = now
+    session.add(step)
+    await session.flush()
+    return cost_rub
+
+
 def _extract_output_text(run_result: Any) -> str:
     """Pull the markdown body off a Pydantic-AI AgentRunResult, version-tolerant."""
     output = getattr(run_result, "output", None)
@@ -321,6 +378,14 @@ def _extract_output_text(run_result: Any) -> str:
     return str(output)
 
 
+def _first_present(*values: int | None) -> int:
+    """First non-None value (honours a legitimate 0-token count), else 0."""
+    for value in values:
+        if value is not None:
+            return int(value)
+    return 0
+
+
 def _extract_usage(run_result: Any) -> tuple[int, int]:
     """Return ``(input_tokens, output_tokens)`` from an AgentRunResult.
 
@@ -328,20 +393,27 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     ``input_tokens``/``output_tokens`` (newer) or
     ``request_tokens``/``response_tokens`` (older). Defensive across both.
     """
-    # Pydantic-AI is migrating ``.usage`` from a method to a property (a live
-    # golden surfaced the deprecation warning). Handle BOTH so a version bump
-    # doesn't silently zero the token counts (billing-token correctness).
-    usage_attr = getattr(run_result, "usage", None)
-    usage = usage_attr() if callable(usage_attr) else usage_attr
-    if usage is None:
-        return 0, 0
-    input_tokens = (
-        getattr(usage, "input_tokens", None) or getattr(usage, "request_tokens", None) or 0
-    )
-    output_tokens = (
-        getattr(usage, "output_tokens", None) or getattr(usage, "response_tokens", None) or 0
-    )
-    return int(input_tokens), int(output_tokens)
+    # Pydantic-AI emits DeprecationWarnings both for the ``.usage`` METHOD form
+    # (now a property) AND for the ``request_tokens``/``response_tokens`` aliases
+    # (renamed to ``input_tokens``/``output_tokens``). A live golden surfaced that
+    # under pytest's filterwarnings=error these escalate to exceptions — failing a
+    # leaf delegation's billing, or (swallowed) silently dropping the memory step.
+    # Guard the WHOLE access; prefer the canonical field by PRESENCE (is-not-None,
+    # so a legitimate 0-token count wins over a stale alias). Handle both shapes so
+    # a version bump can't silently zero the billing tokens.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        usage_attr = getattr(run_result, "usage", None)
+        usage = usage_attr() if callable(usage_attr) else usage_attr
+        if usage is None:
+            return 0, 0
+        input_tokens = _first_present(
+            getattr(usage, "input_tokens", None), getattr(usage, "request_tokens", None)
+        )
+        output_tokens = _first_present(
+            getattr(usage, "output_tokens", None), getattr(usage, "response_tokens", None)
+        )
+    return input_tokens, output_tokens
 
 
 def build_leaf_runner(
@@ -808,7 +880,10 @@ class MasterAgent:
         synth_latency = int((perf_counter() - t1) * 1000)
         final_artifact = strip_wrapping_fence(_extract_output_text(synth_run)).strip()
         # Master steps use a collision-free index space vs the leaf delegation
-        # steps (which occupy 1..len(artifacts)): plan=0, synthesis=len+1.
+        # steps (which occupy 1..len(artifacts)): plan=0, synthesis=len+1. NOTE
+        # (01.4b): post-task memory extraction reserves len+2 (see
+        # orchestrator.execute_agent_task) — keep synthesis at len+1 so the
+        # (task_id, step_index) unique key holds across the leaf+Master+memory steps.
         synthesis_index = len(coordinator_output.artifacts) + 1
         await self._bill(
             deps,
@@ -910,6 +985,7 @@ async def dispatch_task(
     tool_rate_limiter: ToolRateLimiter | None = None,
     step_recorder: StepRecorder | None = None,
     quota_admission: QuotaAdmissionCheck | None = None,
+    memory_extraction: MemoryExtractionHook | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
@@ -989,6 +1065,7 @@ async def dispatch_task(
         session=session,
         master_step_recorder=master_step_recorder,
         quota_admission=quota_admission,
+        memory_extraction=memory_extraction,
     )
 
 
@@ -1008,6 +1085,7 @@ __all__ = [
     "normalize_artifact_markdown",
     "record_delegation_step",
     "record_master_call_step",
+    "record_memory_call_step",
     "resolve_master",
     "strip_wrapping_fence",
 ]

@@ -573,6 +573,21 @@ def test_extract_usage_request_response_aliases_and_none() -> None:
 
     assert _extract_usage(_OldResult()) == (7, 11)
 
+    # A present canonical field (even 0) must win over a stale deprecated alias.
+    @dataclass
+    class _ZeroNewUsage:
+        input_tokens: int = 0
+        output_tokens: int = 0
+        request_tokens: int = 999
+        response_tokens: int = 999
+
+    @dataclass
+    class _ZeroNewResult:
+        def usage(self) -> _ZeroNewUsage:
+            return _ZeroNewUsage()
+
+    assert _extract_usage(_ZeroNewResult()) == (0, 0)
+
     @dataclass
     class _NoUsage:
         pass

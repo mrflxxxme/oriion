@@ -56,9 +56,13 @@ class CellMemoryRepository:
     async def get_by_id(self, entry_id: UUID) -> MemoryEntry | None:
         return await self._session.get(MemoryEntry, entry_id)
 
-    async def delete_by_id(self, entry_id: UUID) -> bool:
+    async def delete_by_id(self, entry_id: UUID, *, cell_id: UUID) -> bool:
+        # Defense-in-depth: scope the delete to the active cell explicitly (RLS
+        # FORCE already blocks cross-cell deletes; this matches the other methods).
         result = await self._session.execute(
-            delete(MemoryEntry).where(MemoryEntry.id == entry_id).returning(MemoryEntry.id)
+            delete(MemoryEntry)
+            .where(MemoryEntry.id == entry_id, MemoryEntry.cell_id == cell_id)
+            .returning(MemoryEntry.id)
         )
         return result.scalar_one_or_none() is not None
 

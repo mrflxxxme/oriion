@@ -95,7 +95,7 @@ class CellMemoryService:
         return await self._repo.list_recent(cell_id, limit=limit, offset=offset)
 
     async def delete(self, *, cell_id: UUID, entry_id: UUID) -> None:
-        deleted = await self._repo.delete_by_id(entry_id)
+        deleted = await self._repo.delete_by_id(entry_id, cell_id=cell_id)
         if not deleted:
             raise MemoryEntryNotFound(str(entry_id))
         logger.info("memory.cell.deleted", cell_id=str(cell_id), entry_id=str(entry_id))

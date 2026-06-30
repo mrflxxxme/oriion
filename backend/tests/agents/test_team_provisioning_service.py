@@ -63,6 +63,7 @@ async def test_provision_team_fresh_inserts_and_emits() -> None:
         Result(scalar=None),  # writer → insert
         Result(scalar=None),  # analyst → insert
         Result(scalar=None),  # seed preset → insert
+        Result(scalar=None),  # seed memory_curator → insert
         Result(scalar=preset),  # _load_preset
         Result(scalar_list=[]),  # existing instances → none
         Result(rows=[]),  # _archetype_slug_map → all "unknown"
@@ -75,8 +76,8 @@ async def test_provision_team_fresh_inserts_and_emits() -> None:
     )
 
     assert len(instances) == 4
-    # 4 archetypes + 1 preset (seed) + 4 instances added.
-    assert len(session.added) == 9
+    # 4 archetypes + 1 preset + 1 memory_curator (seed) + 4 instances added.
+    assert len(session.added) == 10
 
 
 @pytest.mark.asyncio
@@ -91,6 +92,7 @@ async def test_provision_team_idempotent_reuses_existing() -> None:
         Result(scalar=arcs[2]),
         Result(scalar=arcs[3]),
         Result(scalar=preset),  # seed preset found
+        Result(scalar=arcs[0]),  # seed memory_curator found (idempotent)
         Result(scalar=preset),  # _load_preset found
         Result(scalar_list=instances),  # existing instances cover every archetype
     ]
@@ -115,6 +117,7 @@ async def test_provision_team_unknown_preset_raises() -> None:
         Result(scalar=arcs[2]),
         Result(scalar=arcs[3]),
         Result(scalar=preset),  # seed preset found
+        Result(scalar=arcs[0]),  # seed memory_curator found
         Result(scalar=None),  # _load_preset("ghost") → missing
     ]
     session = StubSession(results=results)

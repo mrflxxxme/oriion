@@ -98,6 +98,11 @@ ROLE_TO_MODEL: dict[str, tuple[str, str]] = {
     # (R1) where its reasoning depth applies without JSON fragility.
     "master": ("deepseek", "deepseek-chat"),
     "master_synthesis": ("deepseek", "deepseek-reasoner"),
+    # 01.4b memory-curator (ADR-011 Wave-1): the auto-extraction filter emits a
+    # structured MemoryExtraction (fenced-JSON → deepseek-chat, like the Master
+    # plan); the conversation summarizer is free text on the same lite chat tier.
+    "memory_filter": ("deepseek", "deepseek-chat"),
+    "memory_summary": ("deepseek", "deepseek-chat"),
     "embedder": ("yandexgpt", "text-search-doc"),
     "default": ("deepseek", "deepseek-chat"),
 }
@@ -118,6 +123,10 @@ ROLE_TO_MAX_TOKENS: dict[str, int] = {
     # coordinator plan); the synthesis is a full deliverable (like the writer).
     "master": 2048,
     "master_synthesis": 8192,
+    # 01.4b: the filter emits a compact MemoryExtraction JSON; the summary is a
+    # ~500-token digest — both lite output budgets.
+    "memory_filter": 1024,
+    "memory_summary": 1024,
     "default": 4096,
 }
 

@@ -32,7 +32,11 @@ from src.billing.services.quota_service import enforce_quota_admission
 from src.llm_gateway.factory import build_llm_router
 from src.llm_gateway.services.router_service import LLMRouter
 from src.mcp.tools.rate_limit import ToolRateLimiter
+from src.memory.repositories.memory_repository import CellMemoryRepository
+from src.memory.services.embedder import build_gateway_embedder
+from src.memory.services.memory_service import CellMemoryService
 from src.runtime.dispatch import dispatch_task
+from src.runtime.memory_extraction import build_memory_extraction_hook
 from src.runtime.queue import broker  # noqa: F401 — installs the broker before @actor binds
 from src.runtime.redis_sse_publisher import RedisSSEPublisher
 from src.runtime.sse_publisher import SSEPublisher, build_sse_publisher
@@ -94,6 +98,27 @@ async def run_task_dispatch(
         # redelivered message sees a non-queued row and short-circuits.
         task.status = "running"
         await session.commit()
+        # AC-01.4.7: wire the real post-task memory auto-extraction hook (mirrors
+        # quota_admission). Built per task — it closes over the cell context + the
+        # gateway embedder; the orchestrator calls it on success with the final
+        # deliverable + a collision-free step index, billing it as a task_step.
+        user_prompt = ""
+        raw_input = getattr(task, "input_jsonb", None)
+        if isinstance(raw_input, dict):
+            user_prompt = str(raw_input.get("prompt", ""))
+        memory_extraction = build_memory_extraction_hook(
+            session=session,
+            llm_router=router,
+            cell_id=cell_id,
+            user_id=user_id,
+            task_id=task_id,
+            workspace_id=workspace_id,
+            cell_memory=CellMemoryService(
+                CellMemoryRepository(session),
+                build_gateway_embedder(router, workspace_id=workspace_id),
+            ),
+            user_prompt=user_prompt,
+        )
         try:
             await dispatch(
                 task=task,
@@ -107,6 +132,8 @@ async def run_task_dispatch(
                 # AC-01.3.5/.6: real per-cell + per-day quota gate in the worker
                 # (the orchestrator's default is None ⇒ no-op for unit tests).
                 quota_admission=enforce_quota_admission,
+                # AC-01.4.7: post-task memory auto-extraction (01.4b).
+                memory_extraction=memory_extraction,
             )
         except Exception:
             logger.exception("runtime.dispatch.actor.failed", task_id=str(task_id))

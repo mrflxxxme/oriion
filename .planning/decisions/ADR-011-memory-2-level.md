@@ -116,13 +116,26 @@ embed-on-store, advisory soft caps 500/cell·200/role) + conversation history
 Conversation summaries are stored as `memory_entries` with
 `kind='conversation_summary'` (as specified above).
 
-**Deferred → `01.4b — memory auto-extraction`:** the **automatic** filter-agent
-(lite-LLM extraction after each task) + the **LLM conversation summarizer** +
-their orchestrator/worker post-task wiring + a `memory_curator` archetype seed +
-live worker validation. The summarizer is an injected port (ready for 01.4b).
-Reason: the auto-trigger needs a NOT-NULL `task_steps.agent_archetype_id` seed +
-an orchestrator hot-path change + flaky-on-Windows live validation — a
-focused-split (`[[infra-pr-scope-prefers-focused-splits]]`).
+**Implemented in `01.4b — memory auto-extraction`** (2026-06-24,
+`tender-clarke-a1cd06`): the **automatic** filter-agent (lite-LLM extraction after
+each *succeeded* task) + the **LLM conversation summarizer** + their orchestrator/
+worker post-task wiring. Decisions: the `task_steps` rows are billed under a new
+horizontal **`memory_curator`** archetype with `role_category='analyzer'` (reuse —
+no CHECK migration) and `step_type='llm_call'` (the step CHECK has no
+`memory_extraction` value; `phase` lives in `input_jsonb`); the orchestrator gets a
+`memory_extraction` seam (mirror of `quota_admission`: default `None ⇒ no-op`, the
+worker wires the real hook) that runs on success **pre-final-write** so the cost
+folds into the per-task cap + step-sum (`total == SUM(steps)`, never rejecting). The
+**conversation-turn producer** (capturing agent-turns into `conversation_history`
+*during* a task) is **deferred to a future per-agent chat phase (decision 2026-07-01)**:
+there is no multi-turn conversation surface yet (tasks are single-shot; no chat endpoint),
+and `conversation_history` is per *single* agent, so team-task turns have no unambiguous
+`agent_id` — team work is already fully recorded in `tasks`/`task_steps`/`task_artifacts`.
+The storage + summarizer scaffold is ready (the 01.4 grill pulled it forward from this
+ADR's original Wave-2 scope); in 01.4b the summarizer is wired + tested via direct `append()`.
+Live-validated in-process vs DeepSeek (`scripts/live_golden_memory.py` 5/5); the
+Dramatiq+Redis worker transport stays proven on Linux. See
+[`phases/01.4b-memory-auto-extraction.md`](../roadmap/wave-1-core-mvp/phases/01.4b-memory-auto-extraction.md).
 
 **Deferred (later waves, per this ADR):** RAG-inject into agent prompts (grill
 Q4), the «Что помнит [агент]» view/edit/delete UI panel (grill Q6 → `01.4-ui`),
