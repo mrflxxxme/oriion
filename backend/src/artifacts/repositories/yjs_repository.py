@@ -9,9 +9,10 @@ always sees the merged state (read-your-writes). Snapshots are immutable
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.artifacts.models import YjsDocument, YjsSnapshot, YjsUpdate
@@ -68,24 +69,23 @@ class YjsRepository:
 
     async def save_head(
         self,
-        document_id: UUID,
+        row: YjsDocument,
         *,
         state: bytes,
         state_vector: bytes,
         update_count: int,
     ) -> None:
-        await self._session.execute(
-            update(YjsDocument)
-            .where(YjsDocument.id == document_id)
-            .values(state=state, state_vector=state_vector, update_count=update_count)
-        )
+        """Persist the merged head onto the (locked) ORM instance so the caller
+        returns fresh values without a re-read."""
+        row.state = state
+        row.state_vector = state_vector
+        row.update_count = update_count
+        await self._session.flush()
 
-    async def mark_compacted(self, document_id: UUID) -> None:
-        await self._session.execute(
-            update(YjsDocument)
-            .where(YjsDocument.id == document_id)
-            .values(update_count=0, last_compacted_at=func.now())
-        )
+    async def mark_compacted(self, row: YjsDocument) -> None:
+        row.update_count = 0
+        row.last_compacted_at = datetime.now(UTC)
+        await self._session.flush()
 
     # ── update log ──────────────────────────────────────────────────── #
 

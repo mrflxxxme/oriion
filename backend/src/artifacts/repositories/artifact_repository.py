@@ -152,6 +152,13 @@ class ArtifactRepository:
         )
         return (await self._session.execute(stmt)).scalars().all()
 
+    async def max_version_num(self, artifact_id: UUID) -> int:
+        """Highest committed version_num (0 when none) — race-retry re-read."""
+        stmt = select(func.coalesce(func.max(ArtifactVersion.version_num), 0)).where(
+            ArtifactVersion.artifact_id == artifact_id
+        )
+        return int((await self._session.execute(stmt)).scalar_one())
+
     async def sum_version_bytes(self, artifact_id: UUID) -> int:
         stmt = select(func.coalesce(func.sum(ArtifactVersion.byte_size), 0)).where(
             ArtifactVersion.artifact_id == artifact_id
