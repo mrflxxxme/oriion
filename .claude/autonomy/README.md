@@ -4,13 +4,17 @@ Source-of-truth for the autonomous multi-phase runner per [ADR-037](../../.plann
 
 ## Build blocks (ADR-037)
 
+Detailed, living tracker: [`BUILD-PLAN.md`](./BUILD-PLAN.md).
+
 | Block | What | Status |
 |---|---|---|
-| **A — Rails** | evidence schema + `ci-evidence` + tripwire config + pre-merge hook + branch protection | 🚧 in progress (this dir) |
-| B — Front | auto-discuss / escalation policy + decisions-log + judge-panel | ⬜ todo |
-| C — Runner | `/autonomy:run` + auto-merge-on-green + RUN-QUEUE + notify + Telegram bridge | ⬜ todo |
+| **A — Rails** | evidence schema + `ci-evidence` + tripwire config + branch protection | ✅ done (PR #74 merged) |
+| **B — Front** | auto-discuss / escalation policy + decisions-log + judge-panel | 🚧 this PR |
+| C — Runner | `/autonomy:run` + auto-merge-on-green + RUN-QUEUE + notify + Telegram bridge + role-loader | ⬜ todo |
 | D — Self-healing | auto-revert + fix-loop + post-merge regression-watch | ⬜ todo |
 | E — Parallelism | opt-in worktree for independent tracks | ⬜ todo |
+
+Branch protection on `main` is live (require PR + `ci-evidence`/`ci-security`; linear history). The 3 remaining protection toggles (`ci-backend` enforcement, `enforce_admins`, `delete_branch_on_merge`) are folded into Block C — see `BUILD-PLAN.md`.
 
 ## Files here
 
@@ -18,6 +22,12 @@ Source-of-truth for the autonomous multi-phase runner per [ADR-037](../../.plann
 |---|---|
 | `tripwire.yaml` | **D2 back tripwire.** Path-globs for the 5 categories that must NOT auto-merge (DB migrations · auth/RBAC/sessions · billing · secrets/keys · public contracts). The runner classifies the PR diff against these before auto-merging; a match → RUN-QUEUE + notify + wait for founder `/ack`. |
 | `evidence-schema.json` | **D3 gate integrity.** JSON-Schema for a local-only-gate evidence artifact. |
+| `escalation-policy.md` | **D4 front escalation.** What the agent owns (all impl+arch, decide+log) vs escalates (product/market + tripwire). Read by `/autonomy:discuss`. |
+| `judge-panel.md` | **D5 optimality.** Wide-fork trigger + N-approach generation + `evaluator` rubric + winner/graft + evidence emission. |
+| `BUILD-PLAN.md` | Living Block A–E tracker (incl. the Block-C protection toggles). |
+
+Scripts: `scripts/autonomy/verify_evidence.py` (D3) · `classify_tripwire.py` (D2) · `log_decision.py` (D4 decisions-log appender).
+Commands: `/autonomy:discuss <phase>` (D4 auto-discuss routine).
 
 ## Evidence protocol (D3) — how a phase proves a local-only gate
 
