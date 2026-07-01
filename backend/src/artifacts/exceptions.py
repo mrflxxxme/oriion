@@ -88,6 +88,17 @@ class YjsDocumentAlreadyExists(ArtifactsError):
         super().__init__(f"yjs document already exists for artifact: {artifact_ref}")
 
 
+class InvalidFilename(ArtifactsError):
+    """Client filename fails the strict charset (path traversal guard, 422)."""
+
+    code = "artifacts.invalid_filename"
+    status_code = 422
+    title = "Invalid filename"
+
+    def __init__(self, filename: str) -> None:
+        super().__init__(f"invalid filename: {filename[:100]}")
+
+
 class S3ObjectNotFound(ArtifactsError):
     """No s3_objects row for the given id/key in this cell (404)."""
 

@@ -183,6 +183,10 @@ module = [
     "fakeredis.*",
     "pgvector.*",
     "yaml",
+    # boto3/botocore ship no inline types; the S3 surface we use is narrow and
+    # wrapped by src/artifacts/ports.py::ObjectStoragePort (typed Protocol).
+    "boto3.*",
+    "botocore.*",
 ]
 ignore_missing_imports = true
 

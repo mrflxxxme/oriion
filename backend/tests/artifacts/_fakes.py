@@ -252,6 +252,70 @@ class FakeYjsRepo:
         ]
 
 
+class FakeS3Repo:
+    """s3_objects lifecycle rows in memory; UNIQUE(bucket, s3_key) enforced."""
+
+    def __init__(self) -> None:
+        self.rows: dict[UUID, SimpleNamespace] = {}
+
+    async def insert_pending(
+        self,
+        *,
+        cell_id: UUID,
+        artifact_id: UUID,
+        bucket: str,
+        s3_key: str,
+        mime_type: str | None = None,
+    ) -> SimpleNamespace:
+        if any(r.bucket == bucket and r.s3_key == s3_key for r in self.rows.values()):
+            raise integrity_error()
+        row = SimpleNamespace(
+            id=uuid4(),
+            cell_id=cell_id,
+            artifact_id=artifact_id,
+            bucket=bucket,
+            s3_key=s3_key,
+            mime_type=mime_type,
+            byte_size=None,
+            content_hash_sha256=None,
+            status="pending",
+            created_at=datetime.now(UTC),
+        )
+        self.rows[row.id] = row
+        return row
+
+    async def get(self, s3_object_id: UUID, *, cell_id: UUID) -> SimpleNamespace | None:
+        row = self.rows.get(s3_object_id)
+        return row if row is not None and row.cell_id == cell_id else None
+
+    async def find_stored_by_key(self, s3_key: str, *, cell_id: UUID) -> SimpleNamespace | None:
+        for row in self.rows.values():
+            if row.s3_key == s3_key and row.cell_id == cell_id and row.status == "stored":
+                return row
+        return None
+
+    async def mark_stored(
+        self, s3_object_id: UUID, *, byte_size: int, content_hash_sha256: str
+    ) -> None:
+        row = self.rows[s3_object_id]
+        row.status = "stored"
+        row.byte_size = byte_size
+        row.content_hash_sha256 = content_hash_sha256
+
+    async def mark_deleted(self, s3_object_id: UUID) -> None:
+        self.rows[s3_object_id].status = "deleted"
+
+    async def delete_stale_pending(self, *, cell_id: UUID, older_than: datetime) -> int:
+        stale = [
+            rid
+            for rid, r in self.rows.items()
+            if r.cell_id == cell_id and r.status == "pending" and r.created_at < older_than
+        ]
+        for rid in stale:
+            del self.rows[rid]
+        return len(stale)
+
+
 class FakeObjectStorage:
     """In-memory S3 port double — presign/head/get/delete with no network."""
 
