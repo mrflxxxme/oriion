@@ -8,13 +8,13 @@ Detailed, living tracker: [`BUILD-PLAN.md`](./BUILD-PLAN.md).
 
 | Block | What | Status |
 |---|---|---|
-| **A — Rails** | evidence schema + `ci-evidence` + tripwire config + branch protection | ✅ done (PR #74 merged) |
-| **B — Front** | auto-discuss / escalation policy + decisions-log + judge-panel | 🚧 this PR |
-| C — Runner | `/autonomy:run` + auto-merge-on-green + RUN-QUEUE + notify + Telegram bridge + role-loader | ⬜ todo |
+| **A — Rails** | evidence schema + `ci-evidence` + tripwire config + branch protection | ✅ PR #74 |
+| **B — Front** | auto-discuss / escalation policy + decisions-log + judge-panel | ✅ PR #75 |
+| **C — Runner** | `/autonomy:run` + auto-merge-on-green + RUN-QUEUE + `/autonomy:ack` + premerge hook + role-loader + notify | 🚧 this PR |
 | D — Self-healing | auto-revert + fix-loop + post-merge regression-watch | ⬜ todo |
 | E — Parallelism | opt-in worktree for independent tracks | ⬜ todo |
 
-Branch protection on `main` is live (require PR + `ci-evidence`/`ci-security`; linear history). The 3 remaining protection toggles (`ci-backend` enforcement, `enforce_admins`, `delete_branch_on_merge`) are folded into Block C — see `BUILD-PLAN.md`.
+Branch protection on `main` is live (require PR + `ci-evidence`/`ci-security`; linear history). The protection toggles are founder-owned switches with ready commands — see `BUILD-PLAN.md`.
 
 ## Files here
 
@@ -24,10 +24,12 @@ Branch protection on `main` is live (require PR + `ci-evidence`/`ci-security`; l
 | `evidence-schema.json` | **D3 gate integrity.** JSON-Schema for a local-only-gate evidence artifact. |
 | `escalation-policy.md` | **D4 front escalation.** What the agent owns (all impl+arch, decide+log) vs escalates (product/market + tripwire). Read by `/autonomy:discuss`. |
 | `judge-panel.md` | **D5 optimality.** Wide-fork trigger + N-approach generation + `evaluator` rubric + winner/graft + evidence emission. |
-| `BUILD-PLAN.md` | Living Block A–E tracker (incl. the Block-C protection toggles). |
+| `BUILD-PLAN.md` | Living Block A–E tracker (incl. the founder-owned protection toggles). |
+| `settings.hook-snippet.json` | **D2 hook config (founder-armed).** Merge its `hooks` key into `.claude/settings.json` to arm the pre-merge tripwire hook. Claude cannot self-install hook config. |
+| `notify.json` *(optional, founder-created)* | `{"telegram_chat_id": "<id>"}` — enables the runner's Telegram phone-ack notifications (D8). Without it: desktop push + RUN-QUEUE only. |
 
-Scripts: `scripts/autonomy/verify_evidence.py` (D3) · `classify_tripwire.py` (D2) · `log_decision.py` (D4 decisions-log appender).
-Commands: `/autonomy:discuss <phase>` (D4 auto-discuss routine).
+Scripts (`scripts/autonomy/`): `verify_evidence.py` (D3) · `classify_tripwire.py` (D2) · `log_decision.py` (D4) · `run_queue.py` (D8 interrupt queue) · `premerge_hook.py` (D2 hook) · `load_role.py` (role spawn-prompt composer).
+Commands: `/autonomy:discuss <phase>` (D4) · `/autonomy:run [queue]` (D6 runner) · `/autonomy:ack [RQ-ID verdict]` (founder resolve).
 
 ## Evidence protocol (D3) — how a phase proves a local-only gate
 
@@ -51,7 +53,9 @@ python scripts/autonomy/verify_evidence.py            # against `git rev-parse H
 python scripts/autonomy/verify_evidence.py --head-sha <sha>
 ```
 
-## Founder one-time actions (not automatable from here)
+## Founder one-time actions (deliberately NOT automatable — these arm the machine)
 
-- **Branch protection:** add `ci-evidence` (alongside `ci-backend`, `ci-security`, `ci-frontend`) to the required status checks on `main`, so a stale/missing evidence artifact actually blocks the merge button. Requires repo-admin — do via GitHub settings or `gh api`.
-- **Telegram bridge (Block C):** one-time channel setup to save a `chat_id` for phone-side `/ack` (`/telegram:configure`).
+- ✅ **Branch protection** — done (require PR + `ci-evidence`/`ci-security` required checks; linear history).
+- ⬜ **Arm the pre-merge hook:** merge the `hooks` key from [`settings.hook-snippet.json`](./settings.hook-snippet.json) into `.claude/settings.json`.
+- ⬜ **Toggles 2/3** (enforce_admins, delete_branch_on_merge) — ready commands in [`BUILD-PLAN.md`](./BUILD-PLAN.md).
+- ⬜ **Telegram phone-ack:** get your `chat_id` (message the bot once; или `/telegram:access`), then create `.claude/autonomy/notify.json` with `{"telegram_chat_id": "<id>"}`.
