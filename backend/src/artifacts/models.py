@@ -88,7 +88,11 @@ class ArtifactVersion(Base):
     artifact_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     version_num: Mapped[int] = mapped_column(Integer, nullable=False)
     storage_kind: Mapped[str] = mapped_column(Text, nullable=False)
-    content_inline: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    # none_as_null: Python None must become SQL NULL (not 'null'::jsonb) —
+    # the storage_kind XOR CHECK tests `content_inline IS NULL` for s3/yjs rows.
+    content_inline: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     s3_object_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     yjs_snapshot_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default=sa_text("0"))

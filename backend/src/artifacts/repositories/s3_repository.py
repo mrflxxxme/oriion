@@ -46,7 +46,9 @@ class S3ObjectRepository:
                 self._session.add(row)
                 await self._session.flush()
         except IntegrityError:
-            self._session.expunge(row)
+            # The rolled-back SAVEPOINT may have evicted the instance already.
+            if row in self._session:
+                self._session.expunge(row)
             raise
         return row
 

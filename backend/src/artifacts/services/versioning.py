@@ -69,7 +69,7 @@ async def allocate_version(
                 created_by_agent_id=created_by_agent_id,
             )
             break
-        except IntegrityError:
+        except IntegrityError as exc:
             logger.warning(
                 "artifacts.version.race_retry",
                 context="artifacts",
@@ -77,6 +77,8 @@ async def allocate_version(
                 artifact_id=str(artifact_id),
                 attempted_num=next_num,
                 attempt=attempt,
+                error_type=type(exc.orig).__name__,
+                error=str(exc.orig),
             )
             next_num = await artifact_repo.max_version_num(artifact_id) + 1
     if version is None:

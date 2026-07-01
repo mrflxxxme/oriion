@@ -126,8 +126,10 @@ class ArtifactRepository:
                 self._session.add(row)
                 await self._session.flush()
         except IntegrityError:
-            # Detach the failed instance so a retry inserts a fresh row.
-            self._session.expunge(row)
+            # Detach the failed instance so a retry inserts a fresh row
+            # (the rolled-back SAVEPOINT may have evicted it already).
+            if row in self._session:
+                self._session.expunge(row)
             raise
         return row
 
