@@ -1,6 +1,6 @@
 ﻿# ADR-023: AI-team runtime — 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB bridge
 
-- **Status:** Accepted
+- **Status:** Accepted (§8 founder-in-the-loop UX **расширен [ADR-037](./ADR-037-autonomous-multiphase-runner.md)** — автономный runner + RUN-QUEUE + evidence-gated auto-merge)
 
 ## Decision
 

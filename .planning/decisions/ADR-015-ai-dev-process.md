@@ -6,6 +6,7 @@
 > - **Tier-based review** → [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) (re-thought tier-table для solo + AI).
 > - **AI-роли (6 → 11) + spawning + AgentDB** → [ADR-023](./ADR-023-ai-team-runtime.md).
 > - **Здесь остаётся:** operational hygiene — изоляция от prod, worktree-per-task, observability + cost-caps, supporting practices.
+> - **Расширен [ADR-037](./ADR-037-autonomous-multiphase-runner.md) (2026-07-01):** под автономным раннером к hygiene добавляются evidence-артефакт integrity (D3), auto-revert + post-merge regression-watch (D7), per-run budget-cap поверх cost-budget.yaml (D6).
 
 ## Decision
 

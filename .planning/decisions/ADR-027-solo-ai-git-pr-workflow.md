@@ -1,6 +1,6 @@
 ﻿# ADR-027: Solo + AI Git/PR workflow — phase-branch + atomic AI commits + selective rebase + tier-based review
 
-- **Status:** Accepted
+- **Status:** Accepted (§5 tier-table **ревизован [ADR-037](./ADR-037-autonomous-multiphase-runner.md)** — под автономным раннером founder выходит из merge-петли на всех тирах; approver-prerogative заменён на узкую растяжку D2 + продукт-эскалацию D4)
 
 ## Decision
 
@@ -66,6 +66,8 @@ Co-Authored-By: backend-implementer (Opus) <backend-implementer@teamly-ai>
 `<type>` следует Conventional Commits (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`).
 
 ### 5. Tier-table (re-thought для solo + AI)
+
+> **⚠️ Ревизия [ADR-037](./ADR-037-autonomous-multiphase-runner.md) (2026-07-01):** под автономным раннером «Founder = всегда финальный approver для tier 3+» **больше не действует**. Founder выходит из merge-петли на всех тирах; авто-мёрж всё зелёное, кроме узкой растяжки категорий (миграции/auth/billing/секреты/контракты → 1-клик ack) + продукт-эскалаций. Таблица ниже описывает legacy manual-режим — сохранена для контекста и как fallback, когда раннер не используется.
 
 | Tier | Примеры | AI reviewers | Founder action |
 |---|---|---|---|

@@ -1,0 +1,48 @@
+name: ci-evidence
+
+# ADR-037 D3 — gate-integrity enforcement.
+#
+# Local-only gates (live goldens with funded LLM, Docker integration, adversarial
+# audit) that GitHub CI cannot run must commit an evidence artifact per gate under
+# evidence/<gate>.json and declare the required gates in evidence/manifest.json.
+# This job asserts, for every declared gate: artifact exists, is FRESH (recorded
+# head_sha == the PR head commit), and verdict == PASS. Any miss blocks merge.
+#
+# Non-breaking: a PR with no evidence/manifest.json (i.e. no local-only gates)
+# passes trivially. Only phases that OPT IN by committing a manifest are gated.
+#
+# The verifier is stdlib-only → runs as bare `python`, no uv/venv, fast.
+# AC-convention: timeout ≤ 8 min (mirrors ci-backend / ci-security).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify-evidence:
+    name: local-gate evidence — freshness + verdict
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      # For PRs, check out the PR HEAD (not the merge commit) so the evidence/*.json
+      # on disk is exactly what the gate committed, and its recorded head_sha can be
+      # compared against this same commit.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Resolve commit-under-test
+        id: sha
+        run: echo "head_sha=${{ github.event.pull_request.head.sha || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify autonomy gate evidence
+        run: python scripts/autonomy/verify_evidence.py --head-sha "${{ steps.sha.outputs.head_sha }}"
