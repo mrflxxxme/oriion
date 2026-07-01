@@ -1,0 +1,4 @@
+{
+  "_comment": "ADR-037 D8 phone-ack channel. telegram_chat_id = founder's chat with the paired bot; the runner sends the 5 interrupt events here (in addition to desktop PushNotification + RUN-QUEUE). Low-sensitivity (chat_id is useless without the bot token, which lives outside the repo). Committed so runner worktrees inherit it.",
+  "telegram_chat_id": "233085299"
+}

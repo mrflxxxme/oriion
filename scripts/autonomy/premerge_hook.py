@@ -24,7 +24,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-_MERGE_RE = re.compile(r"\bgh\s+pr\s+merge\b(?P<rest>[^|;&]*)")
+# Command-position only: line start or after ; & | ( — a *mention* of
+# "gh pr merge" mid-line (e.g. inside a PR-body here-string) must NOT match.
+# First live firing of the armed hook was exactly that false positive.
+_MERGE_RE = re.compile(
+    r"(?:^|[;&|(])\s*gh\s+pr\s+merge\b(?P<rest>[^|;&\n]*)", re.MULTILINE
+)
 _PR_NUM_RE = re.compile(r"\s(\d+)\b")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

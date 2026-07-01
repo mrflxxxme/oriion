@@ -25,7 +25,7 @@ Legend: ✅ done · 🚧 in progress · ⬜ todo
 
 ---
 
-## Block C — Runner (D6/D8) 🚧 (this PR)
+## Block C — Runner (D6/D8) ✅ (PR #76, merged)
 
 - ✅ `/autonomy:run` slash-command — sequential chain `discuss → plan → execute → gates → auto-merge | tripwire-pause → next`, loop until escalation / ack / stuck-gate / empty-queue. Post-merge regression = Block-D stub (stop + notify, no auto-revert yet).
 - ✅ auto-merge-on-green — explicit runner step: `gh pr checks` all-green + `classify_tripwire.py` exit 0 → squash-merge (linear history); exit 10 → RUN-QUEUE `ack-needed` + notify.
@@ -34,25 +34,35 @@ Legend: ✅ done · 🚧 in progress · ⬜ todo
 - ✅ pre-merge tripwire **hook** — `scripts/autonomy/premerge_hook.py` (tested 6/6 against real PRs: clean-allow / tripwire-block with categories / ack-unblock / fail-closed on unparseable-merge input / BOM-tolerant). **FOUNDER ACTION to arm:** merge `settings.hook-snippet.json` into `.claude/settings.json` — Claude is (correctly) not permitted to self-install hook config.
 - ✅ **role-prompt loader** — `scripts/autonomy/load_role.py` composes a spawnable prompt from `.claude/agents/<role>/` (system-prompt + tools-allowlist + optional workflows/checklist; tested against all 11 roles). The runner passes it to general-purpose `Task` spawns — the handbook-roles gap is closed without converting them.
 
-### Branch-protection toggles (founder-owned switches — commands ready)
+### Branch-protection toggles (flipped 2026-07-02 on explicit founder ask)
 
-Auto-mode correctly refuses to let the agent flip these (self-escalation); the founder runs them:
+- ✅ **Toggle 2 — `enforce_admins = true`** — verified via read-back; even the runner's admin-token merge must satisfy required checks. Rollback: `gh api -X DELETE repos/mrflxxxme/oriion/branches/main/protection/enforce_admins`.
+- ✅ **Toggle 3 — `delete_branch_on_merge = true`** — verified; aligns reality with ADR-027 §3a.
+- ⬜ **Toggle 1 — enforce `ci-backend` as required check.** DECIDED: rely on the runner's in-code `gh pr checks` all-green gate. Revisit if the manual-merge path needs a GitHub-level backstop (requires dropping the `paths:` filter first — a required-but-unrun check deadlocks non-matching PRs).
 
-- ⬜ **Toggle 1 — enforce `ci-backend` (+`ci-frontend`) as required checks.** DECIDED for now: rely on the runner's in-code `gh pr checks` all-green gate (the runner never merges with a red/missing backend check). Revisit if the manual-merge path needs the same GitHub-level backstop; requires dropping the workflows' `paths:` filter first (a required-but-unrun check deadlocks non-matching PRs).
-- ⬜ **Toggle 2 — `enforce_admins = true`** — flip NOW that the runner is live: `gh api -X POST repos/mrflxxxme/oriion/branches/main/protection/enforce_admins`. Even the runner's admin-token merge must satisfy required checks. Rollback: same URL with `-X DELETE`.
-- ⬜ **Toggle 3 — `delete_branch_on_merge = true`** — `gh api -X PATCH repos/mrflxxxme/oriion -F delete_branch_on_merge=true`. Aligns reality with ADR-027 §3a; keeps the branch list clean under many runner PRs.
-
----
-
-## Block D — Self-healing (D7) ⬜
-
-- ⬜ post-merge regression-watch — after each auto-merge, on the next phase's CI (or a re-run), attribute a newly-red `main` gate to the offending merge.
-- ⬜ auto-revert — `git revert` the offending merge (main green by construction) + notify (D8).
-- ⬜ autonomous fix-loop — re-plan → fix → gates → re-merge the reverted work.
+### Armed the same day (explicit founder ask)
+- ✅ `.claude/settings.json` — pre-merge tripwire hook live (PreToolUse on Bash|PowerShell → `premerge_hook.py`).
+- ✅ `.claude/autonomy/notify.json` — telegram phone-ack channel (founder chat_id).
 
 ---
 
-## Block E — Parallelism (D6) ⬜
+## Block D — Self-healing (D7) 🚧 (this PR)
 
-- ⬜ opt-in worktree parallelism for genuinely-independent phase tracks (dependency check before parallelizing; sequential is the default).
-- ⬜ per-run token budget-cap (`budget.total`) honoring `cost-budget.yaml` (R-31).
+- ✅ regression-watch — `scripts/autonomy/check_main_health.py`: latest completed run per gate-workflow on main → verdict JSON + `offender_sha` attribution (exit 0/20/1; deploy-staging excluded; in-progress runs ignored; **tested 4/4**: live-healthy + red-fixture-attribution + empty + in-progress-ignored).
+- ✅ auto-revert + notify — `/autonomy:heal` §2: revert branch off fresh main → gated revert-PR → merge → **mandatory RUN-QUEUE `revert` + push + Telegram** (founder always learns of a revert). Attribution sanity-check + conflict/foreign-commit guards → `stuck`, never guess.
+- ✅ autonomous fix-loop — `/autonomy:heal` §3: cherry-pick the reverted work → diagnose from `gh run view --log-failed` → fix + close the gate gap (add the missing test) → full gates + tripwire → merge/ack; max 3 cycles → `stuck`.
+- ✅ run.md step 9 stub replaced: health-check BEFORE each next merge + at run end; exit 20 → heal protocol; exit 1 → no merges while blind.
+
+---
+
+## Block E — Parallelism (D6) 🚧 (this PR)
+
+- ✅ opt-in worktree parallelism — run.md §Parallel tracks: only for provably-independent phases (no shared bounded contexts / no PHASES.md dependency edge / not tripwire-heavy); executor subagents with `isolation: "worktree"` + background, max 2 tracks; **merges always serialized** through the health-check (one offender at a time for D7 attribution).
+- ✅ per-run budget accounting — run.md §Budget: estimate at run end into the `complete` entry; panels + fix-loops count toward dev_team caps; degrade panel N when tight (R-31).
+
+---
+
+## Post-build (after the 01.5 pilot)
+
+- ⬜ pilot retro: what the runner escalated/paused/healed on 01.5 → tighten tripwire globs / escalation-policy wording where it misfired.
+- ⬜ consider Toggle 1 (GitHub-level ci-backend requirement) if manual merges become common.

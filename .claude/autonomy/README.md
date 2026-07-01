@@ -10,11 +10,11 @@ Detailed, living tracker: [`BUILD-PLAN.md`](./BUILD-PLAN.md).
 |---|---|---|
 | **A — Rails** | evidence schema + `ci-evidence` + tripwire config + branch protection | ✅ PR #74 |
 | **B — Front** | auto-discuss / escalation policy + decisions-log + judge-panel | ✅ PR #75 |
-| **C — Runner** | `/autonomy:run` + auto-merge-on-green + RUN-QUEUE + `/autonomy:ack` + premerge hook + role-loader + notify | 🚧 this PR |
-| D — Self-healing | auto-revert + fix-loop + post-merge regression-watch | ⬜ todo |
-| E — Parallelism | opt-in worktree for independent tracks | ⬜ todo |
+| **C — Runner** | `/autonomy:run` + auto-merge-on-green + RUN-QUEUE + `/autonomy:ack` + premerge hook + role-loader + notify | ✅ PR #76 |
+| **D — Self-healing** | `check_main_health.py` + `/autonomy:heal` (auto-revert → notify → fix-loop) | 🚧 this PR |
+| **E — Parallelism** | opt-in worktree tracks (max 2, serialized merges) + budget accounting | 🚧 this PR |
 
-Branch protection on `main` is live (require PR + `ci-evidence`/`ci-security`; linear history). The protection toggles are founder-owned switches with ready commands — see `BUILD-PLAN.md`.
+**Fully armed (2026-07-02):** branch protection (require PR + `ci-evidence`/`ci-security`, linear history, **enforce_admins on**, auto branch-delete) · pre-merge hook live in `.claude/settings.json` · `notify.json` (Telegram phone-ack). Toggle 1 (GitHub-level ci-backend requirement) deliberately deferred — the runner's in-code all-green gate covers it (see `BUILD-PLAN.md`).
 
 ## Files here
 
@@ -28,8 +28,8 @@ Branch protection on `main` is live (require PR + `ci-evidence`/`ci-security`; l
 | `settings.hook-snippet.json` | **D2 hook config (founder-armed).** Merge its `hooks` key into `.claude/settings.json` to arm the pre-merge tripwire hook. Claude cannot self-install hook config. |
 | `notify.json` *(optional, founder-created)* | `{"telegram_chat_id": "<id>"}` — enables the runner's Telegram phone-ack notifications (D8). Without it: desktop push + RUN-QUEUE only. |
 
-Scripts (`scripts/autonomy/`): `verify_evidence.py` (D3) · `classify_tripwire.py` (D2) · `log_decision.py` (D4) · `run_queue.py` (D8 interrupt queue) · `premerge_hook.py` (D2 hook) · `load_role.py` (role spawn-prompt composer).
-Commands: `/autonomy:discuss <phase>` (D4) · `/autonomy:run [queue]` (D6 runner) · `/autonomy:ack [RQ-ID verdict]` (founder resolve).
+Scripts (`scripts/autonomy/`): `verify_evidence.py` (D3) · `classify_tripwire.py` (D2) · `log_decision.py` (D4) · `run_queue.py` (D8 interrupt queue) · `premerge_hook.py` (D2 hook) · `load_role.py` (role spawn-prompt composer) · `check_main_health.py` (D7 regression-watch).
+Commands: `/autonomy:discuss <phase>` (D4) · `/autonomy:run [queue]` (D6 runner) · `/autonomy:ack [RQ-ID verdict]` (founder resolve) · `/autonomy:heal` (D7 auto-revert + fix-loop).
 
 ## Evidence protocol (D3) — how a phase proves a local-only gate
 
@@ -53,9 +53,11 @@ python scripts/autonomy/verify_evidence.py            # against `git rev-parse H
 python scripts/autonomy/verify_evidence.py --head-sha <sha>
 ```
 
-## Founder one-time actions (deliberately NOT automatable — these arm the machine)
+## Founder one-time actions — ALL DONE (2026-07-02, on explicit founder ask)
 
-- ✅ **Branch protection** — done (require PR + `ci-evidence`/`ci-security` required checks; linear history).
-- ⬜ **Arm the pre-merge hook:** merge the `hooks` key from [`settings.hook-snippet.json`](./settings.hook-snippet.json) into `.claude/settings.json`.
-- ⬜ **Toggles 2/3** (enforce_admins, delete_branch_on_merge) — ready commands in [`BUILD-PLAN.md`](./BUILD-PLAN.md).
-- ⬜ **Telegram phone-ack:** get your `chat_id` (message the bot once; или `/telegram:access`), then create `.claude/autonomy/notify.json` with `{"telegram_chat_id": "<id>"}`.
+- ✅ **Branch protection** (require PR + `ci-evidence`/`ci-security`; linear history).
+- ✅ **Pre-merge hook armed** — `.claude/settings.json` (PreToolUse → `premerge_hook.py`).
+- ✅ **Toggles 2/3** — `enforce_admins=true`, `delete_branch_on_merge=true` (verified via read-back).
+- ✅ **Telegram phone-ack** — `notify.json` with the founder's chat_id.
+
+The machine is fully armed. Next: the **01.5 pilot** — `/autonomy:run 01.5` (founder starts Docker + funded `.env` first).
