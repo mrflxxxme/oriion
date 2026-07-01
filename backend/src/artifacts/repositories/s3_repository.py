@@ -82,6 +82,21 @@ class S3ObjectRepository:
             update(S3Object).where(S3Object.id == s3_object_id).values(status="deleted")
         )
 
+    async def mark_all_deleted_for_artifact(self, artifact_id: UUID, *, cell_id: UUID) -> int:
+        """Flip every non-deleted lifecycle row of the artifact to ``deleted``
+        (envelope soft-delete). Physical S3 removal is the janitor's job."""
+        result = await self._session.execute(
+            update(S3Object)
+            .where(
+                S3Object.artifact_id == artifact_id,
+                S3Object.cell_id == cell_id,
+                S3Object.status != "deleted",
+            )
+            .values(status="deleted")
+            .returning(S3Object.id)
+        )
+        return len(result.scalars().all())
+
     async def delete_stale_pending(self, *, cell_id: UUID, older_than: datetime) -> int:
         """Janitor: drop ``pending`` reservations whose presign window expired.
         Returns the number of pruned rows."""

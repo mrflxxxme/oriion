@@ -305,6 +305,18 @@ class FakeS3Repo:
     async def mark_deleted(self, s3_object_id: UUID) -> None:
         self.rows[s3_object_id].status = "deleted"
 
+    async def mark_all_deleted_for_artifact(self, artifact_id: UUID, *, cell_id: UUID) -> int:
+        flipped = 0
+        for row in self.rows.values():
+            if (
+                row.artifact_id == artifact_id
+                and row.cell_id == cell_id
+                and row.status != "deleted"
+            ):
+                row.status = "deleted"
+                flipped += 1
+        return flipped
+
     async def delete_stale_pending(self, *, cell_id: UUID, older_than: datetime) -> int:
         stale = [
             rid
