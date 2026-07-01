@@ -25,22 +25,22 @@ Legend: ✅ done · 🚧 in progress · ⬜ todo
 
 ---
 
-## Block C — Runner (D6/D8) ⬜
+## Block C — Runner (D6/D8) 🚧 (this PR)
 
-- ⬜ `/autonomy:run` slash-command — sequential chain `discuss → plan → execute → gates → auto-merge | tripwire-pause → next`, loop until escalation / ack / stuck-gate / empty-queue.
-- ⬜ auto-merge-on-green — runner checks `gh pr checks` all-green (incl. path-filtered `ci-backend` actually ran) + `classify_tripwire.py` exit 0, then merges (Squash/Rebase — linear history).
-- ⬜ `RUN-QUEUE.md` — pending acks / escalations / reverts + diagnosis (D8).
-- ⬜ notifications — `PushNotification` on 5 interrupt events + Telegram bridge for phone-ack (one-time `chat_id` setup).
-- ⬜ scoped pre-merge tripwire **hook** (`settings.json`) — intercepts the runner's merge step (NOT the founder's manual merges) as defense-in-depth over the runner's explicit `classify_tripwire` step.
-- ⬜ **role-prompt loader** — CLOSE THE GAP: the 11 `.claude/agents/<role>/` dirs are handbooks, not spawnable subagents. Runner needs a loader (inject `<role>/system-prompt.md` into a `Task` general-purpose spawn) OR native single-file subagent conversion, so the pipeline can actually delegate to planner/implementer/reviewer/verifier/evaluator.
+- ✅ `/autonomy:run` slash-command — sequential chain `discuss → plan → execute → gates → auto-merge | tripwire-pause → next`, loop until escalation / ack / stuck-gate / empty-queue. Post-merge regression = Block-D stub (stop + notify, no auto-revert yet).
+- ✅ auto-merge-on-green — explicit runner step: `gh pr checks` all-green + `classify_tripwire.py` exit 0 → squash-merge (linear history); exit 10 → RUN-QUEUE `ack-needed` + notify.
+- ✅ `RUN-QUEUE.md` machinery — `scripts/autonomy/run_queue.py` (add/resolve/check-ack/pending; tested 8-step lifecycle) + `/autonomy:ack` founder command (1-click approve → completes the merge; rejected/escalation verdicts feed the decisions-log).
+- ✅ notifications — runner instructions: PushNotification on the 5 interrupt events + optional Telegram phone-ack via `.claude/autonomy/notify.json` (`{"telegram_chat_id": "..."}`; founder one-time setup, see README).
+- ✅ pre-merge tripwire **hook** — `scripts/autonomy/premerge_hook.py` (tested 6/6 against real PRs: clean-allow / tripwire-block with categories / ack-unblock / fail-closed on unparseable-merge input / BOM-tolerant). **FOUNDER ACTION to arm:** merge `settings.hook-snippet.json` into `.claude/settings.json` — Claude is (correctly) not permitted to self-install hook config.
+- ✅ **role-prompt loader** — `scripts/autonomy/load_role.py` composes a spawnable prompt from `.claude/agents/<role>/` (system-prompt + tools-allowlist + optional workflows/checklist; tested against all 11 roles). The runner passes it to general-purpose `Task` spawns — the handbook-roles gap is closed without converting them.
 
-### Branch-protection toggles folded into Block C (per founder, this session)
+### Branch-protection toggles (founder-owned switches — commands ready)
 
-These 3 were left as founder-owned during Block A because each has a trade-off; they belong to Block C because that is when the runner starts merging with the founder's token and the trade-offs resolve:
+Auto-mode correctly refuses to let the agent flip these (self-escalation); the founder runs them:
 
-- ⬜ **Toggle 1 — enforce `ci-backend` (+`ci-frontend`) as required checks.** Blocked by their `paths:` filter (a required-but-unrun check deadlocks non-matching PRs). Fix = drop the `paths:` filter so they run on every PR, then `gh api -X POST …/required_status_checks/contexts` add `"lint + typecheck + test + security + license"`. **Decision point:** do this (GitHub-level backstop on tests) vs rely on the runner's in-code `gh pr checks` gate (cheaper CI). Recommend: rely on the runner's gate for auto-merge, add the GitHub requirement only if we want the manual-merge path also hard-gated.
-- ⬜ **Toggle 2 — `enforce_admins = true`** (`gh api -X POST …/branches/main/protection/enforce_admins`). Makes gates the *true* merge authority — even the runner's admin-token merge must satisfy required checks. Flip WHEN the runner goes live (Block C), so a runaway runner cannot merge red. Trade-off: founder must temporarily disable it for an emergency hotfix past a red gate.
-- ⬜ **Toggle 3 — `delete_branch_on_merge = true`** (`gh api -X PATCH repos/mrflxxxme/oriion -f delete_branch_on_merge=true`). Currently `false` despite ADR-027 §3a claiming `true` (design-vs-reality drift). Under the runner (many PRs) auto-teardown keeps the branch list clean. Low-risk; can flip anytime.
+- ⬜ **Toggle 1 — enforce `ci-backend` (+`ci-frontend`) as required checks.** DECIDED for now: rely on the runner's in-code `gh pr checks` all-green gate (the runner never merges with a red/missing backend check). Revisit if the manual-merge path needs the same GitHub-level backstop; requires dropping the workflows' `paths:` filter first (a required-but-unrun check deadlocks non-matching PRs).
+- ⬜ **Toggle 2 — `enforce_admins = true`** — flip NOW that the runner is live: `gh api -X POST repos/mrflxxxme/oriion/branches/main/protection/enforce_admins`. Even the runner's admin-token merge must satisfy required checks. Rollback: same URL with `-X DELETE`.
+- ⬜ **Toggle 3 — `delete_branch_on_merge = true`** — `gh api -X PATCH repos/mrflxxxme/oriion -F delete_branch_on_merge=true`. Aligns reality with ADR-027 §3a; keeps the branch list clean under many runner PRs.
 
 ---
 

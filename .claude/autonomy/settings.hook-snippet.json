@@ -1,0 +1,16 @@
+{
+  "_comment": "ADR-037 Block C - pre-merge tripwire hook (defense-in-depth over the runner's explicit classify step). FOUNDER ACTION: merge the `hooks` key below into .claude/settings.json (create the file if absent). Claude cannot self-install hook config - arming this is deliberately a founder-owned switch.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/autonomy/premerge_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}
