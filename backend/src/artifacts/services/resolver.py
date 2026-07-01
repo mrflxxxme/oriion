@@ -115,12 +115,14 @@ class ArtifactResolver:
         if version.storage_kind == "inline":
             content_inline = version.content_inline
         elif version.storage_kind == "s3":
-            assert version.s3_object_id is not None  # XOR CHECK guarantees it
+            if version.s3_object_id is None:  # unreachable: XOR CHECK guarantees it
+                raise ArtifactVersionNotFound(url, version_num)
             download_url = await self._s3_service.download_url(
                 cell_id=current_cell_id, s3_object_id=version.s3_object_id
             )
         else:  # yjs_snapshot — the XOR CHECK admits no other kind
-            assert version.yjs_snapshot_id is not None
+            if version.yjs_snapshot_id is None:  # unreachable, same guarantee
+                raise ArtifactVersionNotFound(url, version_num)
             snapshot = await self._yjs_repo.get_snapshot(
                 version.yjs_snapshot_id, cell_id=current_cell_id
             )
