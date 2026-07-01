@@ -1,5 +1,14 @@
 # Development Journal
 
+## 2026-07-02 · hungry-nash-01feac · @claude-opus (Autonomy Blocks D+E + full arming — automation complete)
+
+- Continues after **#76 (Block C) merged** (`704a395`). Founder: «выполни 2-4 и … достроим полную автоматизацию перед пилотом» — so this session (a) armed every founder-owned switch, (b) built Blocks D+E.
+- **Armed (explicit founder ask — the earlier auto-mode classifier denials no longer apply):** `.claude/settings.json` — pre-merge tripwire hook LIVE (PreToolUse Bash|PowerShell → `premerge_hook.py`) · **Toggle 2** `enforce_admins=true` + **Toggle 3** `delete_branch_on_merge=true` (both verified via API read-back) · `notify.json` with the founder's Telegram chat_id (233085299) for phone-ack. Toggle 1 (GitHub-required ci-backend) stays DECIDED-deferred: the runner's in-code all-green gate covers it; paths-filter deadlock otherwise.
+- **Block D — Self-healing (D7):** `scripts/autonomy/check_main_health.py` — latest completed run per gate-workflow on main → verdict JSON + `offender_sha` attribution (exit 0/20/1; deploy-staging excluded; in-progress ignored; **4/4 harness**: live-healthy + red-fixture attribution + empty→cannot-judge + in-progress-ignored). `/autonomy:heal` — the D7 protocol: attribution sanity-check (never revert a foreign/stale sha — `stuck` instead) → revert branch → **gated** revert-PR (enforce_admins means even reverts pass checks) → mandatory RUN-QUEUE `revert` + push + Telegram → fix-loop (cherry-pick the reverted work, diagnose from `--log-failed`, fix + close the gate gap with the missing test, max 3 cycles → `stuck`). run.md step-9 stub replaced: health-check BEFORE each next merge + at run end; exit 1 = no merges while blind.
+- **Block E — Parallelism (D6 opt-in):** run.md §Parallel tracks — only provably-independent phases (no shared bounded contexts / no PHASES.md edge / not tripwire-heavy), executor subagents `isolation: "worktree"` background, **max 2 tracks, merges always serialized** through the health-check (D7 needs one offender at a time). §Budget — run-end estimate into the `complete` entry; panels + fix-loops count toward dev_team caps (R-31).
+- **ADR-037 build COMPLETE: A ✅#74 · B ✅#75 · C ✅#76 · D+E = this PR.** The machine is fully armed; founder's remaining touchpoints per phase ≈ tripwire acks + product escalations + revert notifications.
+- Next: **pilot `/autonomy:run 01.5`** (Артефакты, ADR-012) — founder starts Docker + funded `.env`, then the loop runs. Post-pilot retro items live in BUILD-PLAN §Post-build.
+
 ## 2026-07-02 · hungry-nash-01feac · @claude-opus (Autonomy Block C — the runner, D6/D8)
 
 - Continues after **#75 (Block B) merged** (`f1dde02`); Block C on `claude/autonomy-block-c`. The Block-B slash-command `/autonomy:discuss` is confirmed live in the harness skill list.

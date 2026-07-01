@@ -32,7 +32,7 @@ For each phase P in the queue:
 8. **Tripwire classify (explicit step)** — `uv run --project backend python scripts/autonomy/classify_tripwire.py --diff-base origin/main` (exit 0 = clean; 10 = matched). The premerge hook re-checks this at the merge command — defense-in-depth.
    - **exit 0** → `gh pr merge <N> --squash --delete-branch` (linear history). 
    - **exit 10** → RUN-QUEUE `ack-needed` (`run_queue.py add --kind ack-needed --pr <N> --phase <P> --summary ... --details "Categories: ..."`) + notify. Do NOT merge. Continue with the next phase ONLY if independent of P; else stop the loop (leave everything green + documented).
-9. **Post-merge regression watch (Block D stub)** — after merge, if `main`'s CI on the merge commit goes red → do NOT auto-revert yet (Block D): RUN-QUEUE `revert`-kind entry with diagnosis + notify + STOP the run.
+9. **Post-merge regression watch (D7)** — don't block on every merge waiting for main's CI (~3 min): run `python scripts/autonomy/check_main_health.py` (a) BEFORE each next merge and (b) at run end. Exit 20 → run the **`/autonomy:heal` protocol** (auto-revert offender → notify → autonomous fix-loop, max 3 cycles); resume the queue after heal merges the fix, stop if heal goes `stuck`. Exit 1 (cannot judge) → no further merges, `stuck` + notify.
 10. **Phase complete** — RUN-QUEUE `complete` entry (one line: PR, cost, decisions count). Next phase.
 
 ## Interrupts → notify (D8), every time
@@ -43,11 +43,20 @@ On the 5 events — **ack-needed / escalation / revert / stuck / run-complete**:
 
 An `/autonomy:ack <ID> approved` (founder, from any session) unblocks the corresponding merge — the premerge hook honors `run_queue.py check-ack`.
 
+## Parallel tracks (Block E — opt-in, D6)
+Sequential is the DEFAULT. Parallelize ONLY when phases are **provably independent**: no shared bounded contexts (compare the phase-specs' touched `src/<context>` + migration dirs), no dependency edge in `PHASES.md`, and neither phase is tripwire-heavy. Then:
+- Spawn per-phase executor subagents via the Agent tool with `isolation: "worktree"` + `run_in_background: true` (max **2** concurrent tracks), each producing its own branch + PR through the full per-phase loop (steps 2–7).
+- **Merges stay SEQUENTIAL** through steps 8–9 in the main session (one merge → health-check → next merge). Never merge two tracks back-to-back without a health-check between — regression attribution (D7) needs one offender at a time.
+- On any doubt about independence — don't parallelize. Wall-clock saved is not worth a cross-track conflict.
+
+## Budget accounting (R-31)
+At run end estimate spend (phases × avg task cost vs `cost-budget.yaml` dev_team caps) and include it in the run's `complete` RUN-QUEUE entry. Judge-panels and heal fix-loops count toward the same per-day budget; degrade panel N=3→2 when tight (see judge-panel.md).
+
 ## Stop conditions (end the run cleanly)
-Queue empty · escalation/ack blocks all remaining phases · budget hard-cap · post-merge regression (stub) · founder says stop. On stop: RUN-QUEUE `complete` summary for the RUN (phases merged / pending acks / escalations / spend estimate) + notify.
+Queue empty · escalation/ack blocks all remaining phases · budget hard-cap · heal went `stuck` (unfixable regression) · founder says stop. On stop: RUN-QUEUE `complete` summary for the RUN (phases merged / pending acks / escalations / reverts+fixes / spend estimate) + notify.
 
 ## Hard rules
-- NEVER merge without: all CI checks green + evidence fresh + tripwire exit 0 (or approved ack).
+- NEVER merge without: all CI checks green + evidence fresh + tripwire exit 0 (or approved ack) + main healthy (check_main_health exit 0).
 - NEVER bypass hooks (`--no-verify`), never `--force` (only `--force-with-lease` on feature branches).
 - NEVER invent `TBD_*` values; never start Docker; never touch `user_production` config.
-- Worktree parallelism is Block E — do NOT parallelize phases yet; sequential only.
+- Parallel tracks: max 2, provable independence only, merges always serialized.
