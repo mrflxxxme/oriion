@@ -1,32 +1,65 @@
-# SKELETON — Wave 1 deliverable (per ADR-024)
-# Detailed event payload schemas deferred to Milestone D, Wave 1 phase
-# Status: structural placeholder for cross-context references
+# Context: artifacts — CloudEvents 1.0 (ADR-024 §3, ADR-038, Phase 01.5)
+# Emitter implementation: backend/src/artifacts/events.py (house mechanism:
+# src/_shared/cloudevents.py — structlog transport now, Redis Streams later
+# with no call-site change).
 
 specversion: "1.0"
 context: artifacts
-status: skeleton
+source: oriion://contexts/artifacts
+status: implemented
 
 events:
-  - type: oriion.artifacts.yjs.document_created.v1
-    description: "New Y.js collaborative document created in a cell"
-    source: oriion.artifacts
-    dataschema: "TODO: link to JSON Schema in Milestone D"
-    data: {}
+  - type: oriion.artifacts.created.v1
+    description: "Artifact envelope created in a cell"
+    data:
+      artifact_id: uuid (string)
+      cell_id: uuid (string)
+      artifact_type: "'document' | 'code' | 'asset'"
+      title: string
+      owner_user_id: uuid (string) | null
+      created_by_agent_id: uuid (string) | null
 
-  - type: oriion.artifacts.yjs.snapshot_saved.v1
-    description: "Y.js document snapshot persisted (checkpoint or compaction)"
-    source: oriion.artifacts
-    dataschema: "TODO"
-    data: {}
+  - type: oriion.artifacts.version_created.v1
+    description: >
+      Immutable version row committed (any storage_kind: inline / s3 /
+      yjs_snapshot). Emitted by the single allocate_version write path,
+      so every version — including the ones announced by the two events
+      below — produces exactly one version_created.
+    data:
+      artifact_id: uuid (string)
+      cell_id: uuid (string)
+      version_num: integer (>= 1)
+      storage_kind: "'inline' | 's3' | 'yjs_snapshot'"
+      byte_size: integer
+      artifact_url: "artifact://<cell_id>/<artifact_id>/v<N>"
+
+  - type: oriion.artifacts.deleted.v1
+    description: "Envelope soft-deleted (versions remain immutable in the DB;
+      s3_objects lifecycle rows flip to 'deleted'; logical bytes freed from
+      cell_storage_usage)"
+    data:
+      artifact_id: uuid (string)
+      cell_id: uuid (string)
+      bytes_freed: integer
+
+  - type: oriion.artifacts.yjs.snapshot_committed.v1
+    description: "Explicit Yjs version commit: live head frozen into an
+      immutable yjs_snapshots row + artifact_versions(storage_kind='yjs_snapshot')"
+    data:
+      artifact_id: uuid (string)
+      cell_id: uuid (string)
+      yjs_document_id: uuid (string)
+      snapshot_id: uuid (string)
+      version_num: integer
+      byte_size: integer
 
   - type: oriion.artifacts.s3.asset_uploaded.v1
-    description: "Binary asset successfully uploaded to S3-compatible storage"
-    source: oriion.artifacts
-    dataschema: "TODO"
-    data: {}
-
-  - type: oriion.artifacts.s3.asset_deleted.v1
-    description: "Asset deleted (soft or hard — semantics TBD in Milestone D)"
-    source: oriion.artifacts
-    dataschema: "TODO"
-    data: {}
+    description: "S3 upload verified server-side (sha256/byte_size computed by
+      the backend, never trusted from the client) — pending → stored + version row"
+    data:
+      artifact_id: uuid (string)
+      cell_id: uuid (string)
+      s3_object_id: uuid (string)
+      s3_key: string
+      byte_size: integer
+      version_num: integer
