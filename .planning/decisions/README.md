@@ -63,8 +63,9 @@
 | [ADR-007](./ADR-007-authentik-then-keycloak.md) | Auth: Custom JWT (W0-1) → Logto (W2-3) → Keycloak (Enterprise) |
 | [ADR-014](./ADR-014-security.md) | Security: RBAC + DLP + isolation memory от tool-output |
 | [ADR-015](./ADR-015-ai-dev-process.md) | AI-dev operational hygiene: isolation, observability, kill-switch, supporting practices |
-| [ADR-023](./ADR-023-ai-team-runtime.md) | AI-team runtime: 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB namespaces |
-| [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) | Solo + AI Git/PR workflow: tier-table re-thought + atomic commits + failure handling |
+| [ADR-023](./ADR-023-ai-team-runtime.md) | AI-team runtime: 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB namespaces (§8 расширен [ADR-037](./ADR-037-autonomous-multiphase-runner.md)) |
+| [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) | Solo + AI Git/PR workflow: tier-table re-thought + atomic commits + failure handling (§5 ревизован [ADR-037](./ADR-037-autonomous-multiphase-runner.md) — полная автономия мёржа) |
+| [ADR-037](./ADR-037-autonomous-multiphase-runner.md) | Autonomous multi-phase runner + gate-authority merge: full-autonomy мёрж + узкая растяжка + evidence/CI-verify + auto-revert/fix-loop (ревизует ADR-027 §5, расширяет ADR-023 §8 + ADR-015) |
 
 ## Governance & policies
 

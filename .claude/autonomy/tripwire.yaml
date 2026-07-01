@@ -1,0 +1,65 @@
+# Autonomy tripwire — задняя растяжка per ADR-037 D2.
+#
+# Runner (Claude в автономной сессии) перед auto-merge классифицирует diff PR'а
+# по этим path-глобам. Совпадение с любой категорией → НЕ auto-merge:
+# фаза доводится до зелёного, пишется в RUN-QUEUE.md + push-notify, ждёт founder 1-клик /ack.
+# Ничего не совпало + все гейты зелёные → auto-merge.
+#
+# Классификатор — git diff --name-only origin/main...HEAD, сверка через fnmatch.
+# Источник истины для категорий — ADR-037 §Decision D2. Меняешь список — правь ADR.
+#
+# Консервативная позиция v1: под-нюанс «существующие таблицы vs новая таблица»
+# для миграций runner ОБЯЗАН применять сам (см. runner_nuance), но по умолчанию
+# ЛЮБАЯ миграция = ack. Ослабляй только после накопленного доверия.
+
+version: 1
+policy: pause-and-ack        # matched → prepare + green + wait for founder /ack
+default_when_unmatched: auto-merge
+
+categories:
+  db_migrations:
+    reason: "Миграция БД — риск по существующим таблицам / RLS-политикам (D2)"
+    globs:
+      - "backend/migrations/versions/**"
+    runner_nuance: |
+      Ack ОБЯЗАТЕЛЕН, если миграция: ALTER/DROP существующей таблицы/колонки,
+      изменение RLS-политики, backfill/data-migration, изменение индексов на
+      горячих таблицах. Чистый CREATE новой таблицы + её RLS с нуля — низкий риск,
+      но v1 всё равно требует ack (консервативно). Runner отражает вердикт нюанса
+      в RUN-QUEUE-записи.
+
+  auth_rbac_sessions:
+    reason: "Auth / RBAC / сессии — surface аутентификации и авторизации (D2)"
+    globs:
+      - "backend/src/iam/**"
+      - "backend/src/rbac/**"
+      - "backend/migrations/versions/iam/**"
+      - "backend/migrations/versions/rbac/**"
+
+  billing_money:
+    reason: "Billing / денежные пути — кредиты, каппы, ЮKassa (D2)"
+    globs:
+      - "backend/src/billing/**"
+      - "backend/migrations/versions/billing/**"
+
+  secrets_keys_crypto:
+    reason: "Секреты / ключи / шифрование — BYOK, master-key, env (D2)"
+    globs:
+      - "backend/src/llm_gateway/**"
+      - "**/*secret*"
+      - "**/*crypto*"
+      - "**/byok*"
+      - "**/.env*"
+      - ".claude/agents/_shared/cost-budget.yaml"
+
+  public_api_contracts:
+    reason: "Слом публичных API/data-контрактов bounded-context (D2)"
+    globs:
+      - ".planning/contracts/**"
+
+# Notes:
+# - Секции src/multitenancy, src/memory, src/tasks, src/agents, src/mcp, src/audit
+#   НЕ в растяжке — обычная внутренняя логика, auto-merge при зелёных гейтах.
+#   Их МИГРАЦИИ попадают под db_migrations выше (любая versions/** = ack v1).
+# - Frontend (frontend/**) целиком вне растяжки на Wave 1 (нет денег/секретов/auth
+#   на клиенте — auth-токены плечо в iam). Пересмотреть при появлении client-side crypto.

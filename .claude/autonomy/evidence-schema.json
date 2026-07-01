@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://teamly.ai/schemas/autonomy-evidence.v1.json",
+  "title": "Autonomy gate evidence artifact",
+  "description": "Per ADR-037 D3. Emitted by a local-only gate (live golden, Docker integration, adversarial audit) that GitHub CI cannot run. Committed to the PR branch under evidence/<gate>.json. The ci-evidence job asserts freshness (head_sha == PR head) + verdict == PASS for every gate the phase declares in evidence/manifest.json. Makes local gates un-fakeable at merge and doubles as founder's post-hoc audit trail.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "gate", "head_sha", "timestamp", "verdict"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Bump when the shape changes; verify_evidence.py pins this."
+    },
+    "gate": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Stable gate id, matches an entry in evidence/manifest.json required_gates (e.g. live_golden_memory, docker_integration, adversarial_audit)."
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "Full 40-char SHA of the commit the gate actually ran against. MUST equal the PR head SHA at CI time, else the evidence is stale and the gate fails."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC when the gate completed."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "FAIL"],
+      "description": "PASS is the only value that lets ci-evidence go green for this gate."
+    },
+    "cost_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "LLM/infra spend to produce this evidence (funded live goldens). Feeds the per-run budget audit."
+    },
+    "runner": {
+      "type": "string",
+      "description": "Who produced it — agent role / script name (e.g. scripts/live_golden_memory.py, reviewer-security)."
+    },
+    "details": {
+      "description": "Free-form gate-specific payload: golden pass counts, reviewer verdicts + refute-by-default confirmation, integration suite summary, etc.",
+      "type": ["object", "string", "array"]
+    }
+  }
+}
