@@ -239,9 +239,15 @@ class S3AssetService:
 
         byte_size = len(body)
         content_hash = hashlib.sha256(body).hexdigest()
-        await self._s3_repo.mark_stored(
+        # Conditional pending→stored transition is the concurrency arbiter
+        # (audit P1): a racing complete that already stored the row makes this
+        # a no-match, and the loser stops BEFORE allocating a version row or
+        # counting usage — one upload can never yield two versions.
+        transitioned = await self._s3_repo.mark_stored(
             row.id, byte_size=byte_size, content_hash_sha256=content_hash
         )
+        if not transitioned:
+            raise UploadNotVerified("upload was completed concurrently")
         version = await allocate_version(
             self._artifact_repo,
             self._usage_repo,

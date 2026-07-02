@@ -17,9 +17,37 @@ from uuid import UUID, uuid4
 from sqlalchemy.exc import IntegrityError
 
 
-def integrity_error() -> IntegrityError:
-    """A realistic IntegrityError instance for race simulations."""
-    return IntegrityError("INSERT INTO ...", {}, Exception("duplicate key value"))
+class FakeUniqueViolationError(Exception):
+    """Mimics asyncpg's UniqueViolationError shape (sqlstate 23505)."""
+
+    sqlstate = "23505"
+
+
+class FakeCheckViolationError(Exception):
+    """Mimics asyncpg's CheckViolationError shape (sqlstate 23514)."""
+
+    sqlstate = "23514"
+
+
+def integrity_error(constraint: str = "artifact_versions_num_uniq") -> IntegrityError:
+    """A realistic unique-violation IntegrityError for race simulations."""
+    return IntegrityError(
+        "INSERT INTO ...",
+        {},
+        FakeUniqueViolationError(f'duplicate key value violates unique constraint "{constraint}"'),
+    )
+
+
+def check_violation_error() -> IntegrityError:
+    """A non-retryable IntegrityError (CHECK violation, not a version race)."""
+    return IntegrityError(
+        "INSERT INTO ...",
+        {},
+        FakeCheckViolationError(
+            'new row for relation "artifact_versions" violates check constraint '
+            '"artifact_versions_storage_xor"'
+        ),
+    )
 
 
 def make_artifact(**over: Any) -> SimpleNamespace:
@@ -47,6 +75,7 @@ class FakeArtifactRepo:
         self.artifacts: dict[UUID, SimpleNamespace] = {}
         self.versions: list[SimpleNamespace] = []
         self.fail_next_inserts = 0  # simulate UNIQUE races
+        self.raise_on_insert: Exception | None = None  # one-shot arbitrary error
         self.insert_version_calls = 0
 
     def add(self, artifact: SimpleNamespace) -> SimpleNamespace:
@@ -100,6 +129,9 @@ class FakeArtifactRepo:
 
     async def insert_version(self, **fields: Any) -> SimpleNamespace:
         self.insert_version_calls += 1
+        if self.raise_on_insert is not None:
+            exc, self.raise_on_insert = self.raise_on_insert, None
+            raise exc
         if self.fail_next_inserts > 0:
             self.fail_next_inserts -= 1
             raise integrity_error()
@@ -161,6 +193,8 @@ class FakeYjsRepo:
     async def insert_document(
         self, *, cell_id: UUID, artifact_id: UUID, state: bytes, state_vector: bytes
     ) -> SimpleNamespace:
+        if artifact_id in self.documents:  # UNIQUE(artifact_id), like the real DDL
+            raise integrity_error("yjs_documents_artifact_uniq")
         row = SimpleNamespace(
             id=uuid4(),
             cell_id=cell_id,
@@ -268,7 +302,7 @@ class FakeS3Repo:
         mime_type: str | None = None,
     ) -> SimpleNamespace:
         if any(r.bucket == bucket and r.s3_key == s3_key for r in self.rows.values()):
-            raise integrity_error()
+            raise integrity_error("s3_objects_bucket_key_uniq")
         row = SimpleNamespace(
             id=uuid4(),
             cell_id=cell_id,
@@ -296,11 +330,14 @@ class FakeS3Repo:
 
     async def mark_stored(
         self, s3_object_id: UUID, *, byte_size: int, content_hash_sha256: str
-    ) -> None:
+    ) -> bool:
         row = self.rows[s3_object_id]
+        if row.status != "pending":  # conditional transition, like the real repo
+            return False
         row.status = "stored"
         row.byte_size = byte_size
         row.content_hash_sha256 = content_hash_sha256
+        return True
 
     async def mark_deleted(self, s3_object_id: UUID) -> None:
         self.rows[s3_object_id].status = "deleted"

@@ -160,6 +160,53 @@ async def test_double_complete_409() -> None:
     assert len(artifacts.versions) == 1  # no duplicate version row
 
 
+async def test_concurrent_double_complete_loser_409() -> None:
+    """Audit P1: two INTERLEAVED completes for one upload — both pass the
+    early `status == pending` read, but the conditional pending→stored
+    transition lets exactly one through. The loser raises 409 and creates
+    neither a second version row nor extra usage bytes.
+
+    Deterministic seam: the outer complete's `get_object` fires the rival
+    complete to completion before the outer one reaches `mark_stored`.
+    """
+    s3_repo, artifacts, usage = FakeS3Repo(), FakeArtifactRepo(), FakeUsageRepo()
+
+    class _InterleavingStorage(FakeObjectStorage):
+        """Runs the rival complete inside the loser's verification window."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.rival: object = None
+            self._fired = False
+
+        async def get_object(self, *, bucket: str, key: str) -> bytes | None:
+            body = await super().get_object(bucket=bucket, key=key)
+            if not self._fired and self.rival is not None:
+                self._fired = True
+                await self.rival()  # type: ignore[operator]  # rival wins here
+            return body
+
+    storage = _InterleavingStorage()
+    svc = _service(s3_repo, artifacts, usage, storage)
+    art = artifacts.add(make_artifact(artifact_type="asset"))
+    row, _ = await svc.presign_upload(cell_id=art.cell_id, artifact_id=art.id, filename="pic.png")
+    body = b"raced-body"
+    storage.put(_BUCKET, row.s3_key, body)
+
+    async def _rival_complete() -> None:
+        await svc.complete_upload(cell_id=art.cell_id, s3_object_id=row.id)
+
+    storage.rival = _rival_complete
+
+    with pytest.raises(UploadNotVerified):  # the interleaved loser fails
+        await svc.complete_upload(cell_id=art.cell_id, s3_object_id=row.id)
+
+    assert row.status == "stored"  # the rival's transition stands
+    assert len(artifacts.versions) == 1  # ONE version row for one upload
+    assert usage.by_cell[art.cell_id] == len(body)  # usage counted exactly once
+    assert art.current_version_num == 1
+
+
 async def test_download_url_only_for_stored() -> None:
     s3_repo, artifacts, usage, storage = (
         FakeS3Repo(),

@@ -130,9 +130,16 @@ class ArtifactService:
         return await self._artifact_repo.list_versions(artifact_id, cell_id=cell_id)
 
     async def soft_delete(self, *, cell_id: UUID, artifact_id: UUID) -> None:
+        # Lock the envelope FIRST (audit P2): allocate_version serializes on
+        # the same FOR-UPDATE row lock, so the byte sum + decrement below can
+        # never interleave with a concurrent version commit and drift
+        # cell_storage_usage.
+        envelope = await self._artifact_repo.get_for_update(artifact_id, cell_id=cell_id)
+        if envelope is None:
+            raise ArtifactNotFound(str(artifact_id))
         bytes_freed = await self._artifact_repo.sum_version_bytes(artifact_id)
         deleted = await self._artifact_repo.soft_delete(artifact_id, cell_id=cell_id)
-        if not deleted:
+        if not deleted:  # unreachable while we hold the lock; defensive
             raise ArtifactNotFound(str(artifact_id))
         await self._s3_repo.mark_all_deleted_for_artifact(artifact_id, cell_id=cell_id)
         if bytes_freed > 0:

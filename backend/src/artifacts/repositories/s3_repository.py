@@ -68,16 +68,24 @@ class S3ObjectRepository:
 
     async def mark_stored(
         self, s3_object_id: UUID, *, byte_size: int, content_hash_sha256: str
-    ) -> None:
-        await self._session.execute(
+    ) -> bool:
+        """Conditional lifecycle transition ``pending → stored``.
+
+        The ``status = 'pending'`` predicate is the concurrency arbiter (audit
+        P1): of two overlapping completes exactly one matches the row and wins;
+        the loser gets ``False`` and must NOT allocate a version or count usage.
+        """
+        result = await self._session.execute(
             update(S3Object)
-            .where(S3Object.id == s3_object_id)
+            .where(S3Object.id == s3_object_id, S3Object.status == "pending")
             .values(
                 status="stored",
                 byte_size=byte_size,
                 content_hash_sha256=content_hash_sha256,
             )
+            .returning(S3Object.id)
         )
+        return result.scalar_one_or_none() is not None
 
     async def mark_deleted(self, s3_object_id: UUID) -> None:
         await self._session.execute(
