@@ -107,8 +107,13 @@ async def test_apply_update_rejects_garbage() -> None:
 async def test_apply_update_missing_document_404() -> None:
     yjs, artifacts, usage = FakeYjsRepo(), FakeArtifactRepo(), FakeUsageRepo()
     svc = _service(yjs, artifacts, usage)
-    with pytest.raises(YjsDocumentNotFound):
+    # No envelope at all → the live-envelope guard 404s first (audit P3).
+    with pytest.raises(ArtifactNotFound):
         await svc.apply_update(cell_id=uuid4(), artifact_id=uuid4(), update_data=b"")
+    # Envelope exists but has no live Yjs doc → the doc-level 404.
+    art = artifacts.add(make_artifact())
+    with pytest.raises(YjsDocumentNotFound):
+        await svc.apply_update(cell_id=art.cell_id, artifact_id=art.id, update_data=b"")
 
 
 async def test_commit_version_creates_snapshot_version_and_usage() -> None:
@@ -133,14 +138,20 @@ async def test_commit_version_creates_snapshot_version_and_usage() -> None:
 
 async def test_compaction_prunes_log_never_snapshots() -> None:
     yjs, artifacts, usage = FakeYjsRepo(), FakeArtifactRepo(), FakeUsageRepo()
-    svc = _service(yjs, artifacts, usage, compact_update_count=3)
+    svc = _service(yjs, artifacts, usage, compact_update_count=2)
     art = artifacts.add(make_artifact())
     await svc.create_document(cell_id=art.cell_id, artifact_id=art.id)
 
-    for word in ("a", "b", "c"):  # 3rd update crosses the threshold
+    # Strict ADR-038 threshold: compaction fires only when count EXCEEDS the
+    # limit — 2nd update (count == 2) must NOT compact, 3rd (count == 3) must.
+    for word in ("a", "b"):
         row = await svc.apply_update(
             cell_id=art.cell_id, artifact_id=art.id, update_data=_client_update(word)
         )
+    assert yjs.snapshots == [] and len(yjs.updates) == 2  # == threshold: no compact
+    row = await svc.apply_update(
+        cell_id=art.cell_id, artifact_id=art.id, update_data=_client_update("c")
+    )
 
     assert yjs.updates == []  # log pruned
     assert len(yjs.snapshots) == 1  # compaction snapshot persisted, NOT deleted
@@ -166,3 +177,41 @@ async def test_compaction_triggers_on_state_size() -> None:
     )
     assert len(yjs.snapshots) == 1  # size threshold fired on the first update
     assert yjs.updates == []
+
+
+async def test_soft_deleted_envelope_yields_404_on_yjs_surface() -> None:
+    """Audit P3: get/apply/commit on a soft-deleted artifact behave like resolve — 404."""
+    yjs, artifacts, usage = FakeYjsRepo(), FakeArtifactRepo(), FakeUsageRepo()
+    svc = _service(yjs, artifacts, usage)
+    art = artifacts.add(make_artifact())
+    await svc.create_document(cell_id=art.cell_id, artifact_id=art.id)
+    art.deleted_at = art.created_at  # soft-delete the envelope
+
+    with pytest.raises(ArtifactNotFound):
+        await svc.get_document(cell_id=art.cell_id, artifact_id=art.id)
+    with pytest.raises(ArtifactNotFound):
+        await svc.apply_update(
+            cell_id=art.cell_id, artifact_id=art.id, update_data=_client_update("x")
+        )
+    with pytest.raises(ArtifactNotFound):
+        await svc.commit_version(cell_id=art.cell_id, artifact_id=art.id)
+    assert yjs.updates == [] and yjs.snapshots == []  # nothing written
+
+
+async def test_create_document_toctou_duplicate_maps_to_409() -> None:
+    """Audit P3: a racer inserting between pre-check and INSERT surfaces as the
+    409 domain error (UNIQUE(artifact_id) via SAVEPOINT), never a raw 500."""
+    artifacts, usage = FakeArtifactRepo(), FakeUsageRepo()
+    art = artifacts.add(make_artifact())
+
+    class _BlindYjsRepo(FakeYjsRepo):
+        """Pre-check sees nothing → the INSERT's UNIQUE is the only guard."""
+
+        async def get_by_artifact(self, artifact_id: object, *, cell_id: object) -> None:
+            return None
+
+    blind = _BlindYjsRepo()
+    svc = _service(blind, artifacts, usage)
+    await svc.create_document(cell_id=art.cell_id, artifact_id=art.id)
+    with pytest.raises(YjsDocumentAlreadyExists):  # 2nd insert hits UNIQUE
+        await svc.create_document(cell_id=art.cell_id, artifact_id=art.id)

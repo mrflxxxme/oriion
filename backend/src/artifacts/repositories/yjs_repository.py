@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.artifacts.models import YjsDocument, YjsSnapshot, YjsUpdate
@@ -34,14 +35,24 @@ class YjsRepository:
         state: bytes,
         state_vector: bytes,
     ) -> YjsDocument:
+        """INSERT inside a SAVEPOINT — ``UNIQUE(artifact_id)`` surfaces as
+        ``IntegrityError`` without poisoning the outer transaction (the
+        service maps it to a 409 domain error, audit P3)."""
         row = YjsDocument(
             cell_id=cell_id,
             artifact_id=artifact_id,
             state=state,
             state_vector=state_vector,
         )
-        self._session.add(row)
-        await self._session.flush()
+        try:
+            async with self._session.begin_nested():
+                self._session.add(row)
+                await self._session.flush()
+        except IntegrityError:
+            # The rolled-back SAVEPOINT may have evicted the instance already.
+            if row in self._session:
+                self._session.expunge(row)
+            raise
         return row
 
     async def get_by_artifact(self, artifact_id: UUID, *, cell_id: UUID) -> YjsDocument | None:

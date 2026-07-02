@@ -95,6 +95,32 @@ async def test_missing_or_deleted_envelope_raises_404() -> None:
         )
 
 
+async def test_non_race_integrity_error_is_reraised_not_retried() -> None:
+    """Audit P3: only a 23505 on the version_num constraint is a retryable
+    race — a CHECK/FK violation must surface (500), never loop into a 409."""
+    from sqlalchemy.exc import IntegrityError
+
+    from tests.artifacts._fakes import check_violation_error
+
+    artifacts, usage = FakeArtifactRepo(), FakeUsageRepo()
+    art = artifacts.add(make_artifact())
+    artifacts.raise_on_insert = check_violation_error()
+
+    with pytest.raises(IntegrityError):
+        await allocate_version(
+            artifacts,  # type: ignore[arg-type]
+            usage,  # type: ignore[arg-type]
+            cell_id=art.cell_id,
+            artifact_id=art.id,
+            storage_kind="inline",
+            content_inline={},
+            byte_size=0,
+            content_hash_sha256="",
+        )
+    assert artifacts.insert_version_calls == 1  # no retry on a non-race error
+    assert usage.calls == []
+
+
 async def test_zero_byte_version_skips_usage_but_emits_event() -> None:
     artifacts, usage = FakeArtifactRepo(), FakeUsageRepo()
     art = artifacts.add(make_artifact())

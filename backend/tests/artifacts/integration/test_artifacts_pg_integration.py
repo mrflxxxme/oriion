@@ -284,9 +284,9 @@ async def test_yjs_read_your_writes_commit_and_compaction(db_session: AsyncSessi
         )
         assert resolved.yjs_state_base64 is not None
 
-        # Compaction: tiny threshold → the NEXT update prunes the log,
-        # keeps every snapshot, resets the counter.
-        compacting = YjsService(yjs_repo, artifact_repo, usage_repo, compact_update_count=1)
+        # Compaction: threshold 0 → the NEXT update EXCEEDS it (strict `>`,
+        # ADR-038), prunes the log, keeps every snapshot, resets the counter.
+        compacting = YjsService(yjs_repo, artifact_repo, usage_repo, compact_update_count=0)
         await compacting.apply_update(
             cell_id=cell_id, artifact_id=artifact.id, update_data=_client_update("!")
         )

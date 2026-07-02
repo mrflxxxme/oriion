@@ -23,6 +23,23 @@ from src.artifacts.repositories.artifact_repository import ArtifactRepository, U
 logger = structlog.get_logger(__name__)
 
 _MAX_ATTEMPTS = 3
+_VERSION_NUM_CONSTRAINT = "artifact_versions_num_uniq"
+
+
+def _is_version_num_race(exc: IntegrityError) -> bool:
+    """True only for a unique-violation (SQLSTATE 23505) on the
+    ``UNIQUE(artifact_id, version_num)`` constraint (audit P3).
+
+    Anything else (XOR CHECK, FK, RLS) is a programming/data error and must
+    surface as a 500 — retrying it can never succeed and 409 would mislead.
+    The asyncpg exception is wrapped by SQLAlchemy's DBAPI adapter, so the
+    sqlstate is looked up on ``orig`` and then on its ``__cause__``.
+    """
+    cause = exc.orig
+    sqlstate = getattr(cause, "sqlstate", None)
+    if sqlstate is None and cause is not None:
+        sqlstate = getattr(cause.__cause__, "sqlstate", None)
+    return sqlstate == "23505" and _VERSION_NUM_CONSTRAINT in str(cause)
 
 
 async def allocate_version(
@@ -70,6 +87,10 @@ async def allocate_version(
             )
             break
         except IntegrityError as exc:
+            if not _is_version_num_race(exc):
+                # XOR/FK/RLS violations are not retryable races — surface them.
+                raise
+            # Content-safe log: error_type only, never the raw DB message.
             logger.warning(
                 "artifacts.version.race_retry",
                 context="artifacts",
@@ -78,7 +99,6 @@ async def allocate_version(
                 attempted_num=next_num,
                 attempt=attempt,
                 error_type=type(exc.orig).__name__,
-                error=str(exc.orig),
             )
             next_num = await artifact_repo.max_version_num(artifact_id) + 1
     if version is None:

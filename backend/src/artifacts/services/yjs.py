@@ -22,6 +22,7 @@ from uuid import UUID
 
 import structlog
 from pycrdt import Doc
+from sqlalchemy.exc import IntegrityError
 
 from src.artifacts.events import emit_yjs_snapshot_committed
 from src.artifacts.exceptions import (
@@ -63,6 +64,12 @@ class YjsService:
         self._compact_update_count = compact_update_count
         self._compact_state_bytes = compact_state_bytes
 
+    async def _require_live_envelope(self, *, cell_id: UUID, artifact_id: UUID) -> None:
+        """404 when the envelope is absent or soft-deleted (audit P3 — the Yjs
+        surface must match resolve/get: a deleted artifact has no live doc)."""
+        if await self._artifact_repo.get(artifact_id, cell_id=cell_id) is None:
+            raise ArtifactNotFound(str(artifact_id))
+
     async def create_document(self, *, cell_id: UUID, artifact_id: UUID) -> YjsDocument:
         """Create the live CRDT head for a 'document'/'code' artifact."""
         artifact = await self._artifact_repo.get(artifact_id, cell_id=cell_id)
@@ -76,14 +83,20 @@ class YjsService:
         if await self._yjs_repo.get_by_artifact(artifact_id, cell_id=cell_id) is not None:
             raise YjsDocumentAlreadyExists(str(artifact_id))
         empty: Doc[Any] = Doc()
-        return await self._yjs_repo.insert_document(
-            cell_id=cell_id,
-            artifact_id=artifact_id,
-            state=empty.get_update(),
-            state_vector=empty.get_state(),
-        )
+        try:
+            # SAVEPOINT-wrapped: UNIQUE(artifact_id) closes the TOCTOU window
+            # between the pre-check above and this insert (audit P3).
+            return await self._yjs_repo.insert_document(
+                cell_id=cell_id,
+                artifact_id=artifact_id,
+                state=empty.get_update(),
+                state_vector=empty.get_state(),
+            )
+        except IntegrityError as exc:
+            raise YjsDocumentAlreadyExists(str(artifact_id)) from exc
 
     async def get_document(self, *, cell_id: UUID, artifact_id: UUID) -> YjsDocument:
+        await self._require_live_envelope(cell_id=cell_id, artifact_id=artifact_id)
         row = await self._yjs_repo.get_by_artifact(artifact_id, cell_id=cell_id)
         if row is None:
             raise YjsDocumentNotFound(str(artifact_id))
@@ -93,6 +106,7 @@ class YjsService:
         self, *, cell_id: UUID, artifact_id: UUID, update_data: bytes
     ) -> YjsDocument:
         """Merge one client update into the head under the row lock."""
+        await self._require_live_envelope(cell_id=cell_id, artifact_id=artifact_id)
         row = await self._yjs_repo.get_by_artifact_for_update(artifact_id, cell_id=cell_id)
         if row is None:
             raise YjsDocumentNotFound(str(artifact_id))
@@ -115,8 +129,10 @@ class YjsService:
             state_vector=new_vector,
             update_count=row.update_count + 1,
         )
+        # Strict `>` on both thresholds — ADR-038: "при update_count > 500
+        # или > 1 MiB" (audit P3).
         if (
-            row.update_count >= self._compact_update_count
+            row.update_count > self._compact_update_count
             or len(new_state) > self._compact_state_bytes
         ):
             await self._compact(row)
@@ -131,6 +147,7 @@ class YjsService:
         created_by_agent_id: UUID | None = None,
     ) -> tuple[ArtifactVersion, YjsSnapshot]:
         """Explicit commit: freeze the head into an immutable snapshot + version."""
+        await self._require_live_envelope(cell_id=cell_id, artifact_id=artifact_id)
         row = await self._yjs_repo.get_by_artifact_for_update(artifact_id, cell_id=cell_id)
         if row is None:
             raise YjsDocumentNotFound(str(artifact_id))
