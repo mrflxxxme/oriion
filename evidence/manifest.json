@@ -1,7 +1,0 @@
-{
-  "phase": "01.6",
-  "required_gates": [
-    "adversarial_audit"
-  ],
-  "notes": "Deterministic phase: no docker_integration (no new DB path), no live_golden (no LLM), no judge_panel (no wide fork). Only the local-only 3-lens adversarial audit needs evidence."
-}
