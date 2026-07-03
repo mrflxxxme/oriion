@@ -91,3 +91,45 @@
 - Decision: Option B: classify tools by risk_level (metadata exists on agents.roles) + enforcement-SEAM (same port pattern as detectors), but NO actual capability-gate in 01.6. The real gate activates in 01.9 when the first dangerous connectors land, together with the owner-config surface
 - Rationale: founder grill verdict 2026-07-03: Wave-1 agents have no outward action-tools (send_email/telegram/money = 01.9+ connectors; web_search/read_url read-only). Hard-deny (A) or approval-flow (C) now = enforcement for a non-existent surface. Substrate-now / enforce-when-there-is-something-to-enforce (same principle as co-editing + quotas). Cross-ref: 01.9 activates the gate.
 - Reversibility: reversible
+
+### 2026-07-03T15:09:47Z | phase 01.8 | impl
+- Fork: 01.8 auth split + real SMTP sender placement
+- Decision: Split: 01.8 core = 2FA TOTP (pyotp) + magic-link (on existing EmailSender port, InMemory-tested) + session-list backend, fully autonomous; 01.8b = Yandex ID + VK ID OAuth (needs client creds). Real YandexSmtpEmailSender = EARLY dedicated slot 01.8-mail (pre-alpha prerequisite), before OAuth: runner writes impl + transport-mock tests autonomously, live-send validates when SMTP creds land in the canonical .env
+- Rationale: founder grill verdict 2026-07-03 (Option A + split): email verification is mandatory before first task (ADR-007) but prod sender is NoOp today - friends cannot self-verify => SMTP is a pre-alpha launch blocker independent of auth-extensions; must NOT be coupled to OAuth-app-registration timing. Split maximizes autonomous volume (OAuth is the only piece needing external client creds). Robust to cred timing: code+mock now, live-send is the follow-up gate.
+- Reversibility: reversible
+
+### 2026-07-03T15:24:16Z | phase 01.7 | impl
+- Fork: RBAC Member artifact-visibility granularity (Wave-1)
+- Decision: Option A: flat - all cell members see all cell artifacts (RLS already by cell_id; Member = cell access). Owner vs Member differ only in RIGHTS (Owner: billing + management + cell-delete; Member: create tasks, see everything in cell), NOT content visibility. Stub only: add visibility text DEFAULT 'cell-shared' to the artifacts envelope (added in 01.7's migration, fast-default, no backfill), NOT enforced - enables per-artifact privacy (B) later without an ALTER-under-data
+- Rationale: founder grill verdict 2026-07-03: pre-alpha cells are single-user; even with Member, a friends-team works on shared artifacts - hiding them prematurely is friction. Per-artifact privacy (B) + agent-whitelist (C) are Wave-2+ granularity when real teams need separation. Substrate-field-now / enforce-later (same pattern as quotas).
+- Reversibility: reversible
+
+### 2026-07-03T15:29:08Z | phase 01.9 | impl
+- Fork: MCP outward-action default before approval-UI exists + server scope
+- Decision: Option A: Wave-1 connectors are READ + DRAFT only - read/fetch (Disk files, TG posts, IMAP inbox) + agent prepares a draft (message/email as an artifact); autonomous outward SEND (send_email/send_telegram) is DENY-until-approval-UI (01.12). Scope = all three servers (telegram-mcp Bot-API + yandex-disk-mcp + imap-smtp-mcp) but each read+draft only, no exotic features. Cross-ref: activates the capability-gate seam from 01.6; constrains 01.11 (TG Business send also gated)
+- Rationale: founder grill verdict 2026-07-03: autonomous send-as-user without a single confirmation (B) = reputational + 152-FZ risk on an unproven product (one hallucinated client email = platform-wide trust loss); DLP catches PII but not 'agent wrote nonsense and sent it'. Read+Draft delivers 90pct value (agent gathers context + drafts), human sends, until 01.12 approval-flow turns on autonomous send deliberately. C (config-flag without UI) rejected as a footgun even opt-in.
+- Reversibility: reversible
+
+### 2026-07-03T15:36:30Z | phase 01.10 | impl
+- Fork: Vertical-prompt authorship process under the autonomous runner (pattern for ALL verticals)
+- Decision: Option B (autonomous-draft -> founder review-gate) ENHANCED with a mandatory research-first phase. Pipeline: (1) DOMAIN RESEARCH phase - a researcher-role agent (WebSearch/WebFetch + funded Brave/Yandex search) produces an internal market/domain brief for the vertical: target audience (CA), behavioral patterns, key content types + tone, competitor conventions, pain points, success criteria - grounded + cited; (2) DRAFT AUTHORING grounded in that brief (not thin general knowledge), optionally judge-panel N-variants; (3) golden dataset + evaluator scoring; (4) REVIEW-GATE = founder promotes draft->reviewed, with the research brief travelling in the PR so the founder reviews the GROUNDING too. Amend ADR-026 (vertical-expertise-pipeline) with the research-first step at 01.10 start
+- Rationale: founder grill verdict 2026-07-03: B + internal preliminary market research so agents understand the vertical's specifics (behavioral pattern + key aspects) and prompts come out higher quality. Founder's market knowledge enters at review (targeted, fast) not per-prompt authorship - the pattern we are moving TO. Research-first raises first-draft quality so promotion is more often a rubber-stamp; cost of the research phase is repaid in fewer founder edit cycles. C (1-2 line positioning skeleton upfront) stays fallback for truly niche verticals (IP-buh, WB-seller W2/W3).
+- Reversibility: reversible
+
+### 2026-07-03T15:41:07Z | phase 01.11 | impl
+- Fork: How the runner treats a legally-gated phase (OQ-32/OQ-33)
+- Decision: Option B: runner builds the FULL flagged scaffold autonomously behind feature_flag=OFF (Business-API integration, consent model, per-DM-access audit logging, ephemeral <=7d retention, pgcrypto encryption) - all mock/fixture-tested, ZERO live calls to real private DMs, flag stays OFF. Legal closure of OQ-32/33 = review of ready code + flag flip + RKN notification, not a from-scratch start. HARD RULE: any code that ACTIVATES real DM reads OR flips the flag -> escalate (tripwire secrets + product 152-FZ)
+- Rationale: founder grill verdict 2026-07-03: the legal gate is about ACTIVATION of PDN processing, not the existence of code. Runner can safely build the whole integration behind an off flag (exactly what ADR-030 prescribes), maximizing autonomous volume even on a gated phase. A (wait entirely) loses weeks of autonomous work on code that is legally writable now. C is a half-measure - the scaffold already covers the consent-UX model.
+- Reversibility: reversible
+
+### 2026-07-03T15:48:10Z | phase 01.12 | impl
+- Fork: Staying autonomous on the product-heavy Dashboard/Onboarding phase
+- Decision: Principle (also amends escalation-policy D4): user-facing content ALREADY specified in an ADR/UI-SPEC (wizard copy in ADR-022, product units in ADR-016, palette in ADR-031) is IMPLEMENTED as-is, NOT re-escalated - executing an approved spec is not a new product decision. Demo-scenarios / seeded first-task examples (not in any ADR) -> autonomous research-first draft + founder review-gate (same as vertical prompts). Net-new user-facing decisions covered by NO ADR -> escalate. 01.12 thus near-autonomous: wizard/dashboard/approval-UI per ADR-022/016/031, demo-scenarios via draft->review-gate
+- Rationale: founder grill verdict 2026-07-03: resolves the tension 'frontend is outside the tripwire but user-facing escalates per D4' - what escalates is not everything VISIBLE but everything UNDECIDED-and-visible. Same rule cuts escalations across all future UI phases.
+- Reversibility: reversible
+
+### 2026-07-03T16:19:56Z | phase 01.5 | impl
+- Fork: Loosen db_migrations tripwire for greenfield without weakening the gate
+- Decision: Option C (grill): classify_tripwire v2 content-inspects upgrade() and auto-drops db_migrations iff EVERY touched migration is a provable pure-CREATE; fail-closed on any f-string/ALTER/DROP/backfill/index-on-existing/unknown-call/unreadable. Complexity kept OUT of the gate: new cell-scoped migrations use literal-arg helpers backend/migrations/_rls.py (cell_scoped_rls/updated_at_trigger) instead of the f-string RLS loop, so the classifier stays a simple strip-strings + call-allow-list. Shipped PR #82
+- Rationale: founder grill verdict 2026-07-03 (chose C after a grounded finding): the house RLS idiom is an un-provable f-string loop; teaching the GATE to prove loop domains puts a fragile parser where a miss = an unattended destructive migration auto-merging. C moves that complexity into an ordinary tested helper and keeps the safety-critical gate dumb + statically verifiable. A (conservative-only) was near-worthless since the house writes no literal migrations; B (smart parser in gate) too risky.
+- Reversibility: reversible
