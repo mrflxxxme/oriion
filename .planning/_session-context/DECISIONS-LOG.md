@@ -49,3 +49,9 @@
 - Decision: Envelope model in single 'artifacts' schema, G1 winner + 6 grafts (current_version_num, s3_objects lifecycle table, composite anti-drift FKs, text_export, 404-no-oracle, storage_kind evolution comment); bytea + pycrdt synchronous merge under FOR UPDATE
 - Rationale: Judge-panel N=3 (ADR-faithful/flat/evolution) + evaluator, lexicographic rubric. Correctness gate ordered G1(8) > G2(7) > G3(6): G3 broke read-your-writes (async merge), G2 rebound artifact:// grammar onto two probabilistic ID namespaces and dropped ADR-012 tags/type/'code'. Full verdict in ADR-038
 - Reversibility: hard-to-reverse (schema, public-ish seam)
+
+### 2026-07-03T12:33:35Z | phase 01.5 | impl
+- Fork: ci-evidence freshness circularity: evidence commit advances the tip so head_sha==tip is unsatisfiable once a manifest exists
+- Decision: verify_evidence.py walks first-parent past commits touching ONLY evidence/ (bounded, 5); ci-evidence checkout fetch-depth 25; 3 tooling tests incl. mixed-commit stays stale
+- Rationale: Hash circularity: a commit cannot contain its own sha. Freshness redefined as no non-evidence commit after the gate - teeth preserved (any code/docs path stales). 01.5 is the first manifest consumer; without the fix ci-evidence is permanently red
+- Reversibility: reversible

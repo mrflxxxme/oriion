@@ -36,9 +36,13 @@ jobs:
       # For PRs, check out the PR HEAD (not the merge commit) so the evidence/*.json
       # on disk is exactly what the gate committed, and its recorded head_sha can be
       # compared against this same commit.
+      # fetch-depth > 1: the verifier walks first-parent past evidence-only tail
+      # commits (an evidence artifact cannot contain its own commit's sha), so it
+      # needs a little history behind the tip.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 25
 
       - name: Resolve commit-under-test
         id: sha

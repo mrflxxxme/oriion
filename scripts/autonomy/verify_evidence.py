@@ -44,6 +44,54 @@ def _git_head_sha() -> str | None:
     return out.stdout.strip() or None
 
 
+def _commit_files(sha: str) -> list[str] | None:
+    """Paths touched by ``sha`` (vs its first parent). None on git failure."""
+    try:
+        out = subprocess.run(
+            ["git", "show", "--name-only", "--format=", "--first-parent", sha],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
+def _last_non_evidence_commit(start_sha: str, evidence_dir: str) -> str:
+    """Walk first-parent past commits that touch ONLY ``evidence_dir``.
+
+    Resolves the head_sha chicken-and-egg: the evidence artifact records the
+    commit the gate ran against, but COMMITTING the artifact advances the tip,
+    so a literal ``head_sha == tip`` can never hold (the commit hash cannot
+    appear inside its own tree). Freshness therefore means: no commit AFTER
+    the gate ran touches anything outside ``evidence_dir``. The teeth are
+    preserved — one code/docs path in a later commit stops the walk and the
+    evidence is stale again.
+    """
+    prefix = evidence_dir.rstrip("/\\") + "/"
+    sha = start_sha
+    # Bound the walk: a legitimate tail is 1-2 evidence-only commits.
+    for _ in range(5):
+        files = _commit_files(sha)
+        if not files or not all(f.startswith(prefix) for f in files):
+            return sha
+        try:
+            out = subprocess.run(
+                ["git", "rev-parse", f"{sha}^"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return sha
+        parent = out.stdout.strip()
+        if not _SHA_RE.match(parent):
+            return sha
+        sha = parent
+    return sha
+
+
 def _load_json(path: Path) -> Any:
     with path.open(encoding="utf-8") as fh:
         return json.load(fh)
@@ -119,6 +167,14 @@ def main(argv: list[str] | None = None) -> int:
             "(pass --head-sha or run inside a git repo)"
         )
         return 1
+
+    resolved_sha = _last_non_evidence_commit(expected_sha, args.evidence_dir)
+    if resolved_sha != expected_sha:
+        print(
+            f"[ci-evidence] tip {expected_sha[:12]} is an evidence-only tail; "
+            f"gates must have run against {resolved_sha[:12]} (last non-evidence commit)"
+        )
+        expected_sha = resolved_sha
 
     evidence_dir = Path(args.evidence_dir)
     failures = 0
