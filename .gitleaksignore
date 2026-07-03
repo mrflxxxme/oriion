@@ -45,3 +45,7 @@ df577ff6c3651cc5121c50810b0d95c07026cb59:backend/tests/_shared/test_config_guard
 # 01.5 artifacts: MinIO dev-compose credential referenced by the S3 integration
 # test (same dummy value as infra/docker-compose.dev.yml; local-only MinIO).
 d09ac2c546f464d08841ebc51930af1ad60e031e:backend/tests/artifacts/integration/test_s3_minio_integration.py:generic-api-key:57
+# Same MinIO dev-compose dummy, re-flagged under the squash-merge commit of
+# PR #78 (squash mints a new sha; the branch-commit fingerprint above no
+# longer matches the history scan).
+a326f7a56a01fd8b735d934fc818e01f0b1a739c:backend/tests/artifacts/integration/test_s3_minio_integration.py:generic-api-key:57
