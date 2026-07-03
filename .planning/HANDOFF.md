@@ -4,20 +4,26 @@
 
 ## Last updated
 
-- Date: 2026-07-02 (**Autonomy Blocks D+E + full arming — ADR-037 build complete**)
-- Session: `hungry-nash-01feac`
-- Agent: @claude-opus
+- Date: 2026-07-03 (**Phase 01.5 Артефакты — первый прогон `/autonomy:run`, code-complete**)
+- Session: `charming-kepler-c814fe` (autonomous runner, ADR-037 pilot)
+- Agent: @claude-fable
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — **in progress**. 01.1-retro ✅ · 01.2 ✅ · 01.3 ✅ · 01.4 ✅ · 01.4b ✅. **Autonomy: A ✅#74 · B ✅#75 · C ✅#76 · D+E = this PR → ADR-037 build COMPLETE.**
-- **Armed this session (explicit founder ask):** pre-merge tripwire hook live in `.claude/settings.json` · `enforce_admins=true` · `delete_branch_on_merge=true` (both API-verified) · `notify.json` (founder Telegram chat_id, phone-ack). Toggle 1 (GitHub-required ci-backend) deliberately deferred — runner's in-code all-green gate covers it.
-- **This PR delivers D+E:** `scripts/autonomy/check_main_health.py` (D7 regression-watch: verdict + offender_sha; **4/4 tested** incl. live) · `/autonomy:heal` (auto-revert → mandatory revert-notification → autonomous fix-loop ≤3 cycles → stuck; attribution sanity-guards) · run.md updates (step-9 stub → heal protocol + health-check cadence; §Parallel tracks: opt-in worktree subagents, max 2, **serialized merges**; §Budget R-31) · BUILD-PLAN/README brought to "fully armed".
-- **Branch:** `claude/autonomy-block-de` (off `origin/main` = `704a395`). Focused PR → `main`.
-- ⚠️ **Dual-tree guard:** canon `.planning/` в worktree; the outer `…/TEAMLY_RU/.planning` stale. Anchor: `git rev-parse --show-toplevel`.
-- ⚠️ Note for future sessions in this repo: the **pre-merge hook is armed** — any `gh pr merge` from a Claude session is classified against `tripwire.yaml`; tripwire-matched merges need an approved `/autonomy:ack` (RUN-QUEUE) first. Founder UI merges unaffected.
+- **Wave:** Wave 1 (Core MVP) — in progress. 01.1-retro ✅ · 01.2 ✅ · 01.3 ✅ · 01.4 ✅ · 01.4b ✅ · **01.5 = this PR (autonomy-pilot)**.
+- **01.5 «Артефакты» (ADR-012 / [ADR-038](./decisions/ADR-038-artifacts-envelope-schema.md)):** новый bounded context `backend/src/artifacts/` — envelope-схема 7 таблиц (`artifacts_0001`, FORCE RLS, immutable versions), Yjs bytea+pycrdt синхронный merge (REST-only Wave 1), S3 presigned flow против MinIO/YOS, `artifact://` resolver, `cell_storage_usage` учёт, контракты переписаны. `tasks.task_artifacts` НЕ тронут — его висячие `s3_key`/`yjs_document_id` теперь резолвятся против artifacts-таблиц.
+- **Автономный цикл отработал:** 9 forks (6 owned / 2 escalated non-blocking / 1 judge-panel → ADR-038) · 3-lens adversarial audit поймал 1 P1 (concurrent double-complete) — закрыт с тестом гонки · ci-evidence freshness circularity починен (`verify_evidence.py` walk мимо evidence-only коммитов).
+- **Gates финального кода:** ruff clean · mypy --strict 214 · bandit 0 · unit 852 · integration 55 (real PG + MinIO) · `src/artifacts` 93%.
+- ⚠️ **Dual-tree guard:** canon `.planning/` в активном worktree; anchor `git rev-parse --show-toplevel`.
+- ⚠️ Pre-merge tripwire hook armed: merge этого PR требует approved `/autonomy:ack` (diff трогает `backend/migrations/versions/**` + `.planning/contracts/**`).
 
-## Active blockers (none block this infra PR)
+## Pending founder actions
+
+1. **Tripwire ack на PR 01.5** — RUN-QUEUE `ack-needed` запись (создаётся при открытии PR): db_migrations (чистый greenfield CREATE новой схемы + RLS, runner_nuance = низкий риск) + public_api_contracts (SKELETON → implemented, единственный источник правды). `/autonomy:ack <ID> approved` → раннер мержит.
+2. **Эскалации (non-blocking, leans уже исполняются):** RQ-20260701-001 co-editing scope (lean B: y-websocket отложен до co-editing UI) · RQ-20260701-002 storage-квоты (lean B: track-only, enforcement = billing follow-up).
+3. **Chip `task_6cdb162a`** — hardening-хвосты аудита (janitor wiring, body-caps, presign-overwrite window, live-Yjs bytes accounting) — запустить после merge.
+
+## Active blockers (none block this PR)
 
 | ID | Описание | Owner | Block уровень |
 |---|---|---|---|
@@ -26,12 +32,6 @@
 | OQ-19 | Открытие ЮKassa (5–10 дн) | Founder + бухгалтер | gates **01.3b ЮKassa** test→live |
 | OQ-32 / OQ-33 | Telegram Business consent-UX + 152-ФЗ + РКН | Founder + юрист | gates **Phase 01.11** |
 
-## Next actions
-
-1. **Founder: merge this D+E PR** — the last manual merge before the runner takes over; note `delete_branch_on_merge` is now on (branch auto-teardown is the norm, per ADR-027 §3a).
-2. **PILOT:** founder starts Docker + funded `.env` → **`/autonomy:run 01.5`**. Phase 01.5 (Артефакты, [ADR-012](./decisions/ADR-012-artifacts.md)) runs end-to-end through the autonomous loop. Expected founder touchpoints: tripwire acks (01.5 adds new tables → `db_migrations` ack ожидается), product escalations (artifact visibility UX may escalate), revert notifications (if any).
-3. **Post-pilot retro** (BUILD-PLAN §Post-build): tighten tripwire globs / escalation wording where the pilot misfired; reconsider Toggle 1.
-
 ## Next product phase
 
-**Phase 01.5 — Артефакты** ([ADR-012](./decisions/ADR-012-artifacts.md)): Yjs-документы + S3-ассеты + citeable `artifact://` URLs — executed THROUGH `/autonomy:run` as the pilot.
+**Phase 01.6 — Security guardrails** ([ADR-014](./decisions/ADR-014-security.md)): input/output фильтр + capability sandboxing + DLP-сканер. Помечена «до любого PII-surface». Следующий кандидат для `/autonomy:run 01.6`.
