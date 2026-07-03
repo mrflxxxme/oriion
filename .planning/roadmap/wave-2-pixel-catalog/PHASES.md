@@ -17,6 +17,8 @@
 | 02.6 | RBAC расширение (Admin + Viewer + Bot/Service) | Senior Backend | [ADR-014](../../decisions/ADR-014-security.md) |
 | 02.7 | Vertical-marketing pages (Astro 5) для 5 templates | Founder + Marketing + Frontend | [ADR-001](../../decisions/ADR-001-modular-monolith.md), [ADR-017](../../decisions/ADR-017-vertical-templates.md) |
 | 02.8 | Golden datasets per vertical-template (30-50 задач каждый) | Tester + Tech Lead | [ADR-010](../../decisions/ADR-010-role-versioning.md) |
+| 02.9 | **Real-time co-editing** — y-websocket sync-сервер поверх 01.5 Yjs-субстрата (deferred из 01.5 per RQ-20260701-001, grill 2026-07-03; триггер = многопользовательские cells + первая редактируемая Dashboard-поверхность). Схема 01.5 переиспользуется без изменений (`state`+`state_vector`+update-log) | Senior Backend + Frontend | [ADR-012](../../decisions/ADR-012-artifacts.md), [ADR-038](../../decisions/ADR-038-artifacts-envelope-schema.md) |
+| 02.10 | **Storage-quota enforcement** — admission-check на upload по тарифным лимитам (Trial 1ГБ / Solo 5ГБ / Команда 10–200ГБ), **HARD-REJECT** при превышении + алерт на 90% (deferred из 01.5 per RQ-20260701-002, grill 2026-07-03; триггер = реальные тарифы live). 01.5 `cell_storage_usage` — готовый субстрат учёта | Senior Backend | [ADR-012](../../decisions/ADR-012-artifacts.md), [ADR-008](../../decisions/ADR-008-credits-billing.md) |
 
 ## Acceptance gate to Wave 3
 
