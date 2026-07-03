@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "gate": "judge_panel_artifacts_schema",
-  "head_sha": "ea5208f5b26e27f189e54e6bce0742309f5a00f7",
-  "timestamp": "2026-07-03T09:30:00Z",
+  "head_sha": "738f5f3adc3e2ef8d53f67093313820d1727cddf",
+  "timestamp": "2026-07-03T13:01:47Z",
   "verdict": "PASS",
   "runner": "judge-panel (3x architect generators + evaluator), ADR-037 D5",
   "details": {

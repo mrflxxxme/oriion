@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "gate": "docker_integration",
-  "head_sha": "ea5208f5b26e27f189e54e6bce0742309f5a00f7",
-  "timestamp": "2026-07-03T09:32:00Z",
+  "head_sha": "738f5f3adc3e2ef8d53f67093313820d1727cddf",
+  "timestamp": "2026-07-03T13:01:47Z",
   "verdict": "PASS",
   "runner": "pytest -m 'integration and not live' (real PostgreSQL 16 + real MinIO via infra/docker-compose.dev.yml)",
   "details": {

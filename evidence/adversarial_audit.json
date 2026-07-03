@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "gate": "adversarial_audit",
-  "head_sha": "ea5208f5b26e27f189e54e6bce0742309f5a00f7",
-  "timestamp": "2026-07-03T09:33:00Z",
+  "head_sha": "738f5f3adc3e2ef8d53f67093313820d1727cddf",
+  "timestamp": "2026-07-03T13:01:47Z",
   "verdict": "PASS",
   "runner": "3 independent refute-by-default lenses: reviewer-backend (SOUND) + reviewer-security (SECURE) + verifier (NO-REGRESSIONS)",
   "details": {
