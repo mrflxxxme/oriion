@@ -310,12 +310,15 @@ class Settings(BaseSettings):
 
     # ── Security guardrails (Phase 01.6 — ADR-039) ──────────────────────
     security_injection_scan_enabled: bool = Field(
-        default=True,
+        default=False,
         description=(
             "When True, external content (web_search / read_url results) is run "
             "through the heuristic prompt-injection scanner and flagged fragments "
-            "are B1-neutralized before reaching an agent. Non-destructive (no-op "
-            "on benign content), so it is safe on by default."
+            "are B1-neutralized before reaching an agent. Default False in Wave-1: "
+            "the heuristics can mangle legitimate content that happens to quote an "
+            "attack or contain LLM-template markers, and there is no unattended "
+            "external-connector surface yet — enforcement activates at 01.9 "
+            "alongside DLP + owner-config. See ADR-039 §4."
         ),
     )
     security_dlp_enabled: bool = Field(

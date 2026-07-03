@@ -67,18 +67,23 @@ migration-footprint = нулевой `db_migrations`-tripwire = гейт ост�
 ### 4. Enforcement-состояние в Wave-1 (substrate-now, enforce-at-surface)
 
 Поведение A3/B1 **полностью реализовано + протестировано**, активация — через
-флаги в `Settings`:
+флаги в `Settings`. **Оба флага default OFF в Wave-1** (substrate + seam готовы;
+enforcement включается на первом исходящем surface — 01.9 — вместе с
+owner-config; идентично capability-gate решению этой же фазы):
 
-- `security_injection_scan_enabled` = **True** by default: B1 недеструктивна
-  (no-op на benign-контенте), защищает единственный существующий external-канал
-  (web-результаты) от инъекций.
-- `security_dlp_enabled` = **False** by default: A3 hard-block несёт
-  false-positive-friction (легитимный маркетинг-бриф с телефоном клиента), а
-  **исходящего PII-surface в Wave-1 нет** (артефакты cell-scoped под RLS; connectors
-  = 01.9). Enforcement включается на первом исходящем surface (01.9) вместе с
-  owner-config — идентично capability-gate решению этой же фазы. Гейт
-  **построен** (требование «до любого PII-surface» = существовать раньше 01.9),
-  флаг-флип = одна строка.
+- `security_dlp_enabled` = **False**: A3 hard-block несёт false-positive-friction
+  (легитимный маркетинг-бриф с телефоном/номером клиента), а **исходящего
+  PII-surface в Wave-1 нет** (артефакты cell-scoped под RLS; connectors = 01.9).
+- `security_injection_scan_enabled` = **False** (пересмотрено adversarial-аудитом
+  2026-07-03): исходно default-ON под тезисом «B1 недеструктивна / no-op на
+  benign». Аудит опроверг тезис — эвристики калечат легитимный веб-контент,
+  который *цитирует* атаку или содержит LLM-template-маркеры. Внешнего
+  unattended-коннектора в Wave-1 нет (web read-only, low-risk), поэтому дефолт
+  ушёл в OFF (паттерны ужесточены: убраны голые `developer mode`/`jailbreak` и
+  markdown-заголовки). Включается в 01.9 вместе с DLP.
+
+Гейт **построен** (требование «до любого PII-surface» = существовать раньше 01.9),
+активация = флаг-флип + owner-config.
 
 ### 5. Capability sandboxing = классификатор + seam, без gate
 
@@ -94,8 +99,11 @@ capability-gate в 01.6 нет** — активируется в 01.9, когд�
 - Output DLP: `OutputDlpScreen`-шов на `execute_agent_task` (default `None` ⇒
   no-op в unit-тестах; worker `runtime.queue.actor` подключает реальный,
   собранный `runtime.security_guardrails.build_output_dlp_screen`, gated флагом).
-  Вызов на `_deliverable_text(output)` **до** memory-extraction и success-stamp;
-  raise → failure-handler → `task.failed` + actor коммитит audit-строку.
+  Скрин на `_dlp_screen_text(output)` — **полная** outward-сериализация
+  (`json.dumps(model_dump())`, без cap), чтобы `screened ⊇ delivered` (НЕ
+  усечённый memory-filter `_deliverable_text` — иначе ПДн за cap'ом проходит мимо
+  блока; аудит 2026-07-03). Вызов **до** memory-extraction и success-stamp; любой
+  raise из скрина → `task.failed` + actor коммитит audit-строку.
 - Input injection: sanitize на `runtime.web_search_runner._format_search_results`
   (единый chokepoint scripted+native путей), gated флагом.
 

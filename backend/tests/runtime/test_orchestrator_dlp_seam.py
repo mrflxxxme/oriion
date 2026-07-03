@@ -17,7 +17,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import BaseModel
 from src.agents.tools.delegate import DelegateInput, DelegateResult
-from src.runtime.orchestrator import OrchestratorContext, execute_agent_task
+from src.runtime.orchestrator import OrchestratorContext, _dlp_screen_text, execute_agent_task
 from src.runtime.sse_publisher import InProcessSSEPublisher
 from src.security.exceptions import DlpViolation
 from src.tasks.models import Task
@@ -130,7 +130,9 @@ async def test_clean_screen_task_succeeds(_emit: Any) -> None:
     screen = _Screen()
     await _run(task, publisher, screen)
     assert task.status == "succeeded"
-    assert screen.calls == ["demo output"]  # screened the deliverable text
+    # screens the FULL serialized outward deliverable (not the truncated helper)
+    assert len(screen.calls) == 1
+    assert "demo output" in screen.calls[0]
 
 
 @pytest.mark.asyncio
@@ -149,6 +151,23 @@ async def test_dlp_block_fails_task_without_leaking(_emit: Any) -> None:
     # category labels are present; no raw value can appear (screen never had one).
     assert "inn" in failed.payload["error_message"]
     _emit.emit_task_failed.assert_awaited_once()
+
+
+class _RichOutput(BaseModel):
+    summary: str = "clean summary"
+    assumptions: str = "секрет ИНН 7830002293"  # PII outside summary/artifacts
+
+
+def test_dlp_screen_text_covers_all_outward_fields() -> None:
+    # P1 fix: the DLP screen must see every outward field, not just the
+    # truncated summary/artifacts _deliverable_text feeds the memory filter.
+    text = _dlp_screen_text(_RichOutput())
+    assert "7830002293" in text
+    assert "clean summary" in text
+
+
+def test_dlp_screen_text_none_is_empty() -> None:
+    assert _dlp_screen_text(None) == ""
 
 
 @pytest.mark.asyncio

@@ -39,6 +39,11 @@ class TestDetection:
             "Please act as a helpful assistant and summarize the article.",
             "Our system supports instructions for onboarding new users.",
             "Отчёт по маркетинговой кампании за квартал.",
+            # audit 2026-07-03: these must NOT trip after the pattern trim.
+            "Enable Developer mode in Chrome settings to load the extension.",
+            "How to jailbreak your iPhone and the risks involved.",
+            "## Instructions\nStep 1: preheat the oven to 200C.",
+            "### System requirements\nRAM: 8GB, disk: 20GB.",
         ],
     )
     def test_benign_content_no_op(self, text: str) -> None:

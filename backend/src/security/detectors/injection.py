@@ -51,10 +51,12 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
+        # High-confidence jailbreak *mode* markers only. Bare "developer mode"
+        # (Chrome/Android) and bare "jailbreak" (iPhone how-tos) are dropped —
+        # too common in legitimate content (audit 2026-07-03); role-switch into
+        # developer/dan is still caught by ``role_override`` below.
         "jailbreak_marker",
-        re.compile(
-            r"\b(?:DAN\s+mode|developer\s+mode|jailbreak\s+mode|jailbreak)\b", re.IGNORECASE
-        ),
+        re.compile(r"\b(?:DAN\s+mode|jailbreak\s+mode)\b", re.IGNORECASE),
     ),
     (
         "role_override",
@@ -69,11 +71,11 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         re.compile(r"<\|im_(?:start|end)\|>|\[/?INST\]|<<SYS>>|<</SYS>>", re.IGNORECASE),
     ),
     (
+        # Fenced ``` ```system ``` code block only. The markdown-heading branch
+        # (## Instructions / ### System requirements) was dropped — ubiquitous in
+        # legitimate docs/tutorials (audit 2026-07-03).
         "fenced_system_block",
-        re.compile(
-            r"(?:```|~~~)\s*system\b|^#{2,4}\s*(?:system|instruction)s?\b",
-            re.IGNORECASE | re.MULTILINE,
-        ),
+        re.compile(r"(?:```|~~~)\s*system\b", re.IGNORECASE),
     ),
 )
 

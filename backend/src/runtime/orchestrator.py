@@ -17,6 +17,7 @@ asserts the coarser event order via the in-process SSEPublisher.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -44,7 +45,6 @@ from src.runtime.budget_guard import (
 )
 from src.runtime.sse_events import TaskStreamEvent
 from src.runtime.sse_publisher import SSEPublisher
-from src.security.exceptions import DlpViolation
 from src.tasks import events as tasks_events
 from src.tasks.exceptions import TaskCancelled
 from src.tasks.models import Task
@@ -171,6 +171,29 @@ def _deliverable_text(output: Any) -> str:
                 parts.append(body)
     text = "\n\n".join(parts) if parts else str(output)
     return text[:_MAX_DELIVERABLE_CHARS]
+
+
+def _dlp_screen_text(output: Any) -> str:
+    """FULL outward-deliverable text for the DLP hard-block (01.6, ADR-039).
+
+    Distinct from ``_deliverable_text`` (the memory-filter input — truncated to
+    ``_MAX_DELIVERABLE_CHARS`` and limited to summary+artifacts on the horizontal
+    path). The A3 guard must see EVERY outward string so ``screened ⊇ delivered``:
+    the client receives the full ``output.model_dump()`` in the task.completed
+    frame, so screening a partial view would let PII in the remainder past the
+    block. No cap — correctness over the pathological-input scan cost (bounded by
+    real deliverable size; DLP is off until 01.9). Serializing the dump also
+    covers non-artifact fields (assumptions / open_questions / citations / …).
+    """
+    if output is None:
+        return ""
+    dump = getattr(output, "model_dump", None)
+    if callable(dump):
+        try:
+            return json.dumps(dump(), ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return str(output)
+    return str(output)
 
 
 class OrchestratorContext:
@@ -500,19 +523,24 @@ async def execute_agent_task(
 
     # AC-01.6.5 output-DLP hard-block (01.6, ADR-039). SUCCESS path, after the
     # P1-C cancel re-check (a cancelled task has already returned above) and
-    # BEFORE memory extraction + the success stamp: screen the assembled
-    # deliverable. A3 (grill 2026-07-03) — a PII hit is NOT swallowed (unlike
-    # memory housekeeping): stamp task.failed with code security.dlp.blocked,
-    # emit the terminal ledger, then re-raise so the caller (actor) commits the
-    # failed status AND the audit row the guard wrote on this session. Default
-    # None ⇒ no-op (unit tests / security_dlp_enabled=false); the worker wires
-    # the real deterministic guard. Runs before memory so PII is never extracted
+    # BEFORE memory extraction + the success stamp: screen the FULL outward
+    # deliverable (_dlp_screen_text — untruncated, every outward field — so
+    # screened ⊇ delivered; the filter-agent's truncated _deliverable_text would
+    # leave PII past the cap unscreened). A3 (grill 2026-07-03) — a hit is NOT
+    # swallowed (unlike memory housekeeping): stamp task.failed, emit the
+    # terminal ledger, then re-raise so the caller (actor) commits the failed
+    # status AND the audit row the guard wrote on this session. The except is
+    # broad (not just DlpViolation) so an audit-sink/DB failure in the screen
+    # also stamps failed instead of leaving the task 'running' (the block sits
+    # past the outer handler). Default None ⇒ no-op (unit tests /
+    # security_dlp_enabled=false). Runs before memory so PII is never extracted
     # from a blocked deliverable.
     if output_dlp is not None:
         try:
-            await output_dlp(_deliverable_text(output))
-        except DlpViolation as exc:
+            await output_dlp(_dlp_screen_text(output))
+        except Exception as exc:
             completed_at = datetime.now(UTC)
+            error_code = getattr(exc, "code", exc.__class__.__name__)
             if task is not None:
                 task.status = "failed"
                 task.completed_at = completed_at
@@ -529,9 +557,11 @@ async def execute_agent_task(
                     event_type="task.failed",
                     task_id=task_id,
                     payload={
-                        "error_code": exc.code,
-                        # SECURITY: exc carries category labels only, never the
-                        # matched PII value (ADR-039 §3).
+                        "error_code": str(error_code),
+                        # SECURITY: a DlpViolation carries category labels only,
+                        # never the matched PII value (ADR-039 §3); other screen
+                        # errors (audit/DB) reference the labels payload, not the
+                        # deliverable — no raw PII reaches this frame.
                         "error_message": str(exc),
                         "retry_possible": False,
                         "total_cost_credits": str(ctx.accumulated_cost),
@@ -539,7 +569,7 @@ async def execute_agent_task(
                 )
             )
             await tasks_events.emit_task_failed(
-                task_id=task_id, error_code=exc.code, retry_possible=False
+                task_id=task_id, error_code=str(error_code), retry_possible=False
             )
             raise
 
