@@ -14,10 +14,11 @@ name: ci-evidence
 # The verifier is stdlib-only → runs as bare `python`, no uv/venv, fast.
 # AC-convention: timeout ≤ 8 min (mirrors ci-backend / ci-security).
 
+# PR-only by design: this is a MERGE gate. A squash-merge rewrites history, so
+# on push-to-main the recorded head_sha is structurally stale (an artifact can
+# never contain its own squash commit's sha) — the audit trail lives in the PR.
 on:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
 
 concurrency:
