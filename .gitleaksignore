@@ -41,3 +41,7 @@ df577ff6c3651cc5121c50810b0d95c07026cb59:backend/tests/_shared/test_config_guard
 # comment, which itself tripped generic-api-key in that commit's diff. The comment
 # above no longer quotes it; this fingerprint allowlists the legacy commit.
 6e039027088c833cdb3f30e82016e031cf6df153:.gitleaksignore:generic-api-key:34
+
+# 01.5 artifacts: MinIO dev-compose credential referenced by the S3 integration
+# test (same dummy value as infra/docker-compose.dev.yml; local-only MinIO).
+d09ac2c546f464d08841ebc51930af1ad60e031e:backend/tests/artifacts/integration/test_s3_minio_integration.py:generic-api-key:57
