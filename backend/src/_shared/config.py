@@ -308,6 +308,27 @@ class Settings(BaseSettings):
         description="Yandex Search API key. Fallback backend for mcp.tools.web_search.",
     )
 
+    # ── Security guardrails (Phase 01.6 — ADR-039) ──────────────────────
+    security_injection_scan_enabled: bool = Field(
+        default=True,
+        description=(
+            "When True, external content (web_search / read_url results) is run "
+            "through the heuristic prompt-injection scanner and flagged fragments "
+            "are B1-neutralized before reaching an agent. Non-destructive (no-op "
+            "on benign content), so it is safe on by default."
+        ),
+    )
+    security_dlp_enabled: bool = Field(
+        default=False,
+        description=(
+            "When True, the output-DLP guard A3-hard-blocks a task whose final "
+            "deliverable contains RU-PDN (INN/SNILS/passport/phone/email). Default "
+            "False in Wave-1 (no outward PII surface yet; artifacts are cell-scoped "
+            "under RLS): the guard is built + wired, enforcement flips on at the "
+            "first outward surface (01.9) with owner-config. See ADR-039 §4."
+        ),
+    )
+
     # ── Observability (Phase 00.6) ──────────────────────────────────────
     otel_service_name: str = Field(
         default="oriion-backend",
