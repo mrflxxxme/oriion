@@ -39,6 +39,7 @@ from src.runtime.dispatch import dispatch_task
 from src.runtime.memory_extraction import build_memory_extraction_hook
 from src.runtime.queue import broker  # noqa: F401 — installs the broker before @actor binds
 from src.runtime.redis_sse_publisher import RedisSSEPublisher
+from src.runtime.security_guardrails import build_output_dlp_screen
 from src.runtime.sse_publisher import SSEPublisher, build_sse_publisher
 from src.tasks.models import Task
 from src.tasks.services.task_service import TaskService
@@ -119,6 +120,20 @@ async def run_task_dispatch(
             ),
             user_prompt=user_prompt,
         )
+        # AC-01.6.5: wire the real output-DLP screen only when enabled (ADR-039
+        # §4 — off in Wave-1: no outward PII surface yet). Off ⇒ leave the seam
+        # None (orchestrator no-op). Closes over the task/cell context; the guard
+        # writes the audit row + raises DlpViolation -> task.failed on a hit.
+        output_dlp = (
+            build_output_dlp_screen(
+                session=session,
+                task_id=task_id,
+                cell_id=cell_id,
+                workspace_id=workspace_id,
+            )
+            if get_settings().security_dlp_enabled
+            else None
+        )
         try:
             await dispatch(
                 task=task,
@@ -134,6 +149,8 @@ async def run_task_dispatch(
                 quota_admission=enforce_quota_admission,
                 # AC-01.4.7: post-task memory auto-extraction (01.4b).
                 memory_extraction=memory_extraction,
+                # AC-01.6.5: output-DLP hard-block (01.6), gated by the flag.
+                output_dlp=output_dlp,
             )
         except Exception:
             logger.exception("runtime.dispatch.actor.failed", task_id=str(task_id))

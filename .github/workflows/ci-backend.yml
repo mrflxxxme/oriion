@@ -206,6 +206,9 @@ jobs:
           # services) — the per-module ≥85 gate now matches every other context
           # (local measure ~98%). The Wave-0 40 ratchet floor is retired.
           uv run pytest tests/agents --cov=src/agents --cov-fail-under=85 -q -m "not integration"
+          # Phase 01.6 (ADR-039): src/security is a deterministic guardrails
+          # context (RU-PDN DLP + injection + capability) — pure unit, no DB.
+          uv run pytest tests/security    --cov=src/security     --cov-fail-under=85 -q -m "not integration"
           # _shared/db + _shared/middleware gates: deferred. set_tenant_
           # context is exercised through test_e2e_auth_flow.py integration
           # (oriion_app role canary) + Phase 00.6 Commit 3 refactor moved
