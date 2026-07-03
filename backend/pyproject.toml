@@ -55,6 +55,7 @@ dependencies = [
     "gunicorn>=26.0.0",
     # AC-W1-14 — audit_log cold-storage archival to RU Object Storage (S3-compatible).
     "boto3>=1.35,<2.0",
+    "pycrdt>=0.12,<0.13",
 ]
 
 [dependency-groups]
@@ -182,6 +183,10 @@ module = [
     "fakeredis.*",
     "pgvector.*",
     "yaml",
+    # boto3/botocore ship no inline types; the S3 surface we use is narrow and
+    # wrapped by src/artifacts/ports.py::ObjectStoragePort (typed Protocol).
+    "boto3.*",
+    "botocore.*",
 ]
 ignore_missing_imports = true
 

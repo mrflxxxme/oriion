@@ -16,7 +16,7 @@
 | 01.4 | Memory — cell + role (двухуровневая, manual control) + conversation history (FIFO + summary seam) + «запомни». **256-dim Yandex + single-schema RLS** (grill 2026-06-23). | ✅ **COMPLETE** (auto filter-agent + summarizer → 01.4b ✅) | [ADR-011](../../decisions/ADR-011-memory-2-level.md), [01.4 spec](./phases/01.4-memory.md) | — |
 | 01.4b | Memory auto-extraction — LLM filter-agent (auto-after-task) + LLM conversation summarizer + orchestrator post-task wiring + `memory_curator` archetype seed + live golden | ✅ **Code-complete** (2026-06-24, `tender-clarke-a1cd06`) | [ADR-011](../../decisions/ADR-011-memory-2-level.md), [01.4b spec](./phases/01.4b-memory-auto-extraction.md) | — |
 | 01.4-ui | Memory UI — «Что помнит [агент]» view/edit/delete panel (grill Q6) | ⏳ Pending | [ADR-011](../../decisions/ADR-011-memory-2-level.md) | — |
-| 01.5 | Артефакты — Yjs документы + S3 ассеты + citeable `artifact://` URLs | ⏳ Pending | [ADR-012](../../decisions/ADR-012-artifacts.md) | — |
+| 01.5 | Артефакты — Yjs документы + S3 ассеты + citeable `artifact://` URLs | 🔄 **In progress** (2026-07-02, `/autonomy:run` pilot) | [ADR-012](../../decisions/ADR-012-artifacts.md), [ADR-038](../../decisions/ADR-038-artifacts-envelope-schema.md), [01.5 spec](./phases/01.5-artifacts.md) | — |
 | 01.6 | Security guardrails — input/output фильтр + capability sandboxing + DLP-сканер | ⏳ Pending | [ADR-014](../../decisions/ADR-014-security.md) | **до любого PII-surface** |
 | 01.7 | RBAC — Owner + Member (Admin/Viewer → Wave 2) | ⏳ Pending | [ADR-014](../../decisions/ADR-014-security.md) | — |
 | 01.8 | Auth extensions — 2FA TOTP, magic-link, Yandex ID + VK ID OAuth | ⏳ Pending | [ADR-007](../../decisions/ADR-007-authentik-then-keycloak.md) | — |

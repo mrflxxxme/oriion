@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "gate": "adversarial_audit",
+  "head_sha": "738f5f3adc3e2ef8d53f67093313820d1727cddf",
+  "timestamp": "2026-07-03T13:01:47Z",
+  "verdict": "PASS",
+  "runner": "3 independent refute-by-default lenses: reviewer-backend (SOUND) + reviewer-security (SECURE) + verifier (NO-REGRESSIONS)",
+  "details": {
+    "lenses": {
+      "SECURE": "SECURE - 0 P0/P1; actively attempted RLS bypass, resolver oracle, S3 key traversal/guessing, signed-GET ownership, input-trust; all closed. 3 P2 + 5 P3 hardening -> chip task_6cdb162a",
+      "NO_REGRESSIONS": "NO-REGRESSIONS - existing tests byte-identical to origin/main; migration branch topology safe; main.py handler disjoint; zero findings above P3",
+      "SOUND": "initially NOT-SOUND: 1 P1 (concurrent double-complete -> two version rows + doubled usage) + 2 P2 + 4 P3"
+    },
+    "audit_base_commit": "0e1afdf",
+    "fixes": {
+      "P1_concurrent_double_complete": "5634efe - conditional pending->stored transition (WHERE status='pending' RETURNING), loser gets 409 BEFORE any version row; proven by test_concurrent_double_complete_loser_409",
+      "P2_soft_delete_usage_drift": "5634efe - soft_delete sums+decrements under the envelope FOR UPDATE",
+      "P3_batch": "a04faf3 - retry only on SQLSTATE 23505 version-num unique; yjs guards for soft-deleted envelopes + SAVEPOINT create; strict > compaction thresholds; content-safe race_retry log"
+    },
+    "open_p0_p1": 0,
+    "deferred": "P2/P3 hardening (janitor wiring, body caps, presign-overwrite window, live-yjs bytes accounting, content-type pinning) -> background chip task_6cdb162a; recorded in JOURNAL 2026-07-03",
+    "fix_verification": "all six findings re-verified in code at final tree; full gate battery green at this commit (unit 852 incl. the new race test, integration 55)"
+  }
+}

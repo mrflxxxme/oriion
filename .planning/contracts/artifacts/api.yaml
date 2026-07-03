@@ -1,136 +1,458 @@
-# SKELETON — Wave 1 deliverable (per ADR-024)
-# Detailed OpenAPI spec deferred to Milestone D, Wave 1 phase
-# Status: structural placeholder for cross-context references
-
 openapi: 3.1.0
 info:
-  title: Oriion Artifacts API (SKELETON)
-  version: 0.0.1-skeleton
+  title: Oriion Artifacts API
+  version: 1.0.0
   description: |
-    Artifacts context — Y.js collaborative docs + S3 binary asset storage.
-    SKELETON ONLY — real-time sync semantics + presigned URL flow
-    defined in Milestone D, Wave 1.
+    Artifacts context (ADR-012 / ADR-038, Phase 01.5): artifact envelopes with
+    immutable versions, Yjs CRDT documents (REST-only persistence in Wave 1),
+    S3 presigned uploads (MinIO dev / Yandex Object Storage prod) and citeable
+    `artifact://<cell_id>/<artifact_id>[/v<N>]` URLs.
+
+    Implementation: backend/src/artifacts/routers/artifacts.py (mounted under
+    /api/v1). Cell scope comes from the RLS tenant context (JWT auth), NOT a
+    path parameter. Domain errors are RFC-7807 application/problem+json with a
+    machine `code` (artifacts.not_found, artifacts.malformed_url,
+    artifacts.s3_key_reserved, artifacts.upload_not_verified, ...).
 
 paths:
-  /artifacts/yjs/{document_id}:
-    get:
-      summary: "TODO: define в Milestone D — fetch current Y.js document snapshot"
-      operationId: getYjsDocument
-      parameters:
-        - name: document_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+  /artifacts:
+    post:
+      summary: Create an artifact envelope
+      operationId: createArtifact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArtifactCreate' }
       responses:
-        '200':
-          description: TODO
+        '201':
+          description: Envelope created (current_version_num = 0)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/YjsDocument'
-    patch:
-      summary: "TODO: define в Milestone D — apply Y.js update (CRDT merge)"
-      operationId: patchYjsDocument
-      parameters:
-        - name: document_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/YjsDocument'
-
-  /artifacts/yjs/{document_id}/snapshots:
+              schema: { $ref: '#/components/schemas/Artifact' }
+        '422': { $ref: '#/components/responses/ValidationError' }
     get:
-      summary: "TODO: define в Milestone D — list document snapshots (history)"
-      operationId: listYjsSnapshots
+      summary: List artifacts of the current cell (soft-deleted excluded)
+      operationId: listArtifacts
       parameters:
-        - name: document_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - { name: artifact_type, in: query, required: false,
+            schema: { type: string, enum: [document, code, asset] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         '200':
-          description: TODO
+          description: Newest-first page
           content:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: '#/components/schemas/YjsSnapshot'
+                items: { $ref: '#/components/schemas/Artifact' }
 
-  /artifacts/s3/upload-url:
-    post:
-      summary: "TODO: define в Milestone D — request presigned upload URL"
-      operationId: createS3UploadUrl
-      responses:
-        '200':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UploadUrlResponse'
-
-  /artifacts/s3/{asset_id}:
+  /artifacts/usage:
     get:
-      summary: "TODO: define в Milestone D — fetch asset metadata"
-      operationId: getS3Asset
-      parameters:
-        - name: asset_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+      summary: Per-cell stored-bytes accounting (quota enforcement deferred, RQ-20260701-002)
+      operationId: getStorageUsage
       responses:
         '200':
-          description: TODO
+          description: Current counter (0 when nothing stored yet)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Usage' }
+
+  /artifacts/resolve:
+    get:
+      summary: Resolve a citeable artifact:// URL inside the caller's cell
+      operationId: resolveArtifactUrl
+      description: |
+        Strict grammar `artifact://<cell_id>/<artifact_id>[/v<N>]` (lowercase
+        UUIDs, N >= 1, no leading zeros). No version segment → head via
+        current_version_num (0 committed versions → 404). Cell mismatch is
+        indistinguishable from not-found (404, no cross-cell existence oracle).
+      parameters:
+        - { name: url, in: query, required: true,
+            schema: { type: string, minLength: 1, maxLength: 512 } }
+      responses:
+        '200':
+          description: Resolved version — exactly one payload field is non-null
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Resolved' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+        '422': { $ref: '#/components/responses/ProblemMalformed' }
+
+  /artifacts/uploads/{s3_object_id}/complete:
+    post:
+      summary: Verify an uploaded object server-side and commit the version
+      operationId: completeUpload
+      description: |
+        Backend re-reads the object from the bucket, computes sha256/byte_size
+        itself (client input is never trusted), flips pending → stored and
+        allocates the immutable version row. 409 when the object is missing
+        in the bucket or the lifecycle row is not 'pending' (double-complete).
+      parameters:
+        - { name: s3_object_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: Verified + versioned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadComplete' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+        '409': { $ref: '#/components/responses/ProblemConflict' }
+
+  /artifacts/uploads/{s3_object_id}/download-url:
+    get:
+      summary: Signed GET URL (1-hour TTL) for a stored object
+      operationId: getDownloadUrl
+      parameters:
+        - { name: s3_object_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Bucket is never public — always a signed link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DownloadUrl' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+
+  /artifacts/{artifact_id}:
+    get:
+      summary: Fetch one envelope
+      operationId: getArtifact
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      responses:
+        '200':
+          description: Envelope
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Artifact' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+    delete:
+      summary: Soft-delete the envelope
+      operationId: deleteArtifact
+      description: |
+        Sets deleted_at; versions stay immutable in the DB; s3_objects rows
+        flip to 'deleted'; logical bytes are freed from cell_storage_usage.
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      responses:
+        '204': { description: Soft-deleted }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+
+  /artifacts/{artifact_id}/versions:
+    post:
+      summary: Commit an inline (jsonb) content version
+      operationId: createInlineVersion
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InlineVersionCreate' }
+      responses:
+        '201':
+          description: Version committed; envelope head bumped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtifactVersion' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+        '409': { $ref: '#/components/responses/ProblemConflict' }
+    get:
+      summary: List versions (ascending version_num)
+      operationId: listVersions
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      responses:
+        '200':
+          description: All committed versions
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/S3Asset'
-    delete:
-      summary: "TODO: define в Milestone D — delete asset (soft or hard, TBD)"
-      operationId: deleteS3Asset
+                type: array
+                items: { $ref: '#/components/schemas/ArtifactVersion' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+
+  /artifacts/{artifact_id}/versions/{version_num}:
+    get:
+      summary: Fetch one immutable version
+      operationId: getVersion
       parameters:
-        - name: asset_id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - { $ref: '#/components/parameters/ArtifactId' }
+        - { name: version_num, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses:
-        '204':
-          description: TODO
+        '200':
+          description: The immutable row behind artifact://.../vN
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ArtifactVersion' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+
+  /artifacts/{artifact_id}/yjs:
+    post:
+      summary: Create the live Yjs document (once per 'document'/'code' artifact)
+      operationId: createYjsDocument
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      responses:
+        '201':
+          description: Empty CRDT head
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YjsDocument' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+        '409': { $ref: '#/components/responses/ProblemConflict' }
+    get:
+      summary: Fetch the live CRDT head (merged state + state vector)
+      operationId: getYjsDocument
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      responses:
+        '200':
+          description: Read-your-writes head
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YjsDocument' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+
+  /artifacts/{artifact_id}/yjs/updates:
+    post:
+      summary: Apply one Yjs update (synchronous merge under row lock)
+      operationId: applyYjsUpdate
+      description: |
+        FOR UPDATE on the head → append to the update log → pycrdt merge →
+        flush. The response (and any subsequent GET) carries the merged state.
+        Compaction (update_count > 500 or state > 1 MiB) snapshots the head
+        and prunes the log — never snapshots.
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/YjsUpdate' }
+      responses:
+        '200':
+          description: Merged head after this update
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YjsDocument' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+        '422': { $ref: '#/components/responses/ProblemMalformed' }
+
+  /artifacts/{artifact_id}/yjs/commit:
+    post:
+      summary: Explicit version commit — freeze the head into snapshot + version
+      operationId: commitYjsVersion
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      responses:
+        '201':
+          description: Immutable yjs_snapshot + artifact_versions row
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/YjsCommit' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+
+  /artifacts/{artifact_id}/uploads:
+    post:
+      summary: Request a presigned POST (5-min TTL) — reserves the S3 key
+      operationId: presignUpload
+      description: |
+        Inserts a 'pending' s3_objects row; UNIQUE(bucket, s3_key) makes the
+        reservation transactional — a duplicate presign for the same next
+        version + filename is rejected with 409. Key structure (ADR-012):
+        <env>/<cell_id>/<artifact_id>/<version_num>/<filename>. Filenames are
+        restricted to a strict charset (path-traversal guard) — 422 otherwise.
+      parameters: [ { $ref: '#/components/parameters/ArtifactId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UploadCreate' }
+      responses:
+        '201':
+          description: Presigned POST policy + reserved lifecycle row
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Upload' }
+        '404': { $ref: '#/components/responses/ProblemNotFound' }
+        '409': { $ref: '#/components/responses/ProblemConflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
 
 components:
+  parameters:
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    ProblemNotFound:
+      description: RFC-7807 — artifacts.not_found / artifacts.version_not_found /
+        artifacts.s3_object_not_found / artifacts.yjs_document_not_found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ProblemConflict:
+      description: RFC-7807 — artifacts.s3_key_reserved / artifacts.upload_not_verified /
+        artifacts.version_conflict / artifacts.yjs_document_exists / artifacts.type_mismatch
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ProblemMalformed:
+      description: RFC-7807 — artifacts.malformed_url / artifacts.invalid_yjs_update /
+        artifacts.invalid_filename
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: FastAPI request validation error (or domain 422 problem+json)
+      content:
+        application/json:
+          schema: { type: object }
+
   schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string, description: "Machine code, e.g. artifacts.not_found" }
+        detail: { type: string }
+        instance: { type: string }
+
+    ArtifactCreate:
+      type: object
+      additionalProperties: false
+      required: [artifact_type, title]
+      properties:
+        artifact_type: { type: string, enum: [document, code, asset] }
+        title: { type: string, minLength: 1, maxLength: 300 }
+        tags:
+          type: array
+          maxItems: 32
+          items: { type: string, minLength: 1, maxLength: 100 }
+        created_by_agent_id: { type: [string, 'null'], format: uuid }
+
+    Artifact:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        cell_id: { type: string, format: uuid }
+        artifact_type: { type: string, enum: [document, code, asset] }
+        title: { type: string }
+        tags: { type: array, items: { type: string } }
+        owner_user_id: { type: [string, 'null'], format: uuid }
+        created_by_agent_id: { type: [string, 'null'], format: uuid }
+        current_version_num: { type: integer, description: "0 = no committed versions" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    InlineVersionCreate:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content: { type: object, description: "Arbitrary jsonb payload; hashed/measured via canonical JSON" }
+        text_export: { type: [string, 'null'], maxLength: 100000,
+                       description: "Optional plain-text projection (future FTS/vector hook)" }
+
+    ArtifactVersion:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        artifact_id: { type: string, format: uuid }
+        version_num: { type: integer, minimum: 1 }
+        storage_kind: { type: string, enum: [inline, s3, yjs_snapshot] }
+        content_inline: { type: [object, 'null'] }
+        s3_object_id: { type: [string, 'null'], format: uuid }
+        yjs_snapshot_id: { type: [string, 'null'], format: uuid }
+        byte_size: { type: integer }
+        content_hash_sha256: { type: string }
+        created_at: { type: string, format: date-time }
+
     YjsDocument:
       type: object
-      description: "TODO: define в Milestone D"
-      properties: {}
+      properties:
+        id: { type: string, format: uuid }
+        artifact_id: { type: string, format: uuid }
+        state_base64: { type: string, description: "Full Yjs update encoding of the merged head" }
+        state_vector_base64: { type: string }
+        update_count: { type: integer, description: "Updates since last compaction" }
+        last_compacted_at: { type: [string, 'null'], format: date-time }
 
-    YjsSnapshot:
+    YjsUpdate:
       type: object
-      description: "TODO: define в Milestone D"
-      properties: {}
+      additionalProperties: false
+      required: [update_base64]
+      properties:
+        update_base64: { type: string, minLength: 1, maxLength: 4194304 }
 
-    S3Asset:
+    YjsCommit:
       type: object
-      description: "TODO: define в Milestone D"
-      properties: {}
+      properties:
+        version: { $ref: '#/components/schemas/ArtifactVersion' }
+        snapshot_id: { type: string, format: uuid }
+        artifact_url: { type: string, example: "artifact://<cell_id>/<artifact_id>/v1" }
 
-    UploadUrlResponse:
+    UploadCreate:
       type: object
-      description: "TODO: define в Milestone D"
-      properties: {}
+      additionalProperties: false
+      required: [filename]
+      properties:
+        filename: { type: string, minLength: 1, maxLength: 255,
+                    description: "Strict charset ^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$" }
+        mime_type: { type: [string, 'null'], maxLength: 255 }
+
+    Upload:
+      type: object
+      properties:
+        s3_object_id: { type: string, format: uuid }
+        bucket: { type: string }
+        s3_key: { type: string }
+        upload_url: { type: string, description: "Presigned POST target" }
+        upload_fields: { type: object, description: "POST policy form fields" }
+        expires_in_seconds: { type: integer, const: 300 }
+
+    S3Object:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        artifact_id: { type: string, format: uuid }
+        bucket: { type: string }
+        s3_key: { type: string }
+        mime_type: { type: [string, 'null'] }
+        byte_size: { type: [integer, 'null'] }
+        content_hash_sha256: { type: [string, 'null'] }
+        status: { type: string, enum: [pending, stored, deleted] }
+
+    UploadComplete:
+      type: object
+      properties:
+        version: { $ref: '#/components/schemas/ArtifactVersion' }
+        s3_object: { $ref: '#/components/schemas/S3Object' }
+        artifact_url: { type: string }
+
+    DownloadUrl:
+      type: object
+      properties:
+        url: { type: string }
+        expires_in_seconds: { type: integer, const: 3600 }
+
+    Usage:
+      type: object
+      properties:
+        cell_id: { type: string, format: uuid }
+        bytes_total: { type: integer }
+
+    Resolved:
+      type: object
+      description: Exactly one of content_inline / download_url / yjs_state_base64 is non-null
+      properties:
+        artifact_id: { type: string, format: uuid }
+        cell_id: { type: string, format: uuid }
+        artifact_type: { type: string, enum: [document, code, asset] }
+        title: { type: string }
+        version_num: { type: integer, minimum: 1 }
+        storage_kind: { type: string, enum: [inline, s3, yjs_snapshot] }
+        byte_size: { type: integer }
+        content_hash_sha256: { type: string }
+        content_inline: { type: [object, 'null'] }
+        download_url: { type: [string, 'null'], description: "Signed GET, 1h TTL" }
+        yjs_state_base64: { type: [string, 'null'] }
+        artifact_url: { type: string, description: "Canonical versioned URL of what was resolved" }

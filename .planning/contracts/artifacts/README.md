@@ -1,73 +1,72 @@
-<!-- SKELETON — Wave 1 deliverable (per ADR-024). Draft quality README; SQL/YAML files are placeholders. -->
-
 # Bounded Context: `artifacts`
 
-> **Status:** SKELETON (Wave 1 deliverable per ADR-024). Real DDL/API/events land in Milestone D, Wave 1 phase.
+> **Status:** IMPLEMENTED (Phase 01.5, Wave 1 — ADR-038 envelope model).
+> Implementation: `backend/src/artifacts/` + `backend/migrations/versions/artifacts/0001_artifacts_core.py`.
 
 ## Purpose
 
 The `artifacts` context owns **persistent storage of work products** generated within cells:
 
-- **Y.js collaborative documents** — CRDT-backed structured content (notes, canvases, agent scratchpads) that support real-time co-editing across users and agents.
-- **S3 binary assets** — arbitrary blobs (images, attachments, generated files) stored in S3-compatible object storage, with metadata tracked in Postgres.
+- **Artifact envelopes** — typed (`document` / `code` / `asset`), addressable, taggable objects with an append-only immutable version history and a `current_version_num` head pointer.
+- **Yjs documents** — CRDT-backed content (bytea state + state vector, merged with pycrdt). Wave 1 persistence is **REST-only** (synchronous merge under `FOR UPDATE` ⇒ read-your-writes); the y-websocket sync server is deferred (RQ-20260701-001) and will reuse the same `state`/`state_vector`/update-log without schema change.
+- **S3 binary assets** — blobs in S3-compatible object storage (MinIO dev / Yandex Object Storage prod) with a Postgres lifecycle row per object (`pending → stored → deleted`).
+- **Citeable `artifact://` URLs** — `artifact://<cell_id>/<artifact_id>[/v<N>]`, stable forever (immutable versions + write-once S3 keys + no-UPDATE DB grants).
 
 This context separates *what* an artifact is (a typed, addressable persistent object) from *how* it was produced (the `tasks` and `agents` contexts).
 
 ## Ubiquitous Language
 
-| Term             | Meaning                                                                                              |
-|------------------|------------------------------------------------------------------------------------------------------|
-| **Y.js Document**| A CRDT-backed structured document (rich text, tree, map). Supports concurrent edits without locking. |
-| **Snapshot**     | A point-in-time persisted state of a Y.js document (for compaction + history).                       |
-| **State Vector** | Y.js construct describing what updates a client has seen; used for diff sync.                        |
-| **S3 Asset**     | A binary blob in S3-compatible storage, identified by `(bucket, key)` with metadata in Postgres.     |
-| **Content Hash** | SHA-256 of asset body; used for dedup and integrity verification.                                    |
-| **Visibility**   | Access scope of an asset: `cell-private` / `organization` / `public-link`.                           |
+| Term                | Meaning                                                                                                    |
+|---------------------|------------------------------------------------------------------------------------------------------------|
+| **Envelope**        | The `artifacts.artifacts` row: type, title, tags, owner, head pointer, soft-delete flag.                    |
+| **Version**         | An append-only immutable `artifact_versions` row (`UNIQUE(artifact_id, version_num)`), XOR one of: inline jsonb / S3 object / Yjs snapshot. |
+| **Head**            | `current_version_num` on the envelope — what a version-less `artifact://` URL resolves to (0 = nothing committed → 404). |
+| **Yjs Document**    | The live CRDT head (`state` bytea + `state_vector`), one per envelope, merged synchronously under a row lock. |
+| **Update Log**      | `yjs_updates` append log (seq IDENTITY) — pruned by compaction, never authoritative for state.              |
+| **Snapshot**        | Immutable point-in-time Yjs state (`yjs_snapshots`) — created by explicit commit or compaction; never deleted. |
+| **Compaction**      | update_count > 500 OR state > 1 MiB ⇒ snapshot the head + prune the log + reset the counter.                |
+| **Key Reservation** | Presign inserts a `pending` `s3_objects` row; `UNIQUE(bucket, s3_key)` rejects a duplicate at reserve time. |
+| **Content Hash**    | SHA-256 computed **server-side** at upload complete (client input is never trusted).                        |
+| **Storage Usage**   | `cell_storage_usage.bytes_total` — transactional per-cell accounting (enforcement deferred, RQ-20260701-002). |
 
-## Invariants (placeholder — TODO in Milestone D, Wave 1)
+## Invariants
 
-- TODO: every artifact is scoped to exactly one `cell_id`; cross-cell access goes through RBAC, not direct refs.
-- TODO: Y.js document state evolves monotonically — older snapshots remain readable for history.
-- TODO: `s3_assets.(s3_bucket, s3_key)` is globally unique.
-- TODO: `content_hash_sha256` is computed server-side after upload completes; never trusted from client.
-- TODO: deleting an asset record requires the underlying S3 object also be deleted (no orphans).
-- TODO: Y.js document compaction preserves the latest state vector — no data loss across compactions.
+- Every row in all 7 tables is scoped to exactly one `cell_id`; **FORCE RLS** with the direct predicate `cell_id = _shared.current_cell_id()` (USING + WITH CHECK) — missing GUC ⇒ default-deny.
+- `cell_id` is denormalized onto every child table and pinned by **composite anti-drift FKs** `(parent_id, cell_id) → parent(id, cell_id)` — a child can never claim a different cell than its parent.
+- `artifact_versions` and `yjs_snapshots` are **immutable at the DB privilege level**: `oriion_app` has no UPDATE and no DELETE on them. `artifact://.../vN` therefore never changes meaning.
+- Version numbering is serialized by a `FOR UPDATE` lock on the envelope; `UNIQUE(artifact_id, version_num)` remains authoritative and a direct-SQL racer triggers a re-read-and-retry (max 3 attempts → 409).
+- The version storage XOR: exactly one of `content_inline` / `s3_object_id` / `yjs_snapshot_id` is set, matching `storage_kind` (`CHECK` constraint). `storage_kind` is the evolution seam: Wave-2 `'connector'` / Wave-3 `'gitea_ref'` land as a CHECK-swap, no backfill.
+- `s3_objects.(bucket, s3_key)` is globally unique; keys follow `<env>/<cell_id>/<artifact_id>/<version_num>/<filename>` (ADR-012) with a strict filename charset (path-traversal guard).
+- `content_hash_sha256` / `byte_size` are computed server-side after upload completes; the bucket is never public (presigned POST 5-min TTL for upload, signed GET 1-hour TTL for download).
+- Envelope deletion is **soft** (`deleted_at`): versions stay, `s3_objects` rows flip to `deleted` (physical removal = janitor), logical bytes are freed from `cell_storage_usage`.
+- Resolver: malformed URL → 422; cell mismatch → the **same 404** as not-found (no cross-cell existence oracle).
+- Compaction preserves the latest state + state vector and every snapshot — only `yjs_updates` rows are pruned.
+- `cell_storage_usage.bytes_total` changes in the same transaction as the version/upload/delete that caused it.
 
 ## Cross-Context Dependencies
 
-- **multitenancy** — every artifact is scoped to `cell_id` (which transitively gives `organization_id`).
-- **tasks** — `tasks.task_artifacts` rows reference `yjs_documents.id` or `s3_assets.id` for task outputs.
-- **rbac** — per-cell access control gates read/write to artifacts.
-- **iam** — `last_editor_user_id` references the authenticated principal (Wave 1+).
-- **agents** — agent executions produce artifacts (output side of the task lifecycle).
+- **multitenancy** — every row is scoped to `cell_id` (FK to `multitenancy.cells`, RLS via the shared 3-GUC model).
+- **tasks** — `tasks.task_artifacts.s3_key` / `.yjs_document_id` (dangling text/uuid columns, unchanged in this phase) resolve against `artifacts.s3_objects.s3_key` / `artifacts.yjs_documents.id` — queryable targets, no FK.
+- **iam** — `owner_user_id` / `created_by_user_id` reference the authenticated principal; the API is JWT-authenticated and the tenant context derives the cell.
+- **agents** — `created_by_agent_id` marks agent-produced artifacts (orchestrator hot-path wiring is a follow-up phase, mirror of 01.4→01.4b).
+- **billing** — storage quota **enforcement** per ADR-012 tariffs consumes `cell_storage_usage` (deferred, RQ-20260701-002).
 
-## Why Wave 1 (not Wave 0)
+## API & Events
 
-Y.js infrastructure is **non-trivial** — it requires:
-
-1. A real-time sync layer (WebSocket-based provider).
-2. CRDT merge semantics across browser + backend.
-3. Snapshot/compaction strategy to bound document size.
-4. Tooling for diff inspection + rollback.
-
-For **Wave 0**, structured content lives **inline as JSONB** in `tasks.task_outputs` (or similar).
-This is acceptable for single-author, single-session workflows.
-Real-time co-editing is a Wave 1 differentiator and lands here.
-
-S3 asset storage is also scheduled for Wave 1 — Wave 0 can rely on inline base64 or local fs for
-the small set of demo artifacts.
+- REST surface: `api.yaml` (mounted under `/api/v1`, errors = RFC-7807 problem+json with machine `code`).
+- CloudEvents: `events.yaml` — 5 events emitted via the house `src/_shared/cloudevents.py` mechanism (structlog transport now, Redis Streams later without call-site changes).
 
 ## ADR References
 
-- **ADR-024** — Bounded Context Contracts (this context schema, §1).
-- TODO: future ADR for Y.js provider choice (Hocuspocus vs custom WebSocket vs SaaS).
-- TODO: future ADR for S3-compatible storage backend (MinIO self-hosted vs cloud vendor).
+- **ADR-012** — Артефакты: Yjs для документов, S3 для ассетов (parent decision).
+- **ADR-038** — Envelope-схема в едином `artifacts` schema (judge-panel composite; binding design for this contract).
+- **ADR-024** — Bounded Context Contracts (this contract's format + 1:1 conformance rule).
+- **ADR-009** — RLS / 3-GUC tenant model.
 
-## Open Questions (defer to Milestone D, Wave 1)
+## Deferred (tracked)
 
-- Snapshot frequency policy: time-based vs operation-count-based vs hybrid.
-- Y.js document size limits and compaction threshold.
-- Asset lifecycle: TTL for ephemeral artifacts, cold-storage tier for old assets.
-- Per-asset signed URL expiry policy.
-- Garbage collection of orphaned S3 objects (artifacts that lost their parent task).
-- Conflict resolution UX when two agents Y.js-edit the same document simultaneously.
+- y-websocket real-time co-editing — RQ-20260701-001 (schema-ready: state + state_vector + update log).
+- Storage quota enforcement by tariff — RQ-20260701-002 (`cell_storage_usage` accounting is live).
+- FTS / pgvector search — `text_export` + jsonb `tags` reserve the space without backfill.
+- Connector-mode (Wave 2) / Gitea refs (Wave 3) — `storage_kind` CHECK-swap.
+- Scheduled janitor for stale `pending` reservations and physical S3 deletion (service method `purge_stale_pending` exists; scheduling is a follow-up).
