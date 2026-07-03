@@ -34,6 +34,8 @@ Decisions that need the founder's market/ЦА knowledge, which the agent structu
 
 > Litmus: *"Would a competent senior engineer with no market context still be guessing?"* If the right answer depends on customers/market/business strategy, not on code — escalate.
 
+> **Already-decided ≠ product fork (grill 2026-07-03).** User-facing content that an ADR / UI-SPEC has already fixed — a wizard string in [ADR-022](../../.planning/decisions/ADR-022-coordinator-wizard-llm-hybrid.md), a product unit name in [ADR-016](../../.planning/decisions/ADR-016-team-first-ux.md), a palette token in [ADR-031](../../.planning/decisions/ADR-031-design-direction-restyling.md) — is **implemented as-is, not re-escalated**: executing an approved spec is engineering, not a new product decision. What escalates is not everything *visible* but everything *undecided-and-visible* — a net-new user-facing choice covered by no ADR/UI-SPEC. Copy/scenarios the agent must originate (e.g. onboarding demo-scenarios, seeded first-task examples) take the **autonomous-draft → founder review-gate** path (same as vertical prompts, ADR-026), not an up-front escalation.
+
 ### 2. Tripwire categories (same list as the back tripwire)
 
 DB migrations on existing tables/RLS · auth/RBAC/sessions · billing/money · secrets/keys/crypto · public API-contract breaks. These escalate at the **design** step too (not only at merge), because the *approach* is as sensitive as the diff.
