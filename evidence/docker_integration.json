@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "gate": "docker_integration",
+  "head_sha": "ea5208f5b26e27f189e54e6bce0742309f5a00f7",
+  "timestamp": "2026-07-03T09:32:00Z",
+  "verdict": "PASS",
+  "runner": "pytest -m 'integration and not live' (real PostgreSQL 16 + real MinIO via infra/docker-compose.dev.yml)",
+  "details": {
+    "integration_passed": 55,
+    "integration_failed": 0,
+    "artifacts_integration_tests": [
+      "test_rls_cross_cell_isolation_all_seven_tables",
+      "test_rls_default_deny_without_context",
+      "test_version_race_retry_lands_on_next_free_num",
+      "test_versions_and_snapshots_immutable_at_db_level",
+      "test_yjs_read_your_writes_commit_and_compaction",
+      "test_resolver_head_vn_and_404_semantics",
+      "test_task_artifacts_refs_resolve_against_artifacts_tables",
+      "test_cell_storage_usage_consistent_across_lifecycle",
+      "test_full_s3_flow_presign_upload_complete_signed_get (live MinIO: presign->409 dup->HTTP upload->server-side sha256->signed GET 200 + unsigned 403)"
+    ],
+    "also_at_this_commit": {
+      "unit_passed": 852,
+      "ruff": "clean (396 files)",
+      "mypy_strict": "0 errors / 214 source files",
+      "bandit": "0 findings",
+      "coverage_src_artifacts_pct": 93.0
+    },
+    "note": "GitHub CI integration job has no MinIO service; this local Docker run is the AC-01.5.4 gate per PLAN risk note"
+  }
+}

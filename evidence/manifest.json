@@ -1,0 +1,8 @@
+{
+  "phase": "01.5",
+  "required_gates": [
+    "judge_panel_artifacts_schema",
+    "docker_integration",
+    "adversarial_audit"
+  ]
+}
