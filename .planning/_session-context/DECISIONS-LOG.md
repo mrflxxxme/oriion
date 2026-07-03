@@ -133,3 +133,27 @@
 - Decision: Option C (grill): classify_tripwire v2 content-inspects upgrade() and auto-drops db_migrations iff EVERY touched migration is a provable pure-CREATE; fail-closed on any f-string/ALTER/DROP/backfill/index-on-existing/unknown-call/unreadable. Complexity kept OUT of the gate: new cell-scoped migrations use literal-arg helpers backend/migrations/_rls.py (cell_scoped_rls/updated_at_trigger) instead of the f-string RLS loop, so the classifier stays a simple strip-strings + call-allow-list. Shipped PR #82
 - Rationale: founder grill verdict 2026-07-03 (chose C after a grounded finding): the house RLS idiom is an un-provable f-string loop; teaching the GATE to prove loop domains puts a fragile parser where a miss = an unattended destructive migration auto-merging. C moves that complexity into an ordinary tested helper and keeps the safety-critical gate dumb + statically verifiable. A (conservative-only) was near-worthless since the house writes no literal migrations; B (smart parser in gate) too risky.
 - Reversibility: reversible
+
+### 2026-07-03T16:50:56Z | phase 01.6 | arch | ADR-039
+- Fork: Formalize the grill-resolved security-guardrails architecture into an ADR
+- Decision: ADR-039 Accepted: new 'security' bounded context with detector PORTS + deterministic layer B (regex+checksum RU-PDN; injection heuristics); NO tables/migrations (DLP writes existing audit.audit_log); runtime seams mirror quota_admission/memory_extraction; port seam preserves B->A ML upgrade
+- Rationale: Gril 2026-07-03 pre-resolved the arch fork (14:09 entry); the runner authors the ADR per the 'own ADR at 01.6 start' instruction. Zero-migration keeps the blocking gate deterministic + Docker-independent (no stuck-risk) + tripwire-free (auto-merge)
+- Reversibility: arch: reversible via port swap (B->A); bounded-context boundary is durable
+
+### 2026-07-03T16:51:08Z | phase 01.6 | impl
+- Fork: Capability risk_level metadata: grill assumed it exists on agents.roles
+- Decision: Implement tool risk as a deterministic STATIC registry (TOOL_RISK dict in src/security/capability.py) + classify_tool()/requires_approval() (fail-closed: unknown->dangerous), NOT a DB column
+- Rationale: Recon found there is NO agents.roles table (personas live in agents.agent_archetypes with tools_allowed ARRAY) and NO risk_level column. A static registry satisfies the grill intent ('classify tools by risk + seam, no gate') with ZERO migration - even more aligned with the deterministic/no-stuck-risk goal than an ALTER. Real gate still activates 01.9.
+- Reversibility: reversible; a DB-backed per-workspace override can layer on in 01.9 owner-config
+
+### 2026-07-03T16:51:08Z | phase 01.6 | impl
+- Fork: Guardrail enforcement default-state in Wave-1 (dlp + injection flags)
+- Decision: security_injection_scan_enabled default TRUE (B1 non-destructive, no-op on benign, protects the only external channel = web results); security_dlp_enabled default FALSE (A3 hard-block, activates at first outward PII surface = 01.9 + owner-config). Both behaviors fully built + unit-tested; activation = flag flip
+- Rationale: Mirrors the founder's uniform 'substrate-now, enforce-when-there-is-a-surface' pattern applied to EVERY sibling 01.6 fork (capability gate->01.9; storage quotas->W2; co-editing->W2). DLP hard-block has false-positive friction (legit marketing brief with a client phone) and NO outward PII surface exists in Wave-1 (artifacts cell-scoped under RLS; connectors=01.9). 'Before any PII surface' = the gate must EXIST before 01.9, satisfied by building it now. Injection B1 is safe to enable (non-destructive).
+- Reversibility: reversible; single-line flag flip in 01.9
+
+### 2026-07-03T17:28:18Z | phase 01.6 | impl
+- Fork: Adversarial-audit corrections (3 lenses, refute-by-default)
+- Decision: SOUND P1: DLP screens the FULL outward deliverable (_dlp_screen_text = json.dumps(model_dump()), uncapped) not the truncated memory-filter _deliverable_text, so screened >= delivered. NO-REG P2: security_injection_scan_enabled default flipped True->False (heuristics mangle legit web content quoting an attack / LLM-template markers; thesis 'no-op on benign' refuted) + trimmed jailbreak_marker (drop bare developer-mode/jailbreak) + fenced_system_block (drop markdown-heading branch). P3: DLP block except broadened to Exception (a screen/audit-DB failure now stamps task.failed instead of leaving 'running'). SECURE PASS (0 P0/P1).
+- Rationale: Fix soundness + the regression + cheap robustness now; DEFER the INN-10 ~10%-false-positive precision-tuning to 01.9 activation (real-data validation belongs at flip time, not blind now) with an explicit must-do note in the phase spec. Both guardrail flags now default OFF (substrate-now, enforce-at-01.9) — consistent with the capability-gate decision for this same phase.
+- Reversibility: reversible; flags + patterns tunable at 01.9

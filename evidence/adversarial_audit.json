@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "gate": "adversarial_audit",
+  "head_sha": "35cac87d2385255e44e0cffcd1e50c8c3f3ac757",
+  "timestamp": "2026-07-03T17:32:33Z",
+  "verdict": "PASS",
+  "cost_usd": 8.0,
+  "runner": "reviewer-security + reviewer-backend (3-lens, refute-by-default)",
+  "details": {
+    "phase": "01.6",
+    "lenses": {
+      "SECURE": {
+        "verdict": "PASS",
+        "p0_p1": 0,
+        "summary": "central invariant 'raw PII never surfaced' held under end-to-end tracing (findings/DlpViolation/audit-payload/SSE/logs); ReDoS refuted (linear injection + capped DLP); checksums validated against real INN/SNILS; audit row persists on the failure path.",
+        "p3_deferred": "INN-10 checksum admits ~10% of arbitrary 10-digit numbers -> precision-tuning required before enabling DLP at 01.9 (documented in phase spec)."
+      },
+      "SOUND": {
+        "verdict": "PASS_AFTER_FIX",
+        "finding": "P1 (fixed) — DLP screened the truncated _deliverable_text (12000-cap, summary+artifacts) so screened != superset of delivered on the horizontal path; PII in the remainder/other fields passed the block.",
+        "fix": "_dlp_screen_text = full json.dumps(output.model_dump()) uncapped; screened >= delivered.",
+        "refuted": "checksum soundness, DLP terminal bookkeeping vs the real handler, ordering (after cancel re-check, before memory), injection span-merge, seam plumbing, None/empty edges."
+      },
+      "NO_REGRESSIONS": {
+        "verdict": "PASS_AFTER_FIX",
+        "finding": "P2 (fixed) — security_injection_scan_enabled default True mangled legitimate web content (bare 'developer mode'/'jailbreak', markdown headings) on the existing web_search path; 'no-op on benign' premise refuted.",
+        "fix": "default False (both guardrail flags off in Wave-1, enforce at 01.9) + trimmed jailbreak_marker + fenced_system_block patterns.",
+        "refuted": "billing invariant, import cycles, config parsing, seam defaults; existing suites green (950 unit)."
+      }
+    },
+    "p3_robustness_fixed": "DLP block caught only DlpViolation -> broadened to except Exception so a screen/audit-DB failure stamps task.failed instead of leaving 'running'.",
+    "gates_final": {
+      "ruff": "clean",
+      "mypy_strict_files": 224,
+      "bandit": 0,
+      "unit_passed": 950,
+      "cov_src_security_pct": 97,
+      "cov_src_runtime_pct": 87
+    }
+  }
+}

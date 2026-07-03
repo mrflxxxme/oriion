@@ -27,6 +27,7 @@ from src._shared.config import get_settings
 from src.mcp.exceptions import MCPError, ToolRateLimitExceeded
 from src.mcp.tools.read_url import ReadURLTool
 from src.mcp.tools.web_search import WebSearchResult, WebSearchTool
+from src.security.detectors.injection import scan_injection
 
 if TYPE_CHECKING:
     from src.mcp.tools.rate_limit import ToolRateLimiter
@@ -39,15 +40,27 @@ if TYPE_CHECKING:
 WEB_SEARCH_MAX_RESULTS = 6
 
 
+def _sanitize_external(text: str) -> str:
+    """B1-neutralize prompt-injection in external content before it reaches an
+    agent (Phase 01.6, ADR-039). Gated by ``security_injection_scan_enabled``
+    (default on); non-destructive and a no-op on benign content."""
+    if not text or not get_settings().security_injection_scan_enabled:
+        return text
+    return scan_injection(text).neutralized_text
+
+
 def _format_search_results(results: list[WebSearchResult]) -> str:
     """Format web_search hits as a citable markdown block (shared by the scripted
-    pre-fetch and the native tool-call path so artifacts stay consistent)."""
+    pre-fetch and the native tool-call path so artifacts stay consistent).
+
+    External snippets are B1-sanitized (ADR-039) before they reach the agent.
+    """
     if not results:
         return ""
     lines = ["## Актуальные результаты веб-поиска (используй как источники, цитируй URL):"]
     for i, r in enumerate(results, start=1):
         lines.append(f"{i}. {r.title} — {r.url}\n   {r.snippet}")
-    return "\n".join(lines)
+    return _sanitize_external("\n".join(lines))
 
 
 async def fetch_research_context(
@@ -155,6 +168,8 @@ def build_native_read_url(
         text = result.text_content.strip()
         if len(text) > max_chars:
             text = text[:max_chars].rstrip() + "…"
+        # B1-sanitize the fetched page before it reaches the agent (ADR-039).
+        text = _sanitize_external(text)
         if not text:
             return f"Страница {url} не содержит читаемого текста."
         header = f"## Содержимое страницы {result.url}"

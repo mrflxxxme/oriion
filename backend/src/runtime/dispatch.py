@@ -86,6 +86,7 @@ from src.runtime.orchestrator import (
     MasterStepRecorder,
     MemoryExtractionHook,
     OrchestratorContext,
+    OutputDlpScreen,
     QuotaAdmissionCheck,
     estimate_step_cost,
     execute_agent_task,
@@ -986,6 +987,7 @@ async def dispatch_task(
     step_recorder: StepRecorder | None = None,
     quota_admission: QuotaAdmissionCheck | None = None,
     memory_extraction: MemoryExtractionHook | None = None,
+    output_dlp: OutputDlpScreen | None = None,
 ) -> dict[str, Any]:
     """Synchronously run the orchestrator for a queued task.
 
@@ -1066,6 +1068,7 @@ async def dispatch_task(
         master_step_recorder=master_step_recorder,
         quota_admission=quota_admission,
         memory_extraction=memory_extraction,
+        output_dlp=output_dlp,
     )
 
 

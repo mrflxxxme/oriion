@@ -4,24 +4,25 @@
 
 ## Last updated
 
-- Date: 2026-07-03 (**Phase 01.5 Артефакты — первый прогон `/autonomy:run`, code-complete**)
-- Session: `charming-kepler-c814fe` (autonomous runner, ADR-037 pilot)
-- Agent: @claude-fable
+- Date: 2026-07-03 (**Phase 01.6 Security guardrails — `/autonomy:run`, code-complete**)
+- Session: autonomous runner (ADR-037), branch `claude/autonomy-run-01-6-mpbq2u`
+- Agent: @claude
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — in progress. 01.1-retro ✅ · 01.2 ✅ · 01.3 ✅ · 01.4 ✅ · 01.4b ✅ · **01.5 = this PR (autonomy-pilot)**.
-- **01.5 «Артефакты» (ADR-012 / [ADR-038](./decisions/ADR-038-artifacts-envelope-schema.md)):** новый bounded context `backend/src/artifacts/` — envelope-схема 7 таблиц (`artifacts_0001`, FORCE RLS, immutable versions), Yjs bytea+pycrdt синхронный merge (REST-only Wave 1), S3 presigned flow против MinIO/YOS, `artifact://` resolver, `cell_storage_usage` учёт, контракты переписаны. `tasks.task_artifacts` НЕ тронут — его висячие `s3_key`/`yjs_document_id` теперь резолвятся против artifacts-таблиц.
-- **Автономный цикл отработал:** 9 forks (6 owned / 2 escalated non-blocking / 1 judge-panel → ADR-038) · 3-lens adversarial audit поймал 1 P1 (concurrent double-complete) — закрыт с тестом гонки · ci-evidence freshness circularity починен (`verify_evidence.py` walk мимо evidence-only коммитов).
-- **Gates финального кода:** ruff clean · mypy --strict 214 · bandit 0 · unit 852 · integration 55 (real PG + MinIO) · `src/artifacts` 93%.
-- ⚠️ **Dual-tree guard:** canon `.planning/` в активном worktree; anchor `git rev-parse --show-toplevel`.
-- ⚠️ Pre-merge tripwire hook armed: merge этого PR требует approved `/autonomy:ack` (diff трогает `backend/migrations/versions/**` + `.planning/contracts/**`).
+- **Wave:** Wave 1 (Core MVP) — in progress. 01.1-retro ✅ · 01.2 ✅ · 01.3 ✅ · 01.4 ✅ · 01.4b ✅ · 01.5 ✅ (merged `a326f7a`) · **01.6 = this PR**.
+- **01.6 «Security guardrails» ([ADR-039](./decisions/ADR-039-security-guardrails-context.md), реализует [ADR-014](./decisions/ADR-014-security.md) §2/§3):** новый bounded context `backend/src/security/` — детерминированный слой B (regex + checksum), детекторы-порты с апгрейд-швом B→A (ML). RU-ПДн DLP (ИНН-10/12 + СНИЛС checksum, паспорт/телефон/email) + prompt-injection эвристики + capability-классификатор. **Ноль таблиц/миграций** (DLP пишет существующий `audit.audit_log`), **ноль tripwire** → **auto-merge на зелёном** (classify_tripwire exit 0).
+- **Runtime-швы** (зеркало `memory_extraction`/`quota_admission`, default None ⇒ no-op): output-DLP A3 hard-block на orchestrator success-пути (screen `_dlp_screen_text` = полный deliverable) + injection B1-sanitize на `web_search_runner`. **Оба флага (`security_dlp_enabled`, `security_injection_scan_enabled`) default OFF в Wave-1** — substrate готов, enforcement активируется в 01.9 (нет исходящего PII/коннектор-surface до 01.9).
+- **Adversarial audit (3 линзы, refute-by-default):** SECURE ✅ PASS (0 P0/P1, инвариант «сырое ПДн не утекает» устоял) · SOUND → 1 P1 (усечённый DLP-скрин → полный `_dlp_screen_text`) закрыт · NO-REGRESSIONS → 1 P2 (injection default-ON калечил веб-контент → default OFF + trim) закрыт · P3 robustness (except Exception) закрыт.
+- **Gates финального кода:** ruff clean · mypy --strict 224 · bandit 0 · unit 950 · `src/security` 97% / `src/runtime` 87%. Docker/live не требуются (детерминированная фаза).
 
 ## Pending founder actions
 
-1. **Tripwire ack на PR 01.5** — RUN-QUEUE `ack-needed` запись (создаётся при открытии PR): db_migrations (чистый greenfield CREATE новой схемы + RLS, runner_nuance = низкий риск) + public_api_contracts (SKELETON → implemented, единственный источник правды). `/autonomy:ack <ID> approved` → раннер мержит.
-2. **Эскалации (non-blocking, leans уже исполняются):** RQ-20260701-001 co-editing scope (lean B: y-websocket отложен до co-editing UI) · RQ-20260701-002 storage-квоты (lean B: track-only, enforcement = billing follow-up).
-3. **Chip `task_6cdb162a`** — hardening-хвосты аудита (janitor wiring, body-caps, presign-overwrite window, live-Yjs bytes accounting) — запустить после merge.
+**НЕТ блокирующих** — фаза tripwire-free, auto-merge на зелёном CI (никакого `/autonomy:ack` не нужно). Раннер сам мёржит после зелёных чеков + post-merge health-check.
+
+Deferred (НЕ блокирует merge; трекается для 01.9 при активации enforcement):
+1. **ИНН-10 precision-tuning** — checksum пропускает ~10% произвольных 10-значных чисел (юрлицо-ИНН, high-FP). Перед `security_dlp_enabled=True` в 01.9: контекстный якорь «ИНН» ИЛИ low-confidence ИЛИ исключить ИНН-10 как не-ПДн. Детали — [01.6 spec §Enforcement activation](./roadmap/wave-1-core-mvp/phases/01.6-security-guardrails.md).
+2. **Активация обоих guardrail-флагов в 01.9** вместе с owner-config surface + реальным capability-gate (`requires_approval` в dispatch outward-tools).
 
 ## Active blockers (none block this PR)
 
@@ -34,4 +35,4 @@
 
 ## Next product phase
 
-**Phase 01.6 — Security guardrails** ([ADR-014](./decisions/ADR-014-security.md)): input/output фильтр + capability sandboxing + DLP-сканер. Помечена «до любого PII-surface». Следующий кандидат для `/autonomy:run 01.6`.
+**Phase 01.7 — RBAC** ([ADR-014](./decisions/ADR-014-security.md)): Owner + Member (Admin/Viewer → Wave 2). Грил 2026-07-03 pre-resolved: **flat member visibility** (все члены cell видят все артефакты; Owner vs Member = права, не видимость) + **visibility stub-колонка** (`visibility text DEFAULT 'cell-shared'` в artifacts-миграции 01.7, fast-default, без backfill, не enforced — задел под per-artifact privacy B в Wave-2). Кандидат для `/autonomy:run 01.7`. Примечание: 01.7 добавит миграцию (existing artifacts table ALTER) → **db_migrations tripwire → ack-needed** (не greenfield).

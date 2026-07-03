@@ -17,6 +17,7 @@ asserts the coarser event order via the in-process SSEPublisher.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -72,6 +73,16 @@ QuotaAdmissionCheck = Callable[[AsyncSession, UUID], Awaitable[QuotaStatus]]
 # output_tokens) — the cost folds into the per-task cap + step-sum, the tokens roll
 # into the task token totals (so cost + tokens stay consistent, like the Master).
 MemoryExtractionHook = Callable[[str, int], Awaitable[tuple[Decimal, int, int]]]
+
+# AC-01.6.5: injected output-DLP screen (01.6, ADR-039). Optional seam (default
+# None ⇒ no-op) mirroring memory_extraction/quota_admission — the orchestrator's
+# unit tests run without the guard; the worker wires the real deterministic
+# DlpGuard (gated by Settings.security_dlp_enabled). Called on the final
+# deliverable text; a PII hit RAISES DlpViolation (code=security.dlp.blocked) so
+# the task is stamped failed (A3 hard-block — NOT swallowed like memory). The
+# guard closes over the task/cell/workspace context (like the memory hook), so
+# the orchestrator passes only the deliverable text.
+OutputDlpScreen = Callable[[str], Awaitable[None]]
 
 # P1-D forward-estimate constants. Mirror runtime.dispatch.estimate_credits's
 # DeepSeek per-token T-credit rates (kept local to avoid the dispatch→
@@ -162,6 +173,29 @@ def _deliverable_text(output: Any) -> str:
     return text[:_MAX_DELIVERABLE_CHARS]
 
 
+def _dlp_screen_text(output: Any) -> str:
+    """FULL outward-deliverable text for the DLP hard-block (01.6, ADR-039).
+
+    Distinct from ``_deliverable_text`` (the memory-filter input — truncated to
+    ``_MAX_DELIVERABLE_CHARS`` and limited to summary+artifacts on the horizontal
+    path). The A3 guard must see EVERY outward string so ``screened ⊇ delivered``:
+    the client receives the full ``output.model_dump()`` in the task.completed
+    frame, so screening a partial view would let PII in the remainder past the
+    block. No cap — correctness over the pathological-input scan cost (bounded by
+    real deliverable size; DLP is off until 01.9). Serializing the dump also
+    covers non-artifact fields (assumptions / open_questions / citations / …).
+    """
+    if output is None:
+        return ""
+    dump = getattr(output, "model_dump", None)
+    if callable(dump):
+        try:
+            return json.dumps(dump(), ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            return str(output)
+    return str(output)
+
+
 class OrchestratorContext:
     """Run-state shared across Coordinator → leaf delegations."""
 
@@ -208,6 +242,7 @@ async def execute_agent_task(
     master_step_recorder: MasterStepRecorder | None = None,
     quota_admission: QuotaAdmissionCheck | None = None,
     memory_extraction: MemoryExtractionHook | None = None,
+    output_dlp: OutputDlpScreen | None = None,
 ) -> dict[str, Any]:
     """Run the Coordinator agent end-to-end + emit SSE event ledger.
 
@@ -485,6 +520,58 @@ async def execute_agent_task(
         )
         await tasks_events.emit_task_cancelled(task_id=task_id, cascaded_to=[])
         return {"summary": "(cancelled)", "total_cost_credits": str(ctx.accumulated_cost)}
+
+    # AC-01.6.5 output-DLP hard-block (01.6, ADR-039). SUCCESS path, after the
+    # P1-C cancel re-check (a cancelled task has already returned above) and
+    # BEFORE memory extraction + the success stamp: screen the FULL outward
+    # deliverable (_dlp_screen_text — untruncated, every outward field — so
+    # screened ⊇ delivered; the filter-agent's truncated _deliverable_text would
+    # leave PII past the cap unscreened). A3 (grill 2026-07-03) — a hit is NOT
+    # swallowed (unlike memory housekeeping): stamp task.failed, emit the
+    # terminal ledger, then re-raise so the caller (actor) commits the failed
+    # status AND the audit row the guard wrote on this session. The except is
+    # broad (not just DlpViolation) so an audit-sink/DB failure in the screen
+    # also stamps failed instead of leaving the task 'running' (the block sits
+    # past the outer handler). Default None ⇒ no-op (unit tests /
+    # security_dlp_enabled=false). Runs before memory so PII is never extracted
+    # from a blocked deliverable.
+    if output_dlp is not None:
+        try:
+            await output_dlp(_dlp_screen_text(output))
+        except Exception as exc:
+            completed_at = datetime.now(UTC)
+            error_code = getattr(exc, "code", exc.__class__.__name__)
+            if task is not None:
+                task.status = "failed"
+                task.completed_at = completed_at
+                task.total_cost_credits = ctx.accumulated_cost
+            refund_unused(ctx.accumulated_cost, reserved)
+            _record_terminal_task_metrics(
+                cell_label=cell_label,
+                outcome="failed",
+                started_at=started_at,
+                completed_at=completed_at,
+            )
+            await sse_publisher.publish(
+                TaskStreamEvent(
+                    event_type="task.failed",
+                    task_id=task_id,
+                    payload={
+                        "error_code": str(error_code),
+                        # SECURITY: a DlpViolation carries category labels only,
+                        # never the matched PII value (ADR-039 §3); other screen
+                        # errors (audit/DB) reference the labels payload, not the
+                        # deliverable — no raw PII reaches this frame.
+                        "error_message": str(exc),
+                        "retry_possible": False,
+                        "total_cost_credits": str(ctx.accumulated_cost),
+                    },
+                )
+            )
+            await tasks_events.emit_task_failed(
+                task_id=task_id, error_code=str(error_code), retry_possible=False
+            )
+            raise
 
     # AC-01.4.7 memory auto-extraction (01.4b). SUCCESS path only (grill Q4): run
     # the injected filter-agent hook on the final deliverable BEFORE the cost
