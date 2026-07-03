@@ -42,46 +42,46 @@ def downgrade() -> None:
     op.execute("DROP TABLE IF EXISTS artifacts.artifacts;")
 '''
 
-ADD_COLUMN = '''
+ADD_COLUMN = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.foo (id uuid PRIMARY KEY);")
     op.execute("ALTER TABLE artifacts.artifacts ADD COLUMN visibility text DEFAULT 'cell-shared';")
 def downgrade() -> None:
     op.execute("DROP TABLE artifacts.foo;")
-'''
+"""
 
-BACKFILL = '''
+BACKFILL = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.bar (id uuid PRIMARY KEY);")
     op.execute("UPDATE tasks.tasks SET status = 'migrated' WHERE status IS NULL;")
-'''
+"""
 
-INDEX_ON_EXISTING = '''
+INDEX_ON_EXISTING = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.baz (id uuid PRIMARY KEY);")
     op.execute("CREATE INDEX ix_hot ON tasks.tasks (created_at);")
-'''
+"""
 
-DYNAMIC = '''
+DYNAMIC = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.qux (id uuid PRIMARY KEY);")
     op.execute(f"CREATE INDEX ix_{name} ON artifacts.qux (id);")
-'''
+"""
 
-OP_ADD_COLUMN = '''
+OP_ADD_COLUMN = """
 def upgrade() -> None:
     op.create_table("newt", sa.Column("id", sa.Uuid, primary_key=True))
     op.add_column("existing", sa.Column("c", sa.Text))
-'''
+"""
 
-CREATES_NOTHING = '''
+CREATES_NOTHING = """
 def upgrade() -> None:
     op.execute("GRANT SELECT ON tasks.tasks TO oriion_app;")
-'''
+"""
 
 # The new house idiom (grill option C): literal table names + RLS helpers, no
 # f-strings -> statically provable pure-CREATE.
-HELPER_MIGRATION = '''
+HELPER_MIGRATION = """
 from migrations._rls import cell_scoped_rls, updated_at_trigger
 
 def upgrade() -> None:
@@ -93,29 +93,29 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DROP TABLE artifacts.foo;")
-'''
+"""
 
 # Same but the helper name is NOT imported from the known module -> spoof guard.
-HELPER_NO_IMPORT = '''
+HELPER_NO_IMPORT = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.foo (id uuid PRIMARY KEY);")
     cell_scoped_rls("artifacts.foo")
-'''
+"""
 
 # An unrecognized call could hide surgery in its own body -> fail-closed ack.
-UNKNOWN_CALL = '''
+UNKNOWN_CALL = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.foo (id uuid PRIMARY KEY);")
     do_something_sneaky(op, "existing")
-'''
+"""
 
 # The historical f-string RLS loop (real house style pre-option-C) -> ack.
-FSTRING_LOOP = '''
+FSTRING_LOOP = """
 def upgrade() -> None:
     op.execute("CREATE TABLE artifacts.foo (id uuid PRIMARY KEY);")
     for tbl in ("artifacts.foo",):
         op.execute(f"ALTER TABLE {tbl} ENABLE ROW LEVEL SECURITY;")
-'''
+"""
 
 
 def test_helper_migration_is_pure_create() -> None:
