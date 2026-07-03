@@ -24,9 +24,16 @@ categories:
     runner_nuance: |
       Ack ОБЯЗАТЕЛЕН, если миграция: ALTER/DROP существующей таблицы/колонки,
       изменение RLS-политики, backfill/data-migration, изменение индексов на
-      горячих таблицах. Чистый CREATE новой таблицы + её RLS с нуля — низкий риск,
-      но v1 всё равно требует ack (консервативно). Runner отражает вердикт нюанса
-      в RUN-QUEUE-записи.
+      горячих таблицах.
+      v2 (grill 2026-07-03, option C): classify_tripwire.py делает КОНТЕНТНУЮ
+      проверку upgrade() и АВТО-СНИМАЕТ db_migrations, если КАЖДАЯ затронутая
+      миграция — доказуемо чистый greenfield CREATE (новые таблицы/схемы + их RLS
+      с нуля). Fail-closed: любой f-string, ALTER/DROP/backfill, index на не-этой
+      таблице, неизвестный вызов, или нечитаемый файл → ack сохраняется. Чтобы
+      pure-CREATE миграция авто-мёржилась, RLS/триггер-boilerplate писать через
+      literal-хелперы `backend/migrations/_rls.py` (cell_scoped_rls /
+      updated_at_trigger), а НЕ через f-string-цикл (последний неинспектируем →
+      всегда ack). Вердикт контент-проверки — в поле verdict `db_migrations_content_check`.
 
   auth_rbac_sessions:
     reason: "Auth / RBAC / сессии — surface аутентификации и авторизации (D2)"
