@@ -52,7 +52,69 @@ def _fetch_runs(limit: int) -> list[dict[str, Any]] | None:
     return runs if isinstance(runs, list) else None
 
 
-def evaluate(runs: list[dict[str, Any]]) -> dict[str, Any]:
+def _workflow_has_push_trigger(text: str) -> bool:
+    """Crude-but-safe YAML probe: does the workflow's ``on:`` include push?"""
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if line.startswith(("on:", '"on":', "'on':")):
+            # Inline form: on: [push, pull_request] / on: push
+            _, _, inline = stripped.partition(":")
+            if "push" in inline:
+                return True
+            # Block form: scan the indented mapping under on:
+            for sub in lines[idx + 1 :]:
+                if sub.strip() and not sub.startswith((" ", "\t")):
+                    break  # next top-level key
+                if sub.strip().startswith("push:"):
+                    return True
+            return False
+    return False
+
+
+def push_triggered_gate_workflows() -> set[str] | None:
+    """Names of gate workflows that run on push to main, per origin/main's tree.
+
+    A workflow that no longer triggers on push (e.g. ci-evidence is a PR-only
+    merge gate) cannot testify about main's health - its stale last main-run
+    would otherwise pin the verdict to a failure forever. None = cannot
+    determine (git error) -> caller keeps the conservative old behavior.
+    """
+    proc = subprocess.run(
+        ["git", "ls-tree", "--name-only", "origin/main", ".github/workflows/"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    if proc.returncode != 0:
+        return None
+    names: set[str] = set()
+    for path in proc.stdout.split():
+        show = subprocess.run(
+            ["git", "show", f"origin/main:{path}"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+        )
+        if show.returncode != 0:
+            return None
+        text = show.stdout
+        wf_name = next(
+            (
+                line.partition(":")[2].strip().strip("\"'")
+                for line in text.splitlines()
+                if line.startswith("name:")
+            ),
+            path.rsplit("/", 1)[-1],
+        )
+        if _workflow_has_push_trigger(text):
+            names.add(wf_name)
+    return names
+
+
+def evaluate(
+    runs: list[dict[str, Any]], push_workflows: set[str] | None = None
+) -> dict[str, Any]:
     """Latest COMPLETED run per gate workflow -> verdict. Runs must be newest-first."""
     latest: dict[str, dict[str, Any]] = {}
     last_green_sha: str | None = None
@@ -68,6 +130,13 @@ def evaluate(runs: list[dict[str, Any]]) -> dict[str, Any]:
         if last_green_sha is None and run.get("conclusion") == "success":
             last_green_sha = run.get("headSha")
 
+    ignored_pr_only = sorted(
+        name
+        for name, run in latest.items()
+        if run.get("conclusion") != "success"
+        and push_workflows is not None
+        and name not in push_workflows
+    )
     failures = [
         {
             "workflow": name,
@@ -77,12 +146,13 @@ def evaluate(runs: list[dict[str, Any]]) -> dict[str, Any]:
             "run_id": run.get("databaseId"),
         }
         for name, run in sorted(latest.items())
-        if run.get("conclusion") != "success"
+        if run.get("conclusion") != "success" and name not in ignored_pr_only
     ]
     return {
         "healthy": not failures,
         "workflows_seen": sorted(latest),
         "failures": failures,
+        "ignored_pr_only": ignored_pr_only,
         "last_green_sha": last_green_sha,
     }
 
@@ -99,12 +169,14 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, json.JSONDecodeError) as exc:
             print(f"[main-health] cannot read fixture: {exc}", file=sys.stderr)
             return 1
+        push_workflows: set[str] | None = None  # fixtures: keep pure old behavior
     else:
         runs = _fetch_runs(args.limit)
         if runs is None:
             return 1
+        push_workflows = push_triggered_gate_workflows()
 
-    verdict = evaluate(runs)
+    verdict = evaluate(runs, push_workflows)
     print(json.dumps(verdict, ensure_ascii=False, indent=2))
     if not verdict["workflows_seen"]:
         print("[main-health] no completed gate-workflow runs found - cannot judge", file=sys.stderr)
