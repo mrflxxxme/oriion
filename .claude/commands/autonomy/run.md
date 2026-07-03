@@ -16,7 +16,7 @@ You are the runner. The strengthened gate-stack is the merge authority — NOT t
 ## Preflight (once per run)
 - `git rev-parse --show-toplevel` — anchor; sync `origin/main`; work off fresh `main`.
 - Docker: check `docker info`. **NEVER start Docker yourself** (founder-controlled). If down → integration/live gates are unavailable: phases whose manifest needs them go to RUN-QUEUE as `stuck`, pick the next phase that doesn't.
-- Funded `.env` present? If a phase needs live goldens and it's absent → same stuck-path.
+- Funded `.env`: run `python scripts/autonomy/provision_env.py` — it copies the canonical funded `backend/.env` (kept git-ignored on the **main checkout**) into the active worktree if absent (idempotent; secret-safe: refuses if the dest isn't git-ignored; never prints values). Exit 0 = present/provisioned; exit 2 = no canonical env configured → live goldens unavailable, same stuck-path as Docker-down (proceed with phases that don't need them). NEVER commit `.env` (tripwire `secrets_keys_crypto` + gitleaks).
 - Note the per-run budget: dev_team per_day soft $30 / hard $75. Track approximate spend; STOP the run at hard cap (add `stuck` entry: budget).
 
 ## Per-phase loop
