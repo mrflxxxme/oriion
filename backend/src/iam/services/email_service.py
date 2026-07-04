@@ -32,7 +32,7 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
-EmailKind = Literal["verification", "password_reset"]
+EmailKind = Literal["verification", "password_reset", "magic_link"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +51,8 @@ class EmailSender(Protocol):
     async def send_password_reset_email(
         self, to: str, token: str, expires_at: datetime
     ) -> None: ...
+
+    async def send_magic_link_email(self, to: str, token: str, expires_at: datetime) -> None: ...
 
 
 class ConsoleEmailSender:
@@ -76,6 +78,14 @@ class ConsoleEmailSender:
             expires_at=expires_at.isoformat(),
         )
 
+    async def send_magic_link_email(self, to: str, token: str, expires_at: datetime) -> None:
+        logger.info(
+            "[EMAIL.MAGIC] dev console email — copy token to /auth/magic-link/consume",
+            to=to,
+            token=token,
+            expires_at=expires_at.isoformat(),
+        )
+
 
 class NoOpEmailSender:
     """Prod placeholder until Yandex 360 SMTP integration (Wave 1)."""
@@ -89,6 +99,12 @@ class NoOpEmailSender:
     async def send_password_reset_email(self, to: str, token: str, expires_at: datetime) -> None:
         logger.warning(
             "NoOpEmailSender — password reset email NOT sent (Wave 1 SMTP missing)",
+            to=to,
+        )
+
+    async def send_magic_link_email(self, to: str, token: str, expires_at: datetime) -> None:
+        logger.warning(
+            "NoOpEmailSender — magic-link email NOT sent (Wave 1 SMTP missing)",
             to=to,
         )
 
@@ -109,6 +125,11 @@ class InMemoryEmailSender:
             EmailRecord(to=to, kind="password_reset", token=token, expires_at=expires_at)
         )
 
+    async def send_magic_link_email(self, to: str, token: str, expires_at: datetime) -> None:
+        self.outbox.append(
+            EmailRecord(to=to, kind="magic_link", token=token, expires_at=expires_at)
+        )
+
     def last(self) -> EmailRecord:
         return self.outbox[-1]
 
@@ -120,6 +141,7 @@ class InMemoryEmailSender:
 
 _VERIFY_SUBJECT = "Подтвердите email — TEAMLY"
 _RESET_SUBJECT = "Сброс пароля — TEAMLY"
+_MAGIC_LINK_SUBJECT = "Вход в TEAMLY по ссылке"
 
 
 class YandexSmtpEmailSender:
@@ -223,3 +245,15 @@ class YandexSmtpEmailSender:
         )
         message = self._build_message(to=to, subject=_RESET_SUBJECT, body=body)
         await self._send(message, to=to, kind="password_reset")
+
+    async def send_magic_link_email(self, to: str, token: str, expires_at: datetime) -> None:
+        ref = self._action_ref("/auth/magic-link/consume", token)
+        body = (
+            "Здравствуйте!\n\n"
+            "Вы запросили вход в TEAMLY по ссылке.\n\n"
+            f"{ref}\n\n"
+            f"Ссылка действительна до {expires_at.isoformat()} и работает один раз.\n\n"
+            "Если вы не запрашивали вход, просто проигнорируйте это письмо.\n"
+        )
+        message = self._build_message(to=to, subject=_MAGIC_LINK_SUBJECT, body=body)
+        await self._send(message, to=to, kind="magic_link")
