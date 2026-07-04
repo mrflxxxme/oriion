@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "gate": "adversarial_audit",
+  "head_sha": "10cc69ed49a6689af393b493794bbff74d7611b2",
+  "timestamp": "2026-07-04T00:32:34Z",
+  "verdict": "PASS",
+  "runner": "autonomous-runner (ADR-037) 3-lens refute-by-default",
+  "details": {
+    "phase": "01.7-rbac",
+    "lenses": {
+      "SECURE": {
+        "verdict": "PASS",
+        "p0_p1": 0,
+        "notes": "cross-tenant refuted (has_cell_permission reads cell_members via RLS-scoped session + explicit cell_id/user_id filter -> caller matches only own cell membership); privilege-escalation refuted (default-deny: non-member OR role-without-grant -> 403); injection refuted (fully parametrised SELECT, no interpolation; test_query_is_parameterised)."
+      },
+      "SOUND": {
+        "verdict": "PASS",
+        "notes": "guard is a hard dependencies=[Depends(...)] side-effect raising before the handler body -> no bypass path; reads intentionally ungated (flat visibility) and asserted open for both roles."
+      },
+      "NO_REGRESSIONS": {
+        "verdict": "PASS",
+        "notes": "full unit 956 passed / 2 skipped (MinIO/SIGHUP env-gated); billing_api_e2e + cells_router updated for guard deps and green (owner path exercises the guard for real); migration additive with default -> existing rows unaffected."
+      }
+    },
+    "gates": {
+      "ruff": "clean (423 files)",
+      "mypy_strict": "0 issues (226 files)",
+      "bandit": "0 issues",
+      "unit": "956 passed, 2 skipped",
+      "integration": "29 passed (real PG, Docker up)",
+      "coverage_src_rbac": "100%"
+    },
+    "findings": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 0,
+      "P3": 3,
+      "p3_deferred": [
+        "role_assignments dead-store seam kept for Wave-2",
+        "single-cell guard/path reconciliation at multi-cell (Wave-1+)",
+        "gate billing.manage on future billing writes"
+      ]
+    }
+  }
+}

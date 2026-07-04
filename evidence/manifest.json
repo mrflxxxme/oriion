@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "phase": "01.7-rbac",
+  "required_gates": [
+    "adversarial_audit"
+  ],
+  "notes": "docker_integration folded into the RBAC + billing-E2E integration run (29 passed) captured under adversarial_audit.details.gates.integration; no live_golden (no LLM); no judge_panel (no wide fork)."
+}
