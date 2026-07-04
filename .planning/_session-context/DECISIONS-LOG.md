@@ -157,3 +157,10 @@
 - Decision: SOUND P1: DLP screens the FULL outward deliverable (_dlp_screen_text = json.dumps(model_dump()), uncapped) not the truncated memory-filter _deliverable_text, so screened >= delivered. NO-REG P2: security_injection_scan_enabled default flipped True->False (heuristics mangle legit web content quoting an attack / LLM-template markers; thesis 'no-op on benign' refuted) + trimmed jailbreak_marker (drop bare developer-mode/jailbreak) + fenced_system_block (drop markdown-heading branch). P3: DLP block except broadened to Exception (a screen/audit-DB failure now stamps task.failed instead of leaving 'running'). SECURE PASS (0 P0/P1).
 - Rationale: Fix soundness + the regression + cheap robustness now; DEFER the INN-10 ~10%-false-positive precision-tuning to 01.9 activation (real-data validation belongs at flip time, not blind now) with an explicit must-do note in the phase spec. Both guardrail flags now default OFF (substrate-now, enforce-at-01.9) — consistent with the capability-gate decision for this same phase.
 - Reversibility: reversible; flags + patterns tunable at 01.9
+
+### 2026-07-04T01:05:50Z | phase 01.8-mail | impl
+- Fork: SMTP TLS default: implicit-TLS 465 vs STARTTLS 587 as the Settings default
+- Decision: smtp_port=465 + smtp_use_tls=True (implicit TLS) as default; STARTTLS 587 supported via smtp_use_tls=False. STARTTLS path sets aiosmtplib start_tls=True so AUTH never crosses cleartext.
+- Rationale: Yandex 360 recommends 465 implicit-TLS; simplest secure default (SSL-on-connect, no downgrade window). Both modes enforce TLS-before-AUTH; cert-verify left at ssl default (never disabled).
+- Reversibility: reversible
+- Session: claude/auto-01.8-mail
