@@ -51,9 +51,8 @@ async def app(
     from src._shared.config import Settings, get_settings
     from src._shared.db.redis import get_redis
     from src._shared.db.session import get_db
-    from src.iam.deps import get_email_sender
+    from src.iam.deps import get_email_sender, get_iam_kms_provider
     from src.iam.services.email_service import InMemoryEmailSender
-    from src.llm_gateway.deps import get_kms_provider
     from src.llm_gateway.services.kms_provider import LocalAESKMS
     from src.main import app as production_app
 
@@ -104,7 +103,7 @@ async def app(
     production_app.dependency_overrides[get_db] = override_get_db
     production_app.dependency_overrides[get_email_sender] = lambda: shared_email_sender
     production_app.dependency_overrides[get_redis] = lambda: fake_redis
-    production_app.dependency_overrides[get_kms_provider] = lambda: test_kms
+    production_app.dependency_overrides[get_iam_kms_provider] = lambda: test_kms
 
     production_app.state.test_email_sender = shared_email_sender  # type: ignore[attr-defined]
 

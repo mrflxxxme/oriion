@@ -43,8 +43,11 @@ from src.iam.services.password_service import PasswordService
 from src.iam.services.rate_limit_service import RateLimitService
 from src.iam.services.token_service import TokenService
 from src.iam.services.totp_service import TotpService
-from src.llm_gateway.deps import get_kms_provider
-from src.llm_gateway.services.kms_provider import KMSProvider
+from src.llm_gateway.services.kms_provider import (
+    KMSProvider,
+    LocalAESKMS,
+    YandexKMS,
+)
 
 
 def get_password_service() -> PasswordService:
@@ -91,9 +94,26 @@ def get_consent_service(
     )
 
 
+def get_iam_kms_provider(settings: Settings = Depends(get_settings)) -> KMSProvider:
+    """Build the KMS provider for iam at-rest encryption FROM SETTINGS.
+
+    Deliberately Settings-driven (not the llm_gateway app.state provider) so
+    the iam auth surface has NO dependency on the llm_gateway lifespan startup —
+    an app that mounts only the iam routers (or a test that overrides only iam
+    deps) still resolves a working KMS. Uses the same construction as the
+    canonical secret-refresh path (``_shared.secret_refresh``): 'local' →
+    LocalAESKMS(master_key from Settings), 'yandex' → YandexKMS.
+    """
+    from src._shared.secret_refresh import resolve_master_key_bytes
+
+    if settings.kms_backend == "yandex":
+        return YandexKMS()
+    return LocalAESKMS(master_key=resolve_master_key_bytes(settings))
+
+
 def get_totp_service(
     db: AsyncSession = Depends(get_db),
-    kms: KMSProvider = Depends(get_kms_provider),
+    kms: KMSProvider = Depends(get_iam_kms_provider),
 ) -> TotpService:
     return TotpService(
         credential_repo=TotpCredentialRepository(db),
