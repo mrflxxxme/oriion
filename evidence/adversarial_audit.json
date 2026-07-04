@@ -1,45 +1,61 @@
 {
   "schema_version": 1,
   "gate": "adversarial_audit",
-  "head_sha": "10cc69ed49a6689af393b493794bbff74d7611b2",
-  "timestamp": "2026-07-04T00:32:34Z",
+  "head_sha": "c9bef560dd4ffa2beaee5c3daa638a04b2e1332e",
+  "timestamp": "2026-07-04T01:20:00Z",
   "verdict": "PASS",
-  "runner": "autonomous-runner (ADR-037) 3-lens refute-by-default",
+  "runner": "reviewer (autonomous, 3 lenses refute-by-default)",
   "details": {
-    "phase": "01.7-rbac",
+    "phase": "01.8-mail",
     "lenses": {
       "SECURE": {
         "verdict": "PASS",
         "p0_p1": 0,
-        "notes": "cross-tenant refuted (has_cell_permission reads cell_members via RLS-scoped session + explicit cell_id/user_id filter -> caller matches only own cell membership); privilege-escalation refuted (default-deny: non-member OR role-without-grant -> 403); injection refuted (fully parametrised SELECT, no interpolation; test_query_is_parameterised)."
+        "checks": [
+          "plaintext token never logged: YandexSmtpEmailSender log line = to+kind+host only; asserted by test_smtp_token_not_logged (caplog DEBUG-level, token absent)",
+          "token never persisted by sender: no DB writes in the sender; only email body carries it",
+          "TLS actually enforced: use_tls=True -> implicit SSL-on-connect (465); use_tls=False -> aiosmtplib start_tls=True forces STARTTLS upgrade BEFORE AUTH (587) so credentials never cross cleartext; asserted by test_smtp_starttls_mode_uses_start_tls_not_implicit",
+          "cert verification NOT disabled: left at aiosmtplib/ssl default (no validate_certs=False, no custom permissive SSLContext)",
+          "smtp_password is SecretStr in Settings (no leak via repr/logs); get_secret_value() only at the sender construction call site in deps.py"
+        ]
       },
       "SOUND": {
         "verdict": "PASS",
-        "notes": "guard is a hard dependencies=[Depends(...)] side-effect raising before the handler body -> no bypass path; reads intentionally ungated (flat visibility) and asserted open for both roles."
+        "p0_p1": 0,
+        "checks": [
+          "MIME built correctly: From/To/Subject + plaintext body containing token/link; asserted for both send_verification_email and send_password_reset_email (test_smtp_verification_builds_message_and_calls_transport, test_smtp_password_reset_builds_message)",
+          "url_base link mode produces full clickable URL (test_smtp_url_base_produces_clickable_link); bare-token mode matches ConsoleEmailSender semantics",
+          "send failure PROPAGATES (does not silently swallow): aiosmtplib.send exception surfaces from the method so a verification email never looks 'sent' when it wasn't; asserted by test_smtp_send_failure_propagates"
+        ]
       },
       "NO_REGRESSIONS": {
         "verdict": "PASS",
-        "notes": "full unit 956 passed / 2 skipped (MinIO/SIGHUP env-gated); billing_api_e2e + cells_router updated for guard deps and green (owner path exercises the guard for real); migration additive with default -> existing rows unaffected."
+        "p0_p1": 0,
+        "checks": [
+          "existing email/auth tests green: 87 passed / 1 live-skipped in tests/iam",
+          "NoOp fallback preserved: prod without SMTP creds selects NoOpEmailSender (no crash); asserted by test_prod_without_creds_falls_back_to_noop + is_smtp_configured helper tests",
+          "Console/NoOp/InMemory senders untouched; new dep aiosmtplib 5.1.2 pip-audit 0 vulns"
+        ]
       }
     },
     "gates": {
-      "ruff": "clean (423 files)",
-      "mypy_strict": "0 issues (226 files)",
-      "bandit": "0 issues",
-      "unit": "956 passed, 2 skipped",
-      "integration": "29 passed (real PG, Docker up)",
-      "coverage_src_rbac": "100%"
+      "ruff": "clean",
+      "ruff_format": "clean",
+      "mypy_strict": "Success (224 source files)",
+      "bandit": "0 issues (any severity)",
+      "pytest_iam": "87 passed, 1 live-skipped",
+      "email_service_coverage": "100%",
+      "tests_iam_aggregate_coverage": "88.28% (gate >=85%)",
+      "pip_audit_new_dep": "aiosmtplib 5.1.2 -> 0 vulns"
     },
-    "findings": {
-      "P0": 0,
-      "P1": 0,
-      "P2": 0,
-      "P3": 3,
-      "p3_deferred": [
-        "role_assignments dead-store seam kept for Wave-2",
-        "single-cell guard/path reconciliation at multi-cell (Wave-1+)",
-        "gate billing.manage on future billing writes"
-      ]
-    }
+    "p2_p3": [
+      "P3 (deferred): live-send not validated until SMTP creds land in canonical .env/Lockbox; one-command gate documented in spec",
+      "P3 (optional): HTML multipart emails (currently plaintext) — low priority"
+    ],
+    "not_required": [
+      "docker_integration (no new DB path/migration)",
+      "live_golden (no LLM)",
+      "judge_panel (no wide fork; design pre-resolved by grill)"
+    ]
   }
 }

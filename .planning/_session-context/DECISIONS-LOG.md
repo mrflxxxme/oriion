@@ -158,6 +158,12 @@
 - Rationale: Fix soundness + the regression + cheap robustness now; DEFER the INN-10 ~10%-false-positive precision-tuning to 01.9 activation (real-data validation belongs at flip time, not blind now) with an explicit must-do note in the phase spec. Both guardrail flags now default OFF (substrate-now, enforce-at-01.9) — consistent with the capability-gate decision for this same phase.
 - Reversibility: reversible; flags + patterns tunable at 01.9
 
+### 2026-07-04T01:05:50Z | phase 01.8-mail | impl
+- Fork: SMTP TLS default: implicit-TLS 465 vs STARTTLS 587 as the Settings default
+- Decision: smtp_port=465 + smtp_use_tls=True (implicit TLS) as default; STARTTLS 587 supported via smtp_use_tls=False. STARTTLS path sets aiosmtplib start_tls=True so AUTH never crosses cleartext.
+- Rationale: Yandex 360 recommends 465 implicit-TLS; simplest secure default (SSL-on-connect, no downgrade window). Both modes enforce TLS-before-AUTH; cert-verify left at ssl default (never disabled).
+- Reversibility: reversible
+- Session: claude/auto-01.8-mail
 ### 2026-07-04T00:02:25Z | phase 01.7 | impl
 - Fork: Permission source-of-truth for the RBAC guard: rbac.role_assignments (what AuthorizationService.has_permission reads) vs multitenancy.cell_members.role_id (what register/bootstrap actually populates)
 - Decision: Enforce off cell_members.role_id. Add AuthorizationService.has_cell_permission joining multitenancy.cell_members -> rbac.role_permissions -> rbac.permissions for scope_type=cell. Leave has_permission (role_assignments path) intact for future workspace-scoped / delegated grants.

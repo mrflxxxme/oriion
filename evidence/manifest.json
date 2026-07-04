@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "phase": "01.7-rbac",
+  "phase": "01.8-mail",
   "required_gates": [
     "adversarial_audit"
   ],
-  "notes": "docker_integration folded into the RBAC + billing-E2E integration run (29 passed) captured under adversarial_audit.details.gates.integration; no live_golden (no LLM); no judge_panel (no wide fork)."
+  "notes": "Transport-only phase: no new DB path/migration so no docker_integration; no live_golden (no LLM); no judge_panel (no wide fork — design pre-resolved by grill 2026-07-03). Live-send is a deferred gate (validates when SMTP creds land in canonical .env); the transport is exercised transport-mocked (aiosmtplib.send patched) under adversarial_audit.details.gates."
 }

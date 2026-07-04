@@ -27,6 +27,9 @@ dependencies = [
     "argon2-cffi>=23.1,<24.0",
     "structlog>=24.4,<25.0",
     "email-validator>=2.2,<3.0",
+    # Phase 01.8 — real Yandex 360 SMTP sender (async transactional email for
+    # the mandatory email-verification gate, ADR-007). MIT; prod/stable.
+    "aiosmtplib>=5.1,<6.0",
     # Phase 00.4 — LLM Gateway + MCP tools
     "cryptography>=48.0.1,<49.0",     # AES-256-GCM for LocalAESKMS (>=48.0.1 fixes GHSA-537c-gmf6-5ccf; prior >=46.0.6 fixed CVE-2026-26007 + CVE-2026-34073)
     # Transitive security floors — CVE drift 2026-06, fixes available (pin direct):
@@ -122,8 +125,10 @@ ignore = [
 "**/deps.py" = ["B008"]
 # Protocol implementations + anti-enum stubs intentionally ignore some args
 # (NoOpEmailSender drops token/expires_at; resend/forgot ignore user_agent
-# since rate-limit is keyed on email only).
-"**/email_service.py" = ["ARG002"]
+# since rate-limit is keyed on email only). Phase 01.8: YandexSmtpEmailSender
+# carries RU email-body content (Cyrillic), intentional — same rationale as
+# dispatch.py / memory_curator.py below.
+"**/email_service.py" = ["ARG002", "RUF001"]
 "**/auth_service.py" = ["ARG002"]
 "**/account_recovery_service.py" = ["ARG002"]
 # Phase 00.5b: canned RU content for the «Market & content brief» demo.

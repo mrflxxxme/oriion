@@ -4,38 +4,108 @@
 
 ## Last updated
 
-- Date: 2026-07-04 (**Phase 01.7 RBAC (Owner + Member) — `/autonomy:run`, code-complete**)
-- Session: autonomous runner (ADR-037), branch `claude/auto-01.7-rbac`
-- Agent: @claude
+- Date: 2026-07-04 (Phase 01.8-mail — real `YandexSmtpEmailSender`)
+- Session: `auto-01.8-mail` (worktree branch `claude/auto-01.8-mail`, off origin/main f7f5698)
+- Agent: @claude-opus (autonomous runner, ADR-037)
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — in progress. 01.1-retro ✅ · 01.2 ✅ · 01.3 ✅ · 01.4 ✅ · 01.4b ✅ · 01.5 ✅ · 01.6 ✅ (merged `#84`) · **01.7 = this PR**.
-- **01.7 «RBAC (Owner + Member)» ([ADR-014](./decisions/ADR-014-security.md) §1):** enforcement поверх уже-собранного RBAC data-layer. **Option A (flat visibility)** — грил 2026-07-03 founder-approved: все члены cell видят все артефакты (RLS уже по `cell_id`; Member = cell-доступ); Owner vs Member различаются ТОЛЬКО в правах. Admin/Viewer → Wave 2.
-- **Gap → что добавила фаза:** каталог permissions/ролей/грантов + `has_permission` уже были; дыра = **enforcement** (0 permission-check'ов в роутерах) + `rbac.role_assignments` (который читает `has_permission`) никем не пишется. Enforcement построен на **`multitenancy.cell_members.role_id`** (populated store: Owner ставится на register, редактируется через cells-роутер) через новый `AuthorizationService.has_cell_permission` (джойн `cell_members → role_permissions → permissions`). Гвард `require_cell_permission(slug)` в `src/rbac/deps.py` → 403 `PermissionDenied` (RbacError-handler в `main.py`).
-- **Owner-only enforcement применён:** `cells.py` — invite / role-change / remove-member + **новый** `DELETE /cells/{cell_id}` (archive); `billing.py` — `billing.view` на cell-scoped `subscription`/`balance`/`transactions` (global `credit-rate`/`plans` открыты). Member: task-create + все reads (`get_cell`/`list_members` не gated — flat visibility).
-- **`artifacts.visibility` stub:** миграция `artifacts/0002_artifact_visibility_stub.py` — `visibility text NOT NULL DEFAULT 'cell-shared'` + CHECK `('cell-shared','private')`, default-backfill (без отдельного pass), **НЕ enforced** нигде (задел под Option B per-artifact privacy в Wave-2). Контракт `contracts/artifacts/schema.sql` + ORM `artifacts/models.py` обновлены 1:1.
-- **Adversarial audit (3 линзы, refute-by-default):** SECURE ✅ PASS (0 P0/P1 — cross-tenant/priv-esc/injection опровергнуты: RLS-scoped + explicit cell/user фильтр + параметризованный SELECT + default-deny) · SOUND ✅ PASS (гвард = hard dependency, raise до тела, нет bypass) · NO-REGRESSIONS ✅ PASS (956 unit green; billing-E2E + cells_router обновлены под гвард и зелёные).
-- **Gates финального кода:** ruff clean (423 files) · mypy --strict 226 (0 issues) · bandit 0 · unit 956 passed / 2 skipped (env-gated) · integration 29 passed (real PG, Docker up) · `src/rbac` coverage **100%**. Live/LLM не требуются.
+- **Wave:** Wave 1 (Core MVP)
+- **Phase 01.6 (Security guardrails)**: ✅ Merged (PR #84).
+- **Phase 01.8-mail (Real Yandex SMTP sender)**: ✅ Code-complete on `claude/auto-01.8-mail` — pending PR + **founder ack** (tripwire) + merge.
 
-## Pending founder actions
+## What just happened (Phase 01.8-mail)
 
-**Блокирующий: `/autonomy:ack`** — фаза задевает tripwire. PR трогает `src/rbac` + auth-adjacent surface **и** содержит миграцию (`artifacts/0002`), которая **ALTER'ит** existing table → tripwire = `auth_rbac_sessions` + `db_migrations`. Миграция НЕ pure-CREATE (ADD COLUMN на существующей таблице) → **не авто-мёрж, нужен founder ack**. Это ожидаемо и корректно (грил 2026-07-03 заранее это отметил).
+Real `YandexSmtpEmailSender` implementing the existing `EmailSender` port (prod
+was `NoOpEmailSender`) over Yandex 360 SMTP via `aiosmtplib`, per the grill +
+founder-approved decision (2026-07-03, DECISIONS-LOG). **Live-send is a deferred
+gate** — it validates only when real SMTP creds land in the canonical `.env`
+(they are NOT present now). Pre-alpha launch blocker per ADR-007 («email
+verification mandatory before first task»), independent of auth-extensions/OAuth
+timing.
 
-Deferred (НЕ блокирует merge):
-1. **P3** — `has_permission` (role_assignments) теперь dead-store в Wave-1; сохранён намеренно как шов под Wave-2 workspace-scoped/delegated гранты. Если Wave-2 не задействует — вернуться к удалению.
-2. **P3** — гвард резолвит cell через tenant-context single-cell (Wave-0 инвариант 1 user → 1 cell), а cells-роутер берёт `cell_id` из path; совпадают в Wave-0. При multi-cell membership + `active_cell` JWT-claim (Wave-1+) согласовать `get_current_cell_id` с path-параметром.
-3. **P3** — billing writes пока нет; при появлении gate'ить `billing.manage` (Owner/billing-роль) тем же фактори.
+### Commits (branch `claude/auto-01.8-mail`, off f7f5698)
 
-## Active blockers (none block this PR beyond the ack)
+```
+chore(deps): add aiosmtplib for real Yandex SMTP sender (01.8)       [coder]
+feat(iam): real YandexSmtpEmailSender + creds-gated selection (01.8) [coder]
+test(iam): transport-mock SMTP sender + selection tests (01.8)       [tester]
+docs(autonomy): 01.8-mail phase spec + PLAN + decision log           [reviewer]
++ evidence/ commit (adversarial_audit + manifest)
+```
 
-| ID | Описание | Owner | Block уровень |
-|---|---|---|---|
-| OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
-| OQ-02 | Юр.форма ООО vs ИП | Founder | gates **01.3b ЮKassa** live-flip |
-| OQ-19 | Открытие ЮKassa (5–10 дн) | Founder + бухгалтер | gates **01.3b ЮKassa** test→live |
-| OQ-32 / OQ-33 | Telegram Business consent-UX + 152-ФЗ + РКН | Founder + юрист | gates **Phase 01.11** |
+### Gap analysis (existed vs added)
 
-## Next product phase
+- **Existed:** `EmailSender` Protocol + Console/NoOp/InMemory impls; `get_email_sender` (dev/test→Console, else→NoOp); auth_service triggers verify email; `email_verification_tokens`/`password_reset_tokens` tables (Phase 00.2); Settings + Lockbox source; per-module `tests/iam` ≥85% CI gate.
+- **Added:** `YandexSmtpEmailSender` (aiosmtplib, TLS-enforced MIME); SMTP Settings fields (host/port/use_tls/user/password/from/timeout + email_verify_url_base) + `is_smtp_configured`/`smtp_sender_address` helpers; creds-gated selection (prod+creds→Yandex, prod-no-creds→NoOp fallback); `aiosmtplib>=5.1,<6.0` dep; transport-mock + selection tests + `@pytest.mark.live` smoke scaffold.
 
-Wave-1 продолжается. RBAC enforcement (01.7) разблокирует любые Owner-gated surface последующих фаз. Admin/Viewer роли + Option B (per-artifact privacy, флип `visibility` stub → enforced через RLS/service-change, без миграции) — Wave 2.
+### Migration
+
+**NONE** — purely transactional/transport phase. No new tables/columns/migrations.
+
+### How sender selection works
+
+`iam/deps.py::get_email_sender(settings)`:
+- dev / test → `ConsoleEmailSender`.
+- prod/staging **with** SMTP creds (`is_smtp_configured` = `smtp_user` AND `smtp_password` both non-empty) → `YandexSmtpEmailSender`.
+- prod/staging **without** creds → `NoOpEmailSender` fallback (deferred-live-send contract; credential-less boot does NOT crash).
+
+### Live-send validation (deferred gate — one command)
+
+```
+SMTP_LIVE_TEST_TO=you@example.com SMTP_USER=no-reply@teamly.ru \
+SMTP_PASSWORD=<yandex-app-password> \
+uv run --project backend pytest tests/iam/unit/test_email_service.py -m live
+```
+
+Env keys: `SMTP_HOST` (default `smtp.yandex.ru`), `SMTP_PORT` (465), `SMTP_USER`,
+`SMTP_PASSWORD` (Yandex **app-password**), `SMTP_FROM` (opt), `SMTP_USE_TLS`
+(opt, default true), `SMTP_LIVE_TEST_TO`. Prod: put `SMTP_USER`+`SMTP_PASSWORD`
+in Lockbox/`.env` → selection auto-switches NoOp→Yandex (no flag needed).
+
+### Gate results
+
+```
+ruff check:      All checks passed
+ruff format:     clean (419 files)
+mypy --strict:   Success (224 source files)
+bandit -r src:   0 issues (any severity)
+pytest tests/iam: 87 passed, 1 live-skipped
+email_service.py coverage: 100%
+tests/iam aggregate: 88.28% (gate ≥85%)
+pip-audit: aiosmtplib 5.1.2 → 0 vulns (pip/starlette findings pre-existing, not this phase)
+```
+
+### Adversarial audit (3 lenses, refute-by-default)
+
+- **SECURE ✅ PASS** (0 P0/P1): token never logged (caplog test) / never persisted; TLS actually enforced (implicit 465 / STARTTLS `start_tls=True` before AUTH — no plaintext-auth over cleartext); cert-verify at ssl default (never disabled); `smtp_password` is SecretStr.
+- **SOUND ✅ PASS**: MIME built correctly for both methods + url_base link mode; send failure propagates (no silently-swallowed "sent").
+- **NO-REGRESSIONS ✅ PASS**: existing email/auth tests green; NoOp fallback preserved; new dep CVE-clean.
+
+## Tripwire / founder action
+
+- **Tripwire:** touches `src/iam/**` → `auth_rbac_sessions` classification → PR is **NOT** auto-merge; requires **founder ack**.
+- Founder: review + ack + merge PR from `claude/auto-01.8-mail`. Note deferred live-send (not validated until SMTP creds provisioned).
+
+## Residual follow-ups
+
+- **Live-send gate (deferred):** validate real delivery via the one command above once SMTP creds land in canonical `.env`/Lockbox.
+- Optional: HTML multipart emails (currently plaintext) — low priority.
+- `.planning/JOURNAL.md` >300 lines → archive to `dev-log/archive/JOURNAL-2026Q3.md` (maintenance, separate task).
+
+## Next agent — read first
+
+1. [`README.md`](./README.md) — what is this project
+2. **this HANDOFF.md** — snapshot
+3. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) — workflow protocol
+4. [01.8-mail spec](./roadmap/wave-1-core-mvp/phases/01.8-mail-smtp-sender.md) + DECISIONS-LOG in `_session-context/`.
+
+## Exit ritual completed (this session)
+
+- [x] 4 atomic commits (coder×2 + tester + reviewer) + evidence commit on `claude/auto-01.8-mail`
+- [x] DECISIONS-LOG entry (impl fork: SMTP TLS default)
+- [x] JOURNAL.md entry appended (this date)
+- [x] HANDOFF.md rewritten (this file)
+- [x] Phase spec `01.8-mail-smtp-sender.md` + `01.8-mail-PLAN.md` written
+- [x] evidence/adversarial_audit.json + manifest.json
+- [ ] PR opened — pending (orchestrator/founder action; tripwire needs founder ack)
