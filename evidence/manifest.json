@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "phase": "01.8",
-  "required_gates": [
-    "adversarial_audit",
-    "docker_integration"
-  ],
-  "notes": "01.8 auth extensions (2FA TOTP + magic-link + session-list). docker_integration is REQUIRED: the phase adds a new iam migration (0007, pure-CREATE) + new DB paths, exercised against real PG (testcontainers) in tests/iam/integration/test_auth_extensions_pg.py. No live_golden (no LLM). No judge_panel (no wide fork — design pre-resolved by grill 2026-07-03; OAuth deferred to 01.8b). Tripwire: src/iam/** + iam migration -> auth_rbac_sessions (needs founder ack); db_migrations content-check downgrades (0007 provably pure-CREATE). Base is the stacked claude/auto-01.8-mail branch, NOT main."
-}

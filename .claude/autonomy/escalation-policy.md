@@ -48,16 +48,31 @@ DB migrations on existing tables/RLS · auth/RBAC/sessions · billing/money · s
 4. **Log** (`arch`→ADR, else `impl`).
 5. **Escalated** → append an escalation record to `RUN-QUEUE.md` (Block C), `PushNotification` + Telegram, and **block only that fork** — continue any independent work; pause the dependent path until `/ack`.
 
+## Presentation contract — show your work, then ask (founder directive 2026-07-04)
+
+Every founder-facing interrupt — **both** a D4 escalation **and** a D2 tripwire `ack-needed` — must be presented as a *decision with analysis*, never a bare "please ack". The founder's attention is the scarce resource: when pulled in, they must immediately see **why the machine stopped here specifically**, what the real risk/trade-off is, and what the agent recommends. "PR #N needs ack" fails this — it makes the founder re-derive the analysis the agent already did.
+
+**Required shape of any interrupt (the RUN-QUEUE entry AND the chat/Telegram/push summary):**
+1. **What tripped / the fork** — the concrete thing (category + the specific files/behavior), one line.
+2. **Analysis** — the *real* risk or judgment, not the generic category blurb: what would go wrong under the worst reasonable interpretation, and what makes it safe (or not) *here*, with evidence (gates, adversarial verdict, what the diff actually does).
+3. **Options** — A/B/C with honest trade-offs; always include "hold / request changes", not only "approve".
+4. **Recommendation** — the agent's lean **and why**, against the optimality rubric. Take a position.
+5. **Ask** — the explicit decision, and how to answer: `/autonomy:ack <id> approved` **or** a direct in-session instruction (an in-session founder decision is an equally authoritative ack — the agent then records it via `run_queue.py resolve <id> --verdict approved` and proceeds).
+
+For a **batch** of related interrupts (e.g. a stacked phase run), present them in **one** message with per-item analysis + a single recommended path (e.g. merge order), so the founder clears the batch in one pass. When the session is interactive, surface the decision through the interactive question tool with options + recommendation inline.
+
+Litmus before sending: *"Have I shown the founder I stumbled on something that genuinely needs their judgment — or am I asking them to rubber-stamp?"* If the latter and the fork was truly agent-ownable, don't escalate (own + log). If it's a real tripwire/product gate, do the analysis **for** them.
+
 ## Escalation record format (→ RUN-QUEUE.md)
 
 ```
 ### ESCALATION · <phase> · <UTC ts> · <product-market|tripwire:<category>>
-- Fork: <one line>
-- Options: A) … B) … [C) …]
-- Agent's lean: <option> — <why, incl. rubric>
-- Why escalated: <market-knowledge needed | irreversible category>
+- Fork: <one line — what tripped / the decision>
+- Analysis: <real risk/judgment; worst reasonable case; what makes it (un)safe here; evidence — gates/adversarial/what the diff does>
+- Options: A) … B) … C) hold / request changes …
+- Recommendation: <option> — <why, incl. rubric>
 - Blocks: <which downstream tasks wait on this>
-- Resolve: reply `/ack <id> <option>` or `revise <id> <note>`
+- Resolve: `/autonomy:ack <id> approved` (or tell the agent in-session)
 ```
 
 ## Grounding — how the 01.4b grill would classify under this policy
