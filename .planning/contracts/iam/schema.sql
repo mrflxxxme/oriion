@@ -230,9 +230,89 @@ COMMENT ON TABLE iam.password_reset_tokens IS
     'Single-use password-reset tokens. Reuse of a used token revokes the entire reset_chain_id.';
 
 -- ---------------------------------------------------------------------
+-- Table: totp_credentials  (Phase 01.8 — 2FA)
+-- Purpose:
+--   Per-user RFC-6238 TOTP second factor. The shared secret is stored
+--   ENCRYPTED AT REST (secret_encrypted, AES-256-GCM blob via the KMS
+--   provider); never plaintext, never logged. One row per user. Two-phase
+--   enrollment: enroll → confirmed_at NULL (pending); confirm → first valid
+--   code sets confirmed_at. "Active" (gates login) when confirmed_at IS NOT
+--   NULL AND disabled_at IS NULL. User-scoped (no cell RLS).
+-- ---------------------------------------------------------------------
+CREATE TABLE iam.totp_credentials (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             uuid NOT NULL REFERENCES iam.users(id) ON DELETE CASCADE,
+    secret_encrypted    bytea NOT NULL,
+    confirmed_at        timestamptz,
+    disabled_at         timestamptz,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX totp_credentials_user_id_uidx
+    ON iam.totp_credentials (user_id);
+CREATE INDEX totp_credentials_active_idx
+    ON iam.totp_credentials (user_id)
+    WHERE confirmed_at IS NOT NULL AND disabled_at IS NULL;
+
+COMMENT ON TABLE iam.totp_credentials IS
+    'Per-user TOTP second factor. secret_encrypted is an AES-256-GCM blob (KMS); never stored/logged in plaintext. Active when confirmed_at IS NOT NULL AND disabled_at IS NULL.';
+
+-- ---------------------------------------------------------------------
+-- Table: totp_backup_codes  (Phase 01.8 — 2FA recovery)
+-- Purpose:
+--   Single-use TOTP recovery codes. SHA-256 hashed before storage; consumed
+--   at most once (used_at). Issued as a batch on 2FA confirm; regenerating
+--   deletes the prior unused batch. User-scoped via credential_id.
+-- ---------------------------------------------------------------------
+CREATE TABLE iam.totp_backup_codes (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    credential_id   uuid NOT NULL REFERENCES iam.totp_credentials(id) ON DELETE CASCADE,
+    code_hash       text NOT NULL,
+    used_at         timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX totp_backup_codes_hash_uidx
+    ON iam.totp_backup_codes (code_hash);
+CREATE INDEX totp_backup_codes_cred_active_idx
+    ON iam.totp_backup_codes (credential_id)
+    WHERE used_at IS NULL;
+
+COMMENT ON TABLE iam.totp_backup_codes IS
+    'Single-use TOTP recovery codes. SHA-256 hashed before storage; consumed at most once (used_at).';
+
+-- ---------------------------------------------------------------------
+-- Table: magic_link_tokens  (Phase 01.8 — passwordless login)
+-- Purpose:
+--   Single-use passwordless-login tokens. Plaintext sent via email only;
+--   storage holds SHA-256 hex hash. Expires after a short TTL. Consuming an
+--   unexpired, unused token issues a session/token-pair like password login.
+--   Re-requesting a link revokes prior unused tokens. User-scoped.
+-- ---------------------------------------------------------------------
+CREATE TABLE iam.magic_link_tokens (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid NOT NULL REFERENCES iam.users(id) ON DELETE CASCADE,
+    token_hash      text NOT NULL,
+    expires_at      timestamptz NOT NULL,
+    used_at         timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX magic_link_tokens_hash_uidx
+    ON iam.magic_link_tokens (token_hash);
+CREATE INDEX magic_link_tokens_user_active_idx
+    ON iam.magic_link_tokens (user_id, expires_at)
+    WHERE used_at IS NULL;
+
+COMMENT ON TABLE iam.magic_link_tokens IS
+    'Single-use passwordless-login tokens. SHA-256 hashed before storage; plaintext only over email.';
+
+-- ---------------------------------------------------------------------
 -- Updated_at trigger pattern (applied via shared function in `_shared.sql`).
 -- Listed here as a reminder for the implementer; actual function definition
 -- lives in the global migration bootstrap (see _shared/0001_init.py).
 -- ---------------------------------------------------------------------
 -- CREATE TRIGGER users_set_updated_at        BEFORE UPDATE ON iam.users        FOR EACH ROW EXECUTE FUNCTION _shared.set_updated_at();
 -- CREATE TRIGGER oauth_links_set_updated_at  BEFORE UPDATE ON iam.oauth_links  FOR EACH ROW EXECUTE FUNCTION _shared.set_updated_at();
+-- CREATE TRIGGER totp_credentials_set_updated_at BEFORE UPDATE ON iam.totp_credentials FOR EACH ROW EXECUTE FUNCTION _shared.set_updated_at();
