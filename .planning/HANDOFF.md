@@ -4,35 +4,108 @@
 
 ## Last updated
 
-- Date: 2026-07-03 (**Phase 01.6 Security guardrails — `/autonomy:run`, code-complete**)
-- Session: autonomous runner (ADR-037), branch `claude/autonomy-run-01-6-mpbq2u`
-- Agent: @claude
+- Date: 2026-07-04 (Phase 01.8-mail — real `YandexSmtpEmailSender`)
+- Session: `auto-01.8-mail` (worktree branch `claude/auto-01.8-mail`, off origin/main f7f5698)
+- Agent: @claude-opus (autonomous runner, ADR-037)
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP) — in progress. 01.1-retro ✅ · 01.2 ✅ · 01.3 ✅ · 01.4 ✅ · 01.4b ✅ · 01.5 ✅ (merged `a326f7a`) · **01.6 = this PR**.
-- **01.6 «Security guardrails» ([ADR-039](./decisions/ADR-039-security-guardrails-context.md), реализует [ADR-014](./decisions/ADR-014-security.md) §2/§3):** новый bounded context `backend/src/security/` — детерминированный слой B (regex + checksum), детекторы-порты с апгрейд-швом B→A (ML). RU-ПДн DLP (ИНН-10/12 + СНИЛС checksum, паспорт/телефон/email) + prompt-injection эвристики + capability-классификатор. **Ноль таблиц/миграций** (DLP пишет существующий `audit.audit_log`), **ноль tripwire** → **auto-merge на зелёном** (classify_tripwire exit 0).
-- **Runtime-швы** (зеркало `memory_extraction`/`quota_admission`, default None ⇒ no-op): output-DLP A3 hard-block на orchestrator success-пути (screen `_dlp_screen_text` = полный deliverable) + injection B1-sanitize на `web_search_runner`. **Оба флага (`security_dlp_enabled`, `security_injection_scan_enabled`) default OFF в Wave-1** — substrate готов, enforcement активируется в 01.9 (нет исходящего PII/коннектор-surface до 01.9).
-- **Adversarial audit (3 линзы, refute-by-default):** SECURE ✅ PASS (0 P0/P1, инвариант «сырое ПДн не утекает» устоял) · SOUND → 1 P1 (усечённый DLP-скрин → полный `_dlp_screen_text`) закрыт · NO-REGRESSIONS → 1 P2 (injection default-ON калечил веб-контент → default OFF + trim) закрыт · P3 robustness (except Exception) закрыт.
-- **Gates финального кода:** ruff clean · mypy --strict 224 · bandit 0 · unit 950 · `src/security` 97% / `src/runtime` 87%. Docker/live не требуются (детерминированная фаза).
+- **Wave:** Wave 1 (Core MVP)
+- **Phase 01.6 (Security guardrails)**: ✅ Merged (PR #84).
+- **Phase 01.8-mail (Real Yandex SMTP sender)**: ✅ Code-complete on `claude/auto-01.8-mail` — pending PR + **founder ack** (tripwire) + merge.
 
-## Pending founder actions
+## What just happened (Phase 01.8-mail)
 
-**НЕТ блокирующих** — фаза tripwire-free, auto-merge на зелёном CI (никакого `/autonomy:ack` не нужно). Раннер сам мёржит после зелёных чеков + post-merge health-check.
+Real `YandexSmtpEmailSender` implementing the existing `EmailSender` port (prod
+was `NoOpEmailSender`) over Yandex 360 SMTP via `aiosmtplib`, per the grill +
+founder-approved decision (2026-07-03, DECISIONS-LOG). **Live-send is a deferred
+gate** — it validates only when real SMTP creds land in the canonical `.env`
+(they are NOT present now). Pre-alpha launch blocker per ADR-007 («email
+verification mandatory before first task»), independent of auth-extensions/OAuth
+timing.
 
-Deferred (НЕ блокирует merge; трекается для 01.9 при активации enforcement):
-1. **ИНН-10 precision-tuning** — checksum пропускает ~10% произвольных 10-значных чисел (юрлицо-ИНН, high-FP). Перед `security_dlp_enabled=True` в 01.9: контекстный якорь «ИНН» ИЛИ low-confidence ИЛИ исключить ИНН-10 как не-ПДн. Детали — [01.6 spec §Enforcement activation](./roadmap/wave-1-core-mvp/phases/01.6-security-guardrails.md).
-2. **Активация обоих guardrail-флагов в 01.9** вместе с owner-config surface + реальным capability-gate (`requires_approval` в dispatch outward-tools).
+### Commits (branch `claude/auto-01.8-mail`, off f7f5698)
 
-## Active blockers (none block this PR)
+```
+chore(deps): add aiosmtplib for real Yandex SMTP sender (01.8)       [coder]
+feat(iam): real YandexSmtpEmailSender + creds-gated selection (01.8) [coder]
+test(iam): transport-mock SMTP sender + selection tests (01.8)       [tester]
+docs(autonomy): 01.8-mail phase spec + PLAN + decision log           [reviewer]
++ evidence/ commit (adversarial_audit + manifest)
+```
 
-| ID | Описание | Owner | Block уровень |
-|---|---|---|---|
-| OQ-04 | РКН-уведомление оператора ПДн | Founder + юрист | Submitted — dev unblocked; final РКН до prod-launch |
-| OQ-02 | Юр.форма ООО vs ИП | Founder | gates **01.3b ЮKassa** live-flip |
-| OQ-19 | Открытие ЮKassa (5–10 дн) | Founder + бухгалтер | gates **01.3b ЮKassa** test→live |
-| OQ-32 / OQ-33 | Telegram Business consent-UX + 152-ФЗ + РКН | Founder + юрист | gates **Phase 01.11** |
+### Gap analysis (existed vs added)
 
-## Next product phase
+- **Existed:** `EmailSender` Protocol + Console/NoOp/InMemory impls; `get_email_sender` (dev/test→Console, else→NoOp); auth_service triggers verify email; `email_verification_tokens`/`password_reset_tokens` tables (Phase 00.2); Settings + Lockbox source; per-module `tests/iam` ≥85% CI gate.
+- **Added:** `YandexSmtpEmailSender` (aiosmtplib, TLS-enforced MIME); SMTP Settings fields (host/port/use_tls/user/password/from/timeout + email_verify_url_base) + `is_smtp_configured`/`smtp_sender_address` helpers; creds-gated selection (prod+creds→Yandex, prod-no-creds→NoOp fallback); `aiosmtplib>=5.1,<6.0` dep; transport-mock + selection tests + `@pytest.mark.live` smoke scaffold.
 
-**Phase 01.7 — RBAC** ([ADR-014](./decisions/ADR-014-security.md)): Owner + Member (Admin/Viewer → Wave 2). Грил 2026-07-03 pre-resolved: **flat member visibility** (все члены cell видят все артефакты; Owner vs Member = права, не видимость) + **visibility stub-колонка** (`visibility text DEFAULT 'cell-shared'` в artifacts-миграции 01.7, fast-default, без backfill, не enforced — задел под per-artifact privacy B в Wave-2). Кандидат для `/autonomy:run 01.7`. Примечание: 01.7 добавит миграцию (existing artifacts table ALTER) → **db_migrations tripwire → ack-needed** (не greenfield).
+### Migration
+
+**NONE** — purely transactional/transport phase. No new tables/columns/migrations.
+
+### How sender selection works
+
+`iam/deps.py::get_email_sender(settings)`:
+- dev / test → `ConsoleEmailSender`.
+- prod/staging **with** SMTP creds (`is_smtp_configured` = `smtp_user` AND `smtp_password` both non-empty) → `YandexSmtpEmailSender`.
+- prod/staging **without** creds → `NoOpEmailSender` fallback (deferred-live-send contract; credential-less boot does NOT crash).
+
+### Live-send validation (deferred gate — one command)
+
+```
+SMTP_LIVE_TEST_TO=you@example.com SMTP_USER=no-reply@teamly.ru \
+SMTP_PASSWORD=<yandex-app-password> \
+uv run --project backend pytest tests/iam/unit/test_email_service.py -m live
+```
+
+Env keys: `SMTP_HOST` (default `smtp.yandex.ru`), `SMTP_PORT` (465), `SMTP_USER`,
+`SMTP_PASSWORD` (Yandex **app-password**), `SMTP_FROM` (opt), `SMTP_USE_TLS`
+(opt, default true), `SMTP_LIVE_TEST_TO`. Prod: put `SMTP_USER`+`SMTP_PASSWORD`
+in Lockbox/`.env` → selection auto-switches NoOp→Yandex (no flag needed).
+
+### Gate results
+
+```
+ruff check:      All checks passed
+ruff format:     clean (419 files)
+mypy --strict:   Success (224 source files)
+bandit -r src:   0 issues (any severity)
+pytest tests/iam: 87 passed, 1 live-skipped
+email_service.py coverage: 100%
+tests/iam aggregate: 88.28% (gate ≥85%)
+pip-audit: aiosmtplib 5.1.2 → 0 vulns (pip/starlette findings pre-existing, not this phase)
+```
+
+### Adversarial audit (3 lenses, refute-by-default)
+
+- **SECURE ✅ PASS** (0 P0/P1): token never logged (caplog test) / never persisted; TLS actually enforced (implicit 465 / STARTTLS `start_tls=True` before AUTH — no plaintext-auth over cleartext); cert-verify at ssl default (never disabled); `smtp_password` is SecretStr.
+- **SOUND ✅ PASS**: MIME built correctly for both methods + url_base link mode; send failure propagates (no silently-swallowed "sent").
+- **NO-REGRESSIONS ✅ PASS**: existing email/auth tests green; NoOp fallback preserved; new dep CVE-clean.
+
+## Tripwire / founder action
+
+- **Tripwire:** touches `src/iam/**` → `auth_rbac_sessions` classification → PR is **NOT** auto-merge; requires **founder ack**.
+- Founder: review + ack + merge PR from `claude/auto-01.8-mail`. Note deferred live-send (not validated until SMTP creds provisioned).
+
+## Residual follow-ups
+
+- **Live-send gate (deferred):** validate real delivery via the one command above once SMTP creds land in canonical `.env`/Lockbox.
+- Optional: HTML multipart emails (currently plaintext) — low priority.
+- `.planning/JOURNAL.md` >300 lines → archive to `dev-log/archive/JOURNAL-2026Q3.md` (maintenance, separate task).
+
+## Next agent — read first
+
+1. [`README.md`](./README.md) — what is this project
+2. **this HANDOFF.md** — snapshot
+3. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) — workflow protocol
+4. [01.8-mail spec](./roadmap/wave-1-core-mvp/phases/01.8-mail-smtp-sender.md) + DECISIONS-LOG in `_session-context/`.
+
+## Exit ritual completed (this session)
+
+- [x] 4 atomic commits (coder×2 + tester + reviewer) + evidence commit on `claude/auto-01.8-mail`
+- [x] DECISIONS-LOG entry (impl fork: SMTP TLS default)
+- [x] JOURNAL.md entry appended (this date)
+- [x] HANDOFF.md rewritten (this file)
+- [x] Phase spec `01.8-mail-smtp-sender.md` + `01.8-mail-PLAN.md` written
+- [x] evidence/adversarial_audit.json + manifest.json
+- [ ] PR opened — pending (orchestrator/founder action; tripwire needs founder ack)
