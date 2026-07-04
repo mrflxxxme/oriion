@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -18,6 +18,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
+from src._shared.middleware.tenant_context import (
+    get_current_cell_id,
+    get_tenant_db_session,
+)
 from src.iam.middleware import AuthenticatedUser, get_current_user
 from src.multitenancy.exceptions import (
     CellNotFound,
@@ -32,6 +36,7 @@ from src.multitenancy.routers.cells import (
 from src.multitenancy.routers.cells import (
     router as cells_router,
 )
+from src.rbac.exceptions import RbacError
 
 
 def _fake_user() -> AuthenticatedUser:
@@ -84,6 +89,22 @@ def mock_repo() -> AsyncMock:
     return AsyncMock()
 
 
+def _grant_session() -> AsyncMock:
+    """Tenant session mock whose execute().first() returns a row → guard grants.
+
+    The Phase 01.7 `require_cell_permission` guard reads cell_members via the
+    tenant-scoped session; a truthy `.first()` = the caller is Owner. These
+    router tests assert routing/mapping behaviour with an Owner caller; the
+    Owner-allowed / Member-denied contract itself is covered by
+    tests/rbac/test_require_cell_permission.py.
+    """
+    session = AsyncMock()
+    result = MagicMock()
+    result.first.return_value = (1,)
+    session.execute = AsyncMock(return_value=result)
+    return session
+
+
 @pytest.fixture
 def client(mock_service: AsyncMock, mock_repo: AsyncMock) -> Iterator[TestClient]:
     app = FastAPI()
@@ -97,9 +118,16 @@ def client(mock_service: AsyncMock, mock_repo: AsyncMock) -> Iterator[TestClient
             content={"code": exc.code, "title": exc.title},
         )
 
+    @app.exception_handler(RbacError)
+    async def _rbac_h(request: Request, exc: RbacError) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code, content={"code": exc.code})
+
     app.dependency_overrides[get_current_user] = _fake_user
     app.dependency_overrides[get_cell_service] = lambda: mock_service
     app.dependency_overrides[get_cell_repo] = lambda: mock_repo
+    # Owner-grant guard deps (see _grant_session docstring).
+    app.dependency_overrides[get_tenant_db_session] = _grant_session
+    app.dependency_overrides[get_current_cell_id] = lambda: uuid4()
 
     yield TestClient(app)
 
