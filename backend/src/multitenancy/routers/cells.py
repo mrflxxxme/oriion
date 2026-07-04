@@ -37,6 +37,13 @@ from src.multitenancy.schemas import (
     InvitationOut,
 )
 from src.multitenancy.services.cell_service import CellService
+from src.rbac.deps import require_cell_permission
+from src.rbac.permissions import (
+    CELL_ARCHIVE,
+    MEMBER_INVITE,
+    MEMBER_REMOVE,
+    MEMBER_ROLE_CHANGE,
+)
 
 router = APIRouter(prefix="/cells", tags=["cells"])
 workspace_cells_router = APIRouter(prefix="/workspaces/{workspace_id}/cells", tags=["cells"])
@@ -167,6 +174,7 @@ async def list_members(
     "/{cell_id}/members/invite",
     response_model=InvitationOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_cell_permission(MEMBER_INVITE))],
 )
 async def invite_member(
     cell_id: UUID,
@@ -193,6 +201,7 @@ async def invite_member(
 @router.patch(
     "/{cell_id}/members/{user_id}",
     response_model=CellMemberOut,
+    dependencies=[Depends(require_cell_permission(MEMBER_ROLE_CHANGE))],
 )
 async def change_member_role(
     cell_id: UUID,
@@ -213,6 +222,7 @@ async def change_member_role(
 @router.delete(
     "/{cell_id}/members/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_cell_permission(MEMBER_REMOVE))],
 )
 async def remove_member(
     cell_id: UUID,
@@ -221,6 +231,28 @@ async def remove_member(
     service: CellService = Depends(get_cell_service),
 ) -> Response:
     await service.remove_member(cell_id=cell_id, user_id=user_id, removed_by=auth.user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── cell delete (archive) — Owner-only ────────────────────────────────────
+
+
+@router.delete(
+    "/{cell_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_cell_permission(CELL_ARCHIVE))],
+)
+async def archive_cell(
+    cell_id: UUID,
+    auth: AuthenticatedUser = Depends(get_current_user),
+    service: CellService = Depends(get_cell_service),
+) -> Response:
+    """Soft-delete (archive) a cell. Owner-only (ADR-014 §1, Phase 01.7).
+
+    Delete = archive (``archived_at``); the cells context has no hard-delete.
+    404 when the cell does not exist (mapped from ``CellNotFound``).
+    """
+    await service.archive_cell(cell_id=cell_id, archived_by=auth.user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

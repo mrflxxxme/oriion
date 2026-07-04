@@ -31,6 +31,8 @@ from src.billing.schemas import (
 from src.billing.services import balance_service
 from src.billing.services.credit_rate_service import get_credit_rate
 from src.iam.middleware import AuthenticatedUser, get_current_user
+from src.rbac.deps import require_cell_permission
+from src.rbac.permissions import BILLING_VIEW
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -91,7 +93,11 @@ async def list_plans(
     return [_plan_to_response(p) for p in plans]
 
 
-@router.get("/subscription", response_model=SubscriptionResponse)
+@router.get(
+    "/subscription",
+    response_model=SubscriptionResponse,
+    dependencies=[Depends(require_cell_permission(BILLING_VIEW))],
+)
 async def get_subscription(
     db: AsyncSession = Depends(get_tenant_db_session),
     cell_id: UUID = Depends(get_current_cell_id),
@@ -102,7 +108,11 @@ async def get_subscription(
     return _subscription_to_response(sub)
 
 
-@router.get("/balance", response_model=BalanceResponse)
+@router.get(
+    "/balance",
+    response_model=BalanceResponse,
+    dependencies=[Depends(require_cell_permission(BILLING_VIEW))],
+)
 async def get_balance(
     db: AsyncSession = Depends(get_tenant_db_session),
     cell_id: UUID = Depends(get_current_cell_id),
@@ -138,7 +148,11 @@ async def get_balance(
     )
 
 
-@router.get("/transactions", response_model=list[TransactionResponse])
+@router.get(
+    "/transactions",
+    response_model=list[TransactionResponse],
+    dependencies=[Depends(require_cell_permission(BILLING_VIEW))],
+)
 async def list_transactions(
     db: AsyncSession = Depends(get_tenant_db_session),
     cell_id: UUID = Depends(get_current_cell_id),
