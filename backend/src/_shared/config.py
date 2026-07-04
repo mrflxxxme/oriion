@@ -182,6 +182,71 @@ class Settings(BaseSettings):
         description="Default sliding-window length (15 min) for (ip,email)-keyed limits.",
     )
 
+    # ── SMTP outbound email (Phase 01.8 — Yandex 360 SMTP, ADR-007) ──────
+    # Real transactional email for the mandatory email-verification gate
+    # (ADR-007: "email verification mandatory before first task"). Prod today
+    # is NoOpEmailSender; the YandexSmtpEmailSender activates ONLY when
+    # smtp_user AND smtp_password are configured (see is_smtp_configured), so a
+    # credential-less prod boot keeps the NoOp fallback and does NOT crash. The
+    # deferred-live-send contract holds: creds are NOT in the canonical .env yet.
+    smtp_host: str = Field(
+        default="smtp.yandex.ru",
+        description="SMTP server host. Yandex 360 = smtp.yandex.ru.",
+    )
+    smtp_port: int = Field(
+        default=465,
+        description=(
+            "SMTP server port. 465 = implicit TLS (SSL-on-connect, the "
+            "smtp_use_tls default); 587 = STARTTLS (set smtp_use_tls=False)."
+        ),
+    )
+    smtp_use_tls: bool = Field(
+        default=True,
+        description=(
+            "True → implicit TLS (SSL on connect, port 465). False → STARTTLS "
+            "upgrade on a cleartext port (587). Auth NEVER travels unencrypted: "
+            "with STARTTLS the sender REQUIRES a successful TLS upgrade before "
+            "AUTH (aiosmtplib start_tls) — no plaintext-auth fallback."
+        ),
+    )
+    smtp_user: str = Field(
+        default="",
+        description=(
+            "SMTP auth username (full Yandex 360 mailbox, e.g. no-reply@teamly.ru). "
+            "Empty = SMTP not configured → sender selection falls back to NoOp."
+        ),
+    )
+    smtp_password: SecretStr = Field(
+        default=SecretStr(""),
+        description=(
+            "SMTP app-password (SecretStr — never logged/repr'd). Yandex 360 "
+            "requires a per-application password, NOT the account password. "
+            "Provisioned via YC Lockbox (prod) / .env (dev); NOT present now. "
+            "Empty = SMTP not configured → sender selection falls back to NoOp."
+        ),
+    )
+    smtp_from: str = Field(
+        default="",
+        description=(
+            "RFC-5322 From address for outbound mail. Empty → falls back to "
+            "smtp_user. Yandex rejects a From that doesn't match an owned mailbox."
+        ),
+    )
+    smtp_timeout_seconds: float = Field(
+        default=30.0,
+        description="Per-send socket timeout (seconds) for the aiosmtplib client.",
+    )
+    email_verify_url_base: str = Field(
+        default="",
+        description=(
+            "Optional public base URL for the verification/reset flow (e.g. "
+            "https://app.teamly.ru). When set, the email body includes a full "
+            "clickable link (<base>/auth/verify-email?token=…); when empty the "
+            "body carries the bare token + the API path, matching "
+            "ConsoleEmailSender semantics."
+        ),
+    )
+
     # ── BYOK + KMS (Phase 00.4) ─────────────────────────────────────────
     kms_backend: Literal["local", "yandex"] = Field(
         default="local",
@@ -388,6 +453,23 @@ class Settings(BaseSettings):
     @property
     def is_prod(self) -> bool:
         return self.app_env == "prod"
+
+    @property
+    def is_smtp_configured(self) -> bool:
+        """True when real SMTP creds are present (Phase 01.8).
+
+        Both the username AND app-password must be non-empty. Sender selection
+        (iam/deps.py::get_email_sender) uses this to pick YandexSmtpEmailSender
+        over NoOpEmailSender — so a credential-less prod boot keeps the NoOp
+        fallback and the deferred-live-send contract (ADR-007) holds without a
+        crash.
+        """
+        return bool(self.smtp_user) and bool(self.smtp_password.get_secret_value())
+
+    @property
+    def smtp_sender_address(self) -> str:
+        """Effective From address — smtp_from if set, else the auth user."""
+        return self.smtp_from or self.smtp_user
 
     @model_validator(mode="after")
     def _guard_no_dev_secrets(self) -> Settings:

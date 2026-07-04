@@ -27,7 +27,12 @@ from src.iam.repositories.session_repository import SessionRepository
 from src.iam.repositories.user_repository import UserRepository
 from src.iam.services.auth_service import AuthService
 from src.iam.services.consent_service import ConsentService
-from src.iam.services.email_service import ConsoleEmailSender, EmailSender, NoOpEmailSender
+from src.iam.services.email_service import (
+    ConsoleEmailSender,
+    EmailSender,
+    NoOpEmailSender,
+    YandexSmtpEmailSender,
+)
 from src.iam.services.password_service import PasswordService
 from src.iam.services.rate_limit_service import RateLimitService
 from src.iam.services.token_service import TokenService
@@ -42,8 +47,27 @@ def get_rate_limit_service(redis: Redis = Depends(get_redis)) -> RateLimitServic
 
 
 def get_email_sender(settings: Settings = Depends(get_settings)) -> EmailSender:
+    """Select the outbound email sender (Phase 01.8).
+
+    * dev / test → ConsoleEmailSender (token to structured log).
+    * prod/staging WITH SMTP creds → YandexSmtpEmailSender (real send).
+    * prod/staging WITHOUT SMTP creds → NoOpEmailSender fallback, so a
+      credential-less boot does NOT crash and the deferred-live-send contract
+      (ADR-007) holds until creds land in the canonical .env / Lockbox.
+    """
     if settings.is_dev or settings.is_test:
         return ConsoleEmailSender()
+    if settings.is_smtp_configured:
+        return YandexSmtpEmailSender(
+            host=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_user,
+            password=settings.smtp_password.get_secret_value(),
+            sender=settings.smtp_sender_address,
+            use_tls=settings.smtp_use_tls,
+            timeout=settings.smtp_timeout_seconds,
+            url_base=settings.email_verify_url_base,
+        )
     return NoOpEmailSender()
 
 
