@@ -164,3 +164,14 @@
 - Rationale: Yandex 360 recommends 465 implicit-TLS; simplest secure default (SSL-on-connect, no downgrade window). Both modes enforce TLS-before-AUTH; cert-verify left at ssl default (never disabled).
 - Reversibility: reversible
 - Session: claude/auto-01.8-mail
+### 2026-07-04T00:02:25Z | phase 01.7 | impl
+- Fork: Permission source-of-truth for the RBAC guard: rbac.role_assignments (what AuthorizationService.has_permission reads) vs multitenancy.cell_members.role_id (what register/bootstrap actually populates)
+- Decision: Enforce off cell_members.role_id. Add AuthorizationService.has_cell_permission joining multitenancy.cell_members -> rbac.role_permissions -> rbac.permissions for scope_type=cell. Leave has_permission (role_assignments path) intact for future workspace-scoped / delegated grants.
+- Rationale: role_assignments is never written by app code or the SECURITY DEFINER bootstrap; only cell_members is populated (owner at register, editable via cells router). Backfilling role_assignments would duplicate the role store and risk drift. Option A is flat + cell-scoped, so cell_members is the correct authority. Smallest correct change.
+- Reversibility: reversible
+
+### 2026-07-04T00:02:30Z | phase 01.7 | impl
+- Fork: Where to place the Owner-only enforcement guard (FastAPI dependency shape)
+- Decision: New src/rbac/deps.py with require_cell_permission(slug) factory returning a FastAPI dependency; resolves current cell via the existing tenant_context (get_current_cell_id) + get_current_user, calls has_cell_permission, raises 403 PermissionDenied on miss. Apply to cells member-mgmt (invite/role-change/remove), cell-delete, and billing writes; Member keeps task-create + all reads.
+- Rationale: Mirrors existing deps.py/Depends wiring (get_current_user, get_tenant_db_session). A permission-slug factory keeps call-sites declarative and avoids a per-endpoint bespoke check. 403 (not 404) because Option A = flat visibility: Members legitimately see the cell, they just lack the right.
+- Reversibility: reversible

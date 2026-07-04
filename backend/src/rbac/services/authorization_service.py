@@ -1,15 +1,24 @@
-"""AuthorizationService.has_permission — central allow-check.
+"""AuthorizationService — central allow-checks (two role stores).
 
-Given (user, scope_type, scope_id, permission_slug), returns True iff the
-user has at least one non-expired role assignment in that scope whose role
-grants the requested permission. The implementation is a single JOIN over
-role_assignments → role_permissions → permissions filtered by the inputs.
+There are two role-binding stores in the system:
 
-Wave 0: no caching. Wave 1+ MAY introduce per-(user,scope) cache invalidated
-by role_assigned.v1 / role_revoked.v1 / role_expired.v1 events (see
-contract README "Computing effective permissions"). The function shape
-intentionally accepts an explicit `session` so caching can be added without
-breaking the call site.
+* ``rbac.role_assignments`` — the general (user, scope_type, scope_id, role)
+  binding with optional ``expires_at``. Read by ``has_permission``. Reserved
+  for future workspace-scoped / delegated / time-boxed grants; NOT populated
+  by any Wave-1 code path.
+* ``multitenancy.cell_members.role_id`` — the **populated** cell-membership
+  role store (Owner set at register via the SECURITY DEFINER bootstrap;
+  editable via the cells router). Read by ``has_cell_permission``.
+
+Phase 01.7 (Owner/Member RBAC enforcement, ADR-014 §1, Option A flat
+visibility) enforces off ``cell_members`` because that is the store that is
+actually written — see DECISIONS-LOG 01.7 impl fork. ``has_permission`` is
+left intact for the role_assignments path a later wave will use.
+
+Wave 0/1: no caching. A later wave MAY introduce a per-(user,scope) cache
+invalidated by role_assigned.v1 / role_revoked.v1 / member.role_changed.v1
+events. Both methods take an explicit ``session`` so caching can be added
+without breaking call sites.
 """
 
 from __future__ import annotations
@@ -18,7 +27,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.rbac.models import Permission, RoleAssignment, RolePermission
@@ -76,4 +85,46 @@ class AuthorizationService:
             .limit(1)
         )
         result = await self._session.execute(stmt)
+        return result.first() is not None
+
+    async def has_cell_permission(
+        self,
+        *,
+        user_id: UUID,
+        cell_id: UUID,
+        permission_slug: str,
+    ) -> bool:
+        """Return True iff the user's cell-membership role grants the permission.
+
+        Resolves the caller's role from ``multitenancy.cell_members`` (the
+        populated store — Owner at register, editable via the cells router)
+        and joins it through ``rbac.role_permissions → rbac.permissions``.
+        This is the enforcement authority for Phase 01.7 (Owner/Member, Option
+        A flat visibility): membership = cell access (all reads), and the role
+        grants decide the write/manage rights.
+
+        A cross-context raw SELECT is used deliberately: the ``rbac`` context
+        does not import ``multitenancy`` ORM models (cross-context FKs are not
+        enforced at the ORM layer per ADR-024). The query is fully
+        parameterised — no interpolation of caller input.
+
+        Returns False when the user is not a member of the cell OR the member's
+        role does not grant ``permission_slug`` (default-deny).
+        """
+        stmt = text(
+            """
+            SELECT 1
+            FROM multitenancy.cell_members cm
+            JOIN rbac.role_permissions rp ON rp.role_id = cm.role_id
+            JOIN rbac.permissions p ON p.id = rp.permission_id
+            WHERE cm.cell_id = :cell_id
+              AND cm.user_id = :user_id
+              AND p.slug = :slug
+            LIMIT 1
+            """
+        )
+        result = await self._session.execute(
+            stmt,
+            {"cell_id": str(cell_id), "user_id": str(user_id), "slug": permission_slug},
+        )
         return result.first() is not None

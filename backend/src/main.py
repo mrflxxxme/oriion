@@ -53,6 +53,7 @@ from src.multitenancy.exceptions import MultitenancyError
 from src.multitenancy.routers.cells import router as cells_router
 from src.multitenancy.routers.cells import workspace_cells_router
 from src.multitenancy.routers.workspaces import router as workspaces_router
+from src.rbac.exceptions import RbacError
 from src.tasks.exceptions import TasksError
 from src.tasks.routers.stream import router as task_stream_router
 from src.tasks.routers.tasks import router as tasks_router
@@ -335,6 +336,24 @@ async def agents_error_handler(request: Request, exc: AgentsError) -> JSONRespon
 
 @app.exception_handler(MultitenancyError)
 async def multitenancy_error_handler(request: Request, exc: MultitenancyError) -> JSONResponse:
+    body: dict[str, object] = {
+        "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
+        "title": exc.title,
+        "status": exc.status_code,
+        "code": exc.code,
+    }
+    if exc.detail:
+        body["detail"] = exc.detail
+    body["instance"] = str(request.url)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=body,
+        media_type="application/problem+json",
+    )
+
+
+@app.exception_handler(RbacError)
+async def rbac_error_handler(request: Request, exc: RbacError) -> JSONResponse:
     body: dict[str, object] = {
         "type": f"https://oriion.app/errors/{exc.code.replace('.', '-')}",
         "title": exc.title,

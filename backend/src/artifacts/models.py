@@ -41,6 +41,10 @@ class Artifact(Base):
             "artifact_type IN ('document','code','asset')",
             name="artifacts_artifact_type_check",
         ),
+        CheckConstraint(
+            "visibility IN ('cell-shared','private')",
+            name="artifacts_visibility_check",
+        ),
         Index("ix_artifacts_cell_created", "cell_id", sa_text("created_at DESC")),
         {"schema": "artifacts"},
     )
@@ -58,6 +62,12 @@ class Artifact(Base):
     created_by_agent_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     current_version_num: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=sa_text("0")
+    )
+    # Per-artifact privacy seam (ADR-014 §1, Phase 01.7). Wave-1 = Option A
+    # (flat visibility): always 'cell-shared', NOT enforced. 'private' is
+    # forward-declared for Option B. See migration 0002_artifact_visibility_stub.
+    visibility: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=sa_text("'cell-shared'")
     )
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=sa_text("now()"))
