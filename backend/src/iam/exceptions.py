@@ -104,3 +104,40 @@ class UserNotFound(IamError):
     code = "iam.user.not_found"
     status_code = 404
     title = "User not found"
+
+
+# ── 2FA / TOTP (Phase 01.8) ───────────────────────────────────────────────
+
+
+class TotpAlreadyEnabled(IamError):
+    code = "iam.totp.already_enabled"
+    status_code = 409
+    title = "TOTP is already enabled for this account"
+
+
+class TotpNotEnrolled(IamError):
+    code = "iam.totp.not_enrolled"
+    status_code = 404
+    title = "No TOTP enrollment in progress"
+
+
+class TotpNotEnabled(IamError):
+    code = "iam.totp.not_enabled"
+    status_code = 404
+    title = "TOTP is not enabled for this account"
+
+
+class TotpInvalidCode(IamError):
+    """Wrong / expired / already-consumed TOTP or backup code."""
+
+    code = "iam.totp.invalid_code"
+    status_code = 401
+    title = "Invalid two-factor code"
+
+
+class TotpChallengeInvalid(IamError):
+    """The login-step 2FA challenge token is missing, expired, or malformed."""
+
+    code = "iam.totp.challenge_invalid"
+    status_code = 401
+    title = "Two-factor challenge invalid or expired"

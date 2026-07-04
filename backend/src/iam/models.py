@@ -14,6 +14,7 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     Index,
+    LargeBinary,
     Text,
     text,
 )
@@ -84,6 +85,12 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    totp_credential: Mapped[TotpCredential | None] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+    magic_link_tokens: Mapped[list[MagicLinkToken]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -288,3 +295,111 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = _ts_default_now()
 
     user: Mapped[User] = relationship(back_populates="password_reset_tokens")
+
+
+class TotpCredential(Base):
+    """Per-user TOTP (RFC-6238) second-factor credential.
+
+    The shared secret is sensitive: it is stored ENCRYPTED AT REST
+    (``secret_encrypted``, AES-256-GCM blob via the KMS provider) and NEVER
+    persisted or logged in plaintext. One row per user (unique ``user_id``).
+
+    Two-phase enrollment:
+      * enroll  → row created with ``confirmed_at`` NULL (pending).
+      * confirm → first valid code activates it (``confirmed_at`` set).
+    A credential is "active" (gates login) only when ``confirmed_at IS NOT NULL
+    AND disabled_at IS NULL``.
+    """
+
+    __tablename__ = "totp_credentials"
+    __table_args__ = (
+        Index("totp_credentials_user_id_uidx", "user_id", unique=True),
+        Index(
+            "totp_credentials_active_idx",
+            "user_id",
+            postgresql_where=text("confirmed_at IS NOT NULL AND disabled_at IS NULL"),
+        ),
+        {"schema": "iam"},
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("iam.users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    secret_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    disabled_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = _ts_default_now()
+    updated_at: Mapped[datetime] = _ts_default_now()
+
+    user: Mapped[User] = relationship(back_populates="totp_credential")
+    backup_codes: Mapped[list[TotpBackupCode]] = relationship(
+        back_populates="credential", cascade="all, delete-orphan"
+    )
+
+
+class TotpBackupCode(Base):
+    """Single-use TOTP recovery code. SHA-256 hashed at rest (like tokens).
+
+    Issued as a batch when 2FA is confirmed; each code is consumed at most once
+    (``used_at``). Regenerating recovery codes deletes the prior unused batch.
+    """
+
+    __tablename__ = "totp_backup_codes"
+    __table_args__ = (
+        Index("totp_backup_codes_hash_uidx", "code_hash", unique=True),
+        Index(
+            "totp_backup_codes_cred_active_idx",
+            "credential_id",
+            postgresql_where=text("used_at IS NULL"),
+        ),
+        {"schema": "iam"},
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    credential_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("iam.totp_credentials.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = _ts_default_now()
+
+    credential: Mapped[TotpCredential] = relationship(back_populates="backup_codes")
+
+
+class MagicLinkToken(Base):
+    """Single-use passwordless-login token; SHA-256 hashed (email-token pattern).
+
+    Plaintext travels ONLY via email; storage holds the SHA-256 hex hash.
+    Consuming an unexpired, unused token issues a session/token-pair exactly
+    like password login. Re-requesting a link revokes prior unused tokens.
+    """
+
+    __tablename__ = "magic_link_tokens"
+    __table_args__ = (
+        Index("magic_link_tokens_hash_uidx", "token_hash", unique=True),
+        Index(
+            "magic_link_tokens_user_active_idx",
+            "user_id",
+            "expires_at",
+            postgresql_where=text("used_at IS NULL"),
+        ),
+        {"schema": "iam"},
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("iam.users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = _ts_default_now()
+
+    user: Mapped[User] = relationship(back_populates="magic_link_tokens")

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.iam.models import Session
@@ -47,6 +48,38 @@ class SessionRepository:
         await self._session.execute(
             update(Session)
             .where(Session.user_id == user_id, Session.revoked_at.is_(None))
+            .values(revoked_at=datetime.now(UTC))
+        )
+
+    async def revoke_for_user(self, *, session_id: UUID, user_id: UUID) -> int:
+        """Revoke ONE session, but only if it belongs to ``user_id``.
+
+        The ``user_id`` predicate is the authorization boundary: a user can
+        never revoke another user's session even if they guess the id. Returns
+        the affected row count (0 = not found / not owned / already revoked).
+        """
+        result = await self._session.execute(
+            update(Session)
+            .where(
+                Session.id == session_id,
+                Session.user_id == user_id,
+                Session.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(UTC))
+        )
+        # execute() of an UPDATE returns a CursorResult carrying rowcount.
+        return int(cast("CursorResult[Any]", result).rowcount)
+
+    async def revoke_all_others_for_user(self, *, user_id: UUID, keep_session_id: UUID) -> None:
+        """Revoke every active session for the user EXCEPT ``keep_session_id``
+        (the caller's current session) — 'log out everywhere else'."""
+        await self._session.execute(
+            update(Session)
+            .where(
+                Session.user_id == user_id,
+                Session.id != keep_session_id,
+                Session.revoked_at.is_(None),
+            )
             .values(revoked_at=datetime.now(UTC))
         )
 

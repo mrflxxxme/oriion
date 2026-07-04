@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from src.iam.deps import get_auth_service
+from src.iam.deps import get_auth_service, get_magic_link_service
 from src.iam.schemas import (
     ForgotPasswordRequest,
     LoginCommand,
     LoginRequest,
+    LoginTotpRequest,
     LogoutRequest,
+    MagicLinkConsumeRequest,
+    MagicLinkRequest,
     RefreshRequest,
     RegisterCommand,
     RegisterRequest,
@@ -17,9 +20,11 @@ from src.iam.schemas import (
     ResendVerificationRequest,
     ResetPasswordRequest,
     TokenPair,
+    TotpChallenge,
     VerifyEmailRequest,
 )
 from src.iam.services.auth_service import AuthService
+from src.iam.services.magic_link_service import MagicLinkService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,12 +70,15 @@ async def register(
     )
 
 
-@router.post("/login", response_model=TokenPair)
+@router.post("/login", response_model=TokenPair | TotpChallenge)
 async def login(
     payload: LoginRequest,
     request: Request,
     service: AuthService = Depends(get_auth_service),
-) -> TokenPair:
+) -> TokenPair | TotpChallenge:
+    """Password login. Returns a token pair, OR a 2FA challenge (HTTP 200 with
+    ``two_factor_required: true``) when the account has active TOTP — the client
+    then completes login via POST /auth/login/totp."""
     return await service.login(
         LoginCommand(
             email=payload.email,
@@ -78,6 +86,45 @@ async def login(
             ip=_client_ip(request),
             user_agent=_user_agent(request),
         )
+    )
+
+
+@router.post("/login/totp", response_model=TokenPair)
+async def login_totp(
+    payload: LoginTotpRequest,
+    request: Request,
+    service: AuthService = Depends(get_auth_service),
+) -> TokenPair:
+    """Second leg of 2FA login — exchange the challenge token + TOTP/backup code
+    for a token pair."""
+    return await service.login_totp(
+        challenge_token=payload.challenge_token,
+        code=payload.code,
+        ip=_client_ip(request),
+        user_agent=_user_agent(request),
+    )
+
+
+@router.post("/magic-link/request", status_code=status.HTTP_202_ACCEPTED)
+async def magic_link_request(
+    payload: MagicLinkRequest,
+    request: Request,
+    service: MagicLinkService = Depends(get_magic_link_service),
+) -> Response:
+    """Anti-enum: always 202 regardless of email existence."""
+    await service.request(payload.email, ip=_client_ip(request), user_agent=_user_agent(request))
+    return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.post("/magic-link/consume", response_model=TokenPair)
+async def magic_link_consume(
+    payload: MagicLinkConsumeRequest,
+    request: Request,
+    service: MagicLinkService = Depends(get_magic_link_service),
+) -> TokenPair:
+    """Consume a single-use magic-link token → issue a session/token pair."""
+    return await service.consume(
+        payload.token, ip=_client_ip(request), user_agent=_user_agent(request)
     )
 
 

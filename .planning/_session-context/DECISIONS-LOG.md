@@ -174,4 +174,21 @@
 - Fork: Where to place the Owner-only enforcement guard (FastAPI dependency shape)
 - Decision: New src/rbac/deps.py with require_cell_permission(slug) factory returning a FastAPI dependency; resolves current cell via the existing tenant_context (get_current_cell_id) + get_current_user, calls has_cell_permission, raises 403 PermissionDenied on miss. Apply to cells member-mgmt (invite/role-change/remove), cell-delete, and billing writes; Member keeps task-create + all reads.
 - Rationale: Mirrors existing deps.py/Depends wiring (get_current_user, get_tenant_db_session). A permission-slug factory keeps call-sites declarative and avoids a per-endpoint bespoke check. 403 (not 404) because Option A = flat visibility: Members legitimately see the cell, they just lack the right.
+
+### 2026-07-04T02:14:16Z | phase 01.8 | impl
+- Fork: TOTP shared-secret at-rest storage: plaintext column vs. KMS-encrypted bytea vs. new dedicated crypto
+- Decision: Encrypt with the existing KMSProvider (LocalAESKMS AES-256-GCM) into a totp_credentials.secret_encrypted bytea; decrypt in-memory only at verify/confirm; base32 plaintext leaves the service once (enroll response), never logged
+- Rationale: Reuses the repo's established BYOK at-rest crypto (ADR-014 amendment); no new dependency; matches oauth_links.*_encrypted precedent; a sensitive secret must never sit plaintext at rest
+- Reversibility: reversible
+
+### 2026-07-04T02:14:16Z | phase 01.8 | impl
+- Fork: Login second factor mechanism: single-call inline (password+code) vs. two-step challenge
+- Decision: Two-step: /auth/login returns a short-lived HS256 TotpChallenge (type-guarded, 5-min, no server state) when 2FA active; /auth/login/totp exchanges challenge+code for a token pair; NO session minted on the password leg
+- Rationale: Keeps the existing password-only /auth/login contract intact for non-2FA users; the signed short-lived challenge is un-forgeable + un-replayable without DB/Redis state; standard TOTP challenge-response UX
+- Reversibility: reversible
+
+### 2026-07-04T02:14:16Z | phase 01.8 | impl
+- Fork: New iam auth tables RLS: cell-scoped RLS policy vs. user-scoped grant-only
+- Decision: User-scoped, GRANT to oriion_app only, NO cell RLS policy (matches iam.sessions / email_verification_tokens / password_reset_tokens); authz enforced by user_id predicates in repos + get_current_user
+- Rationale: These are pre-auth / identity-level rows keyed on user_id, not tenant cell_id; the iam context is system-level (schema.sql: 'RLS not applicable'); adding a cell policy would be wrong + break the pure-CREATE tripwire shape
 - Reversibility: reversible

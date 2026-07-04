@@ -11,6 +11,8 @@ Per-scope thresholds (Q6 decision in session-context plan):
     refresh                → 30 / 1 min (ip)
     verify-email           → 10 / 1 min (ip)
     reset-password         → 10 / 1 min (ip)
+    magic-link (Phase 01.8)→ 3 / 15 min (ip, email)  anti-spam
+    totp      (Phase 01.8) → 5 / 5 min (ip)           brute-force cap
 
 Anti-enumeration note (invariant 9): the counter increments regardless of
 whether the email exists. So a 429 from forgot/resend does not signal
@@ -51,6 +53,11 @@ SCOPE_POLICY: Final[dict[str, RateLimitConfig]] = {
     "refresh": RateLimitConfig(threshold=30, window_seconds=60),
     "verify": RateLimitConfig(threshold=10, window_seconds=60),
     "reset": RateLimitConfig(threshold=10, window_seconds=60),
+    # Phase 01.8 — passwordless login link request: anti-spam like forgot.
+    "magic_link": RateLimitConfig(threshold=3, window_seconds=900),
+    # Phase 01.8 — TOTP second-factor verify: cap brute-force of the 6-digit
+    # code within a login attempt (5 tries / 5 min per ip).
+    "totp": RateLimitConfig(threshold=5, window_seconds=300),
 }
 
 

@@ -43,6 +43,8 @@ from src.iam.exceptions import (
     InvalidCredentials,
     RateLimitExceeded,
     TokenRotationError,
+    TotpInvalidCode,
+    UserNotFound,
 )
 from src.iam.repositories.consent_repository import ConsentRepository
 from src.iam.repositories.email_verification_repository import (
@@ -56,7 +58,9 @@ from src.iam.schemas import (
     LoginCommand,
     RegisterCommand,
     RegisterResult,
+    SessionSummary,
     TokenPair,
+    TotpChallenge,
     UserResponse,
 )
 from src.iam.services.account_recovery_service import AccountRecoveryService
@@ -65,6 +69,7 @@ from src.iam.services.email_service import EmailSender
 from src.iam.services.password_service import PasswordService
 from src.iam.services.rate_limit_service import RateLimitService
 from src.iam.services.token_service import TokenService
+from src.iam.services.totp_service import TotpService
 from src.multitenancy.services.workspace_service import provision_initial_workspace
 
 # Token TTL per contract README invariant 7 (used by register's inline
@@ -104,6 +109,7 @@ class AuthService:
         access_ttl_seconds: int,
         team_provisioning_service: TeamProvisioning = NULL_TEAM_PROVISIONING,
         trial_provisioning_service: TrialProvisioning = NULL_TRIAL_PROVISIONING,
+        totp_service: TotpService | None = None,
     ) -> None:
         # Session is passed in so audit_log inserts + provision_initial_workspace
         # share the request's outer TX with the user / refresh-token writes.
@@ -132,6 +138,11 @@ class AuthService:
         self._require_email_verification = require_email_verification
         self._refresh_ttl_seconds = refresh_ttl_seconds
         self._access_ttl_seconds = access_ttl_seconds
+        # Phase 01.8 — second-factor gate. None (unit-test default) means 2FA
+        # never gates login; production wiring (iam/deps.py) supplies the real
+        # TotpService so login returns a TotpChallenge when the user has active
+        # 2FA. Password-only login for users WITHOUT 2FA is unchanged.
+        self._totp_service = totp_service
         # Account-recovery flows (email-verification + password-reset) live in a
         # focused collaborator (file-size canon split). AuthService stays a
         # facade: the four recovery methods below delegate here, sharing the
@@ -275,7 +286,7 @@ class AuthService:
 
     # ── login ───────────────────────────────────────────────────────────
 
-    async def login(self, cmd: LoginCommand) -> TokenPair:
+    async def login(self, cmd: LoginCommand) -> TokenPair | TotpChallenge:
         if cmd.ip:
             verdict = await self._rate_limit_service.check_and_increment(
                 scope="login", ip=cmd.ip, email=cmd.email
@@ -293,7 +304,60 @@ class AuthService:
         if self._require_email_verification and user.email_verified_at is None:
             raise EmailNotVerified()
 
+        # Phase 01.8 — second factor. If the user has ACTIVE 2FA, the password
+        # alone must NOT mint tokens: return a signed, short-lived challenge
+        # binding this verified password to the pending TOTP step. The client
+        # completes login via login_totp(). Users without 2FA are unaffected.
+        if self._totp_service is not None and await self._totp_service.is_enabled(user.id):
+            challenge = self._token_service.issue_totp_challenge(user.id)
+            return TotpChallenge(challenge_token=challenge)
+
         return await self._issue_token_pair(user_id=user.id, ip=cmd.ip, user_agent=cmd.user_agent)
+
+    async def login_totp(
+        self, *, challenge_token: str, code: str, ip: str | None, user_agent: str | None
+    ) -> TokenPair:
+        """Second leg of 2FA login: verify the challenge + TOTP/backup code.
+
+        The challenge_token proves a correct password was already presented
+        (it is only ever issued by login() after password verification), so no
+        password re-check here — but the TOTP code MUST be valid or this raises.
+        """
+        if ip:
+            verdict = await self._rate_limit_service.check_and_increment(scope="totp", ip=ip)
+            if not verdict.allowed:
+                raise RateLimitExceeded(retry_after=verdict.retry_after)
+
+        user_id = self._token_service.verify_totp_challenge(challenge_token)
+
+        # Defensive: the TotpService must be wired to reach this path; if 2FA was
+        # disabled between the two legs, treat the code as invalid rather than
+        # silently issuing tokens off a stale challenge.
+        if self._totp_service is None:
+            raise TotpInvalidCode()
+        if not await self._totp_service.verify_for_login(user_id=user_id, code=code):
+            raise TotpInvalidCode()
+
+        return await self._issue_token_pair(user_id=user_id, ip=ip, user_agent=user_agent)
+
+    async def issue_token_pair(
+        self,
+        *,
+        user_id: UUID,
+        ip: str | None,
+        user_agent: str | None,
+        rotation_chain_id: UUID | None = None,
+    ) -> TokenPair:
+        """Public entry so collaborators (MagicLinkService) mint sessions via the
+        single-sourced login token path. Kept identical to the historical
+        private impl; the old `_issue_token_pair` name is preserved as an alias
+        below for internal call-sites."""
+        return await self._issue_token_pair(
+            user_id=user_id,
+            ip=ip,
+            user_agent=user_agent,
+            rotation_chain_id=rotation_chain_id,
+        )
 
     async def _issue_token_pair(
         self,
@@ -465,6 +529,63 @@ class AuthService:
 
     async def reset_password(self, plaintext_token: str, new_password: str) -> None:
         await self._account_recovery.reset_password(plaintext_token, new_password)
+
+    # ── session list / revoke (Phase 01.8) ──────────────────────────────
+
+    async def list_sessions(
+        self, user_id: UUID, *, current_session_id: UUID | None = None
+    ) -> list[SessionSummary]:
+        """Active sessions for the user, newest first, flagging the caller's."""
+        rows = await self._session_repo.list_active_for_user(user_id)
+        return [
+            SessionSummary(
+                id=row.id,
+                ip_address=str(row.ip_address) if row.ip_address is not None else None,
+                user_agent=row.user_agent,
+                created_at=row.created_at,
+                last_seen_at=row.last_seen_at,
+                expires_at=row.expires_at,
+                is_current=row.id == current_session_id,
+            )
+            for row in rows
+        ]
+
+    async def revoke_session(self, user_id: UUID, session_id: UUID) -> None:
+        """Revoke ONE of the user's own sessions. Cross-user revoke is blocked
+        by the user_id predicate in the repo; a miss raises 404 (not 403) so we
+        don't confirm the existence of another user's session id."""
+        revoked = await self._session_repo.revoke_for_user(session_id=session_id, user_id=user_id)
+        if revoked == 0:
+            raise UserNotFound("session not found")
+        await self._refresh_repo.revoke_for_session(session_id)
+        await events.emit_session_revoked(session_id=session_id, reason="user_action")
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=user_id,
+            action="iam.session.revoked",
+            resource_type="session",
+            resource_id=session_id,
+            payload=None,
+            session=self._session,
+        )
+
+    async def revoke_all_other_sessions(self, user_id: UUID, keep_session_id: UUID) -> None:
+        """Log out everywhere except the caller's current session."""
+        await self._session_repo.revoke_all_others_for_user(
+            user_id=user_id, keep_session_id=keep_session_id
+        )
+        await self._refresh_repo.revoke_all_for_user_except_session(
+            user_id=user_id, keep_session_id=keep_session_id
+        )
+        await emit_audit_event(
+            actor_type="user",
+            actor_id=user_id,
+            action="iam.session.revoked_all_others",
+            resource_type="user",
+            resource_id=user_id,
+            payload=None,
+            session=self._session,
+        )
 
     # ── /users/me helpers (kept here so router stays thin) ──────────────
 
