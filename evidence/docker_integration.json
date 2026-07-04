@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "gate": "docker_integration",
+  "head_sha": "4ddb43d4f41d16e2992a2209a2a0b842d41bb829",
+  "timestamp": "2026-07-04T03:30:00Z",
+  "verdict": "PASS",
+  "runner": "tester (pytest -m integration against testcontainers PG)",
+  "details": {
+    "phase": "01.8",
+    "suite": "tests/iam/integration/test_auth_extensions_pg.py",
+    "result": "6 passed",
+    "db": "real PostgreSQL via testcontainers; alembic upgrade heads applied migration iam_0007_totp_and_magic_link successfully",
+    "proved": [
+      "migration 0007 applies cleanly on a fresh migrated DB (pure-CREATE: totp_credentials + totp_backup_codes + magic_link_tokens)",
+      "TOTP secret at-rest is CIPHERTEXT: SELECT secret_encrypted FROM iam.totp_credentials — base32 secret is NOT a substring of the stored bytea",
+      "full 2FA flow: enroll -> confirm (10 backup codes) -> login returns two_factor_required (no tokens) -> login/totp with a live code issues a pair; wrong code 401",
+      "backup code single-use: accepted once as second factor, replay -> 401",
+      "disable restores password-only login",
+      "magic-link: request 202 (anti-enum; no email for unknown account) -> consume issues a pair -> replay of consumed token -> 410",
+      "session isolation: user sees only own sessions (current flagged); cross-user revoke -> 404 with the other user's session row untouched (revoked_at IS NULL); revoke-all-others keeps exactly the caller's session active"
+    ],
+    "role_context": "requests run as oriion_app (SET LOCAL ROLE) — the prod non-superuser role, so RLS/grant behavior on the new tables is exercised as in production"
+  }
+}
