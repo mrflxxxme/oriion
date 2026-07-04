@@ -26,6 +26,13 @@ CREATE TABLE artifacts.artifacts (
     -- Head pointer for artifact:// URL resolution. 0 = no committed versions.
     -- Plain int (no cyclic FK to artifact_versions) — ADR-038 graft G3.
     current_version_num  int  NOT NULL DEFAULT 0 CHECK (current_version_num >= 0),
+    -- Per-artifact privacy seam (ADR-014 §1, Phase 01.7). Wave-1 = Option A
+    -- (flat): all cell members see all artifacts → ALWAYS 'cell-shared', NOT
+    -- enforced. 'private' is forward-declared for Option B (a later phase flips
+    -- behaviour via RLS/service change, no ALTER-under-data). Added by migration
+    -- artifacts/0002_artifact_visibility_stub.py.
+    visibility           text NOT NULL DEFAULT 'cell-shared'
+                             CHECK (visibility IN ('cell-shared','private')),
     deleted_at           timestamptz NULL,          -- soft-delete
     created_at           timestamptz NOT NULL DEFAULT now(),
     updated_at           timestamptz NOT NULL DEFAULT now(),
