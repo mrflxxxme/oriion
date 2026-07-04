@@ -41,3 +41,25 @@
 ### RQ-20260703-006 | complete | pr:84 | phase:01.6 | 2026-07-03T17:45:56Z | status:pending
 - Summary: RUN COMPLETE: /autonomy:run 01.6 Security guardrails MERGED (32d5755) — zero founder touchpoints
 - Phase 01.6 (ADR-039) squash-merged to main (32d5755) via auto-merge — tripwire exit 0 (no migrations/contracts/auth/billing/secrets), so NO founder ack was needed (first fully hands-off /autonomy:run phase). New security bounded context: deterministic layer-B RU-PDN DLP (INN/SNILS checksum + passport/phone/email) + injection heuristics (B1) + capability classifier (classify-only seam, gate->01.9); runtime seams mirror memory_extraction/quota_admission (default no-op); BOTH guardrail flags default OFF in Wave-1 (substrate-now, enforce-at-01.9). 6 signed commits. Decisions logged: 4 (1 arch ADR-039 + 3 impl incl. the audit-driven correction). Adversarial audit (3 lenses, refute-by-default, evidence PASS): SECURE PASS (0 P0/P1, raw-PII-never-leaks invariant held); SOUND 1 P1 caught+fixed (DLP screened truncated _deliverable_text -> full _dlp_screen_text); NO-REG 1 P2 caught+fixed (injection default-on mangled legit web content -> default off + pattern trim); P3 robustness fixed. Gates: ruff clean, mypy --strict 224, bandit 0, unit 950, src/security 97% / src/runtime 87%. CI on PR #84 all green (ci-backend + ci-security + ci-evidence; ci-frontend not triggered). Post-merge main: ci-security green, ci-backend in-flight (D7 watch scheduled). Interrupts this run: 0 (no ack-needed / escalation / stuck / revert). Founder touchpoints: 0. Budget estimate (R-31): ~400k subagent tokens (recon ~126k + 3 audit lenses ~276k) + main session; approx 25-35 USD — at/near dev_team per-day soft cap 30, within hard cap 75. FOLLOW-UP for 01.7: (a) evidence/ landed on main via squash (harmless — ci-evidence is PR-only; 01.7 must regenerate its own evidence/manifest to stay fresh, or remove the stale 01.6 files); (b) 01.9 must precision-tune INN-10 (~10% false-positive) before flipping security_dlp_enabled. Next phase: 01.7 RBAC.
+
+### RQ-20260704-001 | ack-needed | pr:86 | phase:01.7 | 2026-07-04T00:42:23Z | status:resolved | resolved:2026-07-04T11:30:19Z | verdict:approved
+- Resolution note: founder approved in-session 2026-07-04 (batch)
+- Summary: 01.7 RBAC (Owner/Member enforcement) — CI green, needs /ack
+- Tripwire exit 10. Categories: db_migrations (ALTER artifacts.visibility, not pure-CREATE), auth_rbac_sessions (src/rbac/**), billing_money (billing router guard), public_api_contracts (contracts/artifacts/schema.sql). Local+CI green: ruff/mypy/bandit clean, 956 unit + 29 integration, src/rbac 100%, adversarial 0 P0/P1. Approve: /autonomy:ack <ID> approved
+- Resolve: `/autonomy:ack RQ-20260704-001 approved|rejected`
+
+### RQ-20260704-002 | ack-needed | pr:87 | phase:01.8-mail | 2026-07-04T01:23:26Z | status:resolved | resolved:2026-07-04T11:30:19Z | verdict:approved
+- Resolution note: founder approved in-session 2026-07-04 (batch)
+- Summary: 01.8-mail YandexSmtpEmailSender — CI green, needs /ack
+- Tripwire exit 10. Category: auth_rbac_sessions (src/iam/**). No migration. Local+CI green: ruff/mypy(224)/bandit clean, 964 unit + 3 skipped, email_service.py 100%, aiosmtplib 5.1.2 pip-audit 0, adversarial 0 P0/P1. Live-send deferred (no SMTP creds). Approve: /autonomy:ack <ID> approved
+- Resolve: `/autonomy:ack RQ-20260704-002 approved|rejected`
+
+### RQ-20260704-003 | ack-needed | pr:88 | phase:01.8 | 2026-07-04T02:46:30Z | status:resolved | resolved:2026-07-04T11:30:19Z | verdict:approved
+- Resolution note: founder approved in-session 2026-07-04 (batch)
+- Summary: 01.8 auth-extensions (2FA TOTP + magic-link + session-list) — CI green, needs /ack
+- STACKED on #87 (base retargeted to main for CI; diff currently includes 01.8-mail until #87 merges). Tripwire exit 10: auth_rbac_sessions (src/iam) + public_api_contracts (contracts/iam); db_migrations auto-downgraded (0007 pure-CREATE). CI green: ruff/mypy(228)/bandit clean, 116 unit + 6 integration (real PG), src/iam 92.14%, pyotp 0 CVE, adversarial 0 P0/P1 (1 P1 caught+closed). Merge order: #86, #87, then #88. Approve: /autonomy:ack <ID> approved
+- Resolve: `/autonomy:ack RQ-20260704-003 approved|rejected`
+
+### RQ-20260704-004 | complete | pr:- | phase:RUN 01.7+01.8-mail+01.8 | 2026-07-04T02:50:26Z | status:pending
+- Summary: Run complete: 3 phases green+PR'd, all awaiting founder /ack
+- 01.7 RBAC PR#86 (RQ-...001) | 01.8-mail SMTP PR#87 (RQ-...002) | 01.8 auth-ext PR#88 (RQ-...003, stacked on #87). All CI green. Merge order: #86 (independent), #87, #88. Spend est ~$15-25 (3 phase-executors, under $75/day hard cap). Reverts: 0. Escalations: 0 (forks pre-resolved 2026-07-03). Docker used for local integration. Session-local: premerge shim (untracked) + this queue.
