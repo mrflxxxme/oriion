@@ -17,6 +17,7 @@ from src.iam.services.email_service import InMemoryEmailSender
 from src.iam.services.password_service import PasswordService
 from src.iam.services.rate_limit_service import RateLimitService
 from src.iam.services.token_service import TokenService
+from src.llm_gateway.services.kms_provider import LocalAESKMS
 
 # ── Fake Redis ────────────────────────────────────────────────────────────
 
@@ -120,3 +121,16 @@ def email_sender() -> Iterator[InMemoryEmailSender]:
     sender = InMemoryEmailSender()
     yield sender
     sender.clear()
+
+
+# ── KMS (deterministic local AES for TOTP at-rest encryption tests) ────────
+
+
+@pytest.fixture
+def local_kms() -> LocalAESKMS:
+    """LocalAESKMS with a fixed 32-byte master key — no env var needed.
+
+    Encrypts the TOTP secret at rest exactly like production (AES-256-GCM),
+    so unit tests exercise the real encrypt/decrypt round-trip.
+    """
+    return LocalAESKMS(master_key=b"unit-test-totp-master-key-32bytes"[:32].ljust(32, b"0"))

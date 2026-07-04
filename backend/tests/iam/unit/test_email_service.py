@@ -35,10 +35,19 @@ async def test_inmemory_captures_password_reset() -> None:
 
 
 @pytest.mark.asyncio
+async def test_inmemory_captures_magic_link() -> None:
+    s = InMemoryEmailSender()
+    await s.send_magic_link_email("m@x.dev", "tok", datetime.now(UTC))
+    assert s.last().kind == "magic_link"
+    assert s.last().to == "m@x.dev"
+
+
+@pytest.mark.asyncio
 async def test_console_does_not_raise() -> None:
     s = ConsoleEmailSender()
     await s.send_verification_email("a@b.dev", "tok", datetime.now(UTC))
     await s.send_password_reset_email("a@b.dev", "tok", datetime.now(UTC))
+    await s.send_magic_link_email("a@b.dev", "tok", datetime.now(UTC))
 
 
 @pytest.mark.asyncio
@@ -46,6 +55,7 @@ async def test_noop_does_not_raise() -> None:
     s = NoOpEmailSender()
     await s.send_verification_email("a@b.dev", "tok", datetime.now(UTC))
     await s.send_password_reset_email("a@b.dev", "tok", datetime.now(UTC))
+    await s.send_magic_link_email("a@b.dev", "tok", datetime.now(UTC))
 
 
 # ── Phase 01.8 — YandexSmtpEmailSender (transport-mocked, NO live network) ───
@@ -109,6 +119,22 @@ async def test_smtp_password_reset_builds_message() -> None:
     body = message.get_content()
     assert "RTOKEN999" in body
     assert "/auth/reset-password" in body
+
+
+@pytest.mark.asyncio
+async def test_smtp_magic_link_builds_message() -> None:
+    sender = _implicit_tls_sender()
+    exp = datetime.now(UTC) + timedelta(minutes=15)
+    with patch("src.iam.services.email_service.aiosmtplib.send", AsyncMock()) as mock_send:
+        await sender.send_magic_link_email("magic@example.com", "MLTOKEN42", exp)
+
+    args, _ = mock_send.await_args
+    message = args[0]
+    assert message["To"] == "magic@example.com"
+    assert "ссылке" in str(message["Subject"])
+    body = message.get_content()
+    assert "MLTOKEN42" in body
+    assert "/auth/magic-link/consume" in body
 
 
 @pytest.mark.asyncio
