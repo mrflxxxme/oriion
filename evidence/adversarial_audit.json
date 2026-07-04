@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "gate": "adversarial_audit",
-  "head_sha": "a55798ef00dd818f89de63cd827466580df557df",
+  "head_sha": "c9bef560dd4ffa2beaee5c3daa638a04b2e1332e",
   "timestamp": "2026-07-04T01:20:00Z",
   "verdict": "PASS",
   "runner": "reviewer (autonomous, 3 lenses refute-by-default)",
