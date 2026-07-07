@@ -1,4 +1,4 @@
-# TEAMLY_RU — top-level Makefile
+# Oriion — top-level Makefile
 #
 # POSIX make targets для local dev + CI. Работают на:
 #   - Linux + macOS (system make)
@@ -30,7 +30,7 @@ NPM := npm
 
 .PHONY: help
 help: ## Print this help (default target)
-	@printf '\nTEAMLY_RU — available targets:\n\n'
+	@printf '\nOriion — available targets:\n\n'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@printf '\nQuickstart:  cp .env.example .env  &&  make dev-bootstrap\n\n'
 

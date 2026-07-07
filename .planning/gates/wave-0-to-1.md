@@ -91,17 +91,18 @@ capacity_snapshot:
 
 Wave 0 → 1 has a **single hard threshold** — a successful internal demo.
 
-**Definition (revised 2026-05-15).** Founder plus 3 friends each run the canonical **«Market & content brief для нового продукта»** demo scenario through the horizontal `productivity-core` team. User input fixed: «Запускаем платформу AI-команд для SMB в РФ. Сделай нам market brief + контент-план первого месяца». Pipeline: Coordinator decomposes into 3 parallel sub-tasks → Researcher (web_search) gathers competitors + boards/communities + trends → Analyst (LLM-only, no Pyodide W0) synthesizes TAM/SAM + competitive matrix + positioning → Writer produces marketing brief + content plan + tone-of-voice doc → Coordinator synthesizes 3 artifacts.
+**Definition (AMENDED Phase 00.6 PR-B, per α decision-7 2026-05-23 — canonical; синхронизировано с frontmatter 2026-07-07 per ADR-040 D12).** Founder runs the canonical **«Market & content brief»** demo scenario **10×** via `python -m scripts.demo_market_brief --api-base-url https://staging.oriion.dev/api/v1 --runs 10` against the real Yandex Cloud staging deployment. Pipeline: Wave-0 deterministic researcher→analyst→writer, each specialist a real LLM call, artifact generation.
 
-**Per-run acceptance:**
-- 3 artifacts produced: `brief.md` ≥1500 words, `competitive-matrix.md` ≥5 rows × ≥4 columns, `content-plan.md` exactly 10 posts with outlines
-- End-to-end latency ≤120 sec p95
-- Cost ≤30¢ per run
+**Acceptance (per frontmatter description — authoritative):**
+- AC8 = cohort p95 latency ≤120s (`statistics.quantiles n=20[18]`)
+- AC9 = per-run artifact shape: `brief.md` ≥1500 RU words, competitive-matrix ≥5×4, content-plan = 10 posts
+- AC10 = per-run cost ≤30¢
+- ≥9/10 runs pass AC9+AC10 AND cohort p95 ≤120s (`--tolerate-failures 1`; strict default 10/10)
 - No manual unblocking of AI loops
 
-**Evidence required.** Screen recording of demo (≤30 min) + 4 demo-run artifact bundles (founder + 3 friends) uploaded to `.planning/gates/evidence/wave-0-to-1/`. Role-prompts hardening backlog produced and handed to Phase 01.1 retro.
+**Evidence required.** `summary.json` + 10× `run_NNN.json` + 1× screen-recording uploaded to `.planning/gates/evidence/wave-0-to-1/`. Tracked as [DV-08](../DEFERRED-VERIFICATION.md) / [RW-07](../FOUNDER-RUNWAY.md).
 
-> WB-Seller team-based threshold superseded per Session-2026-05-15 roadmap reorg. WB-Seller vertical (with original 30-task golden-dataset) now shipped in Wave 2.
+> **Superseded definitions (history):** (1) WB-Seller team-based threshold — superseded per Session-2026-05-15 reorg (WB-Seller vertical → Wave 2); (2) «Founder plus 3 friends, web_search execution» — superseded per α decision-7 (2026-05-23): friend-runs → Wave-2 phase 02.0, web_search tool-wiring → Wave 1. AC7 (demo via UI) deferred to Phase 01.1-retro post-00.7.
 
 **Why a single threshold.** Wave 0 is foundation building. Quantitative business KPIs (NPS, weekly registrations) are not yet measurable — there is no public traffic. The internal demo is binary proof that the cells-to-tasks-to-artifacts pipeline works end-to-end.
 

@@ -1,6 +1,6 @@
-# TEAMLY_RU — Project Entry-Point
+# Oriion — Project Entry-Point
 
-**TEAMLY_RU** — облачная платформа AI-команд для СМБ + personal-users сегмента РФ. Пользователь стартует с универсальной команды («Твои личные ассистенты»), при необходимости расширяет до vertical-команды с domain-expertise. Coordinator декомпозирует задачи (или Master-Agent в vertical-режиме per [ADR-029](./decisions/ADR-029-master-agent-vertical-templates.md)), агенты выполняют, результат — в Pixel Department.
+**Oriion** (рабочее имя per [ADR-040 D3](./decisions/ADR-040-execution-spec-contract.md); прежнее TEAMLY_RU, финальный бренд — OQ-09) — облачная платформа AI-команд для СМБ + personal-users сегмента РФ. Пользователь стартует с универсальной команды («Твои личные ассистенты»), при необходимости расширяет до vertical-команды с domain-expertise. Coordinator декомпозирует задачи (или Master-Agent в vertical-режиме per [ADR-029](./decisions/ADR-029-master-agent-vertical-templates.md)), агенты выполняют, результат — в Pixel Department.
 
 **USP (dual messaging, per [Session-2026-05-15](./JOURNAL.md)):**
 - **Entry:** универсальный horizontal preset `productivity-core` («Твои личные ассистенты»)

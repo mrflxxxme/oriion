@@ -24,7 +24,8 @@ Run the front-autonomy routine for phase **$1**. You are replacing the interacti
    - **Wide fork** (architecture/algorithm/schema, high blast radius) → run the judge-panel (`judge-panel.md`): N approaches → `evaluator` rubric → winner + graft.
    - **Narrow** → take the recommended default.
 5. **Log every owned decision** with `scripts/autonomy/log_decision.py` (`--kind arch --adr …` for architectural — write the ADR too; `--kind impl` otherwise). Pass `--phase $1`.
-6. **Emit the plan.** Produce `PLAN.md` for the phase: the resolved decisions, the task decomposition, `wide_fork:`/`escalated:` flags, and the pipeline template. If any fork escalated, list what is **blocked pending `/ack`** and what can proceed now.
+6. **DoR validation (ADR-040 D1).** Grow the seed-spec into the full phase spec (if not already) and validate it against `.planning/roadmap/DEFINITION-OF-READY.md` — all 11 items. Fixable gaps (agent-owned) → fix the spec now; founder-gaps (product / runway per `.planning/FOUNDER-RUNWAY.md`) → escalate. Planned soft ACs get their `DEFERRED-VERIFICATION.md` row here (D6).
+7. **Emit the plan.** Produce `PLAN.md` for the phase: the resolved decisions, the task decomposition, `wide_fork:`/`escalated:` flags, the pipeline template, and the `DoR: PASS (11/11)` line (execution is forbidden without it). If any fork escalated, list what is **blocked pending `/ack`** and what can proceed now.
 
 ## Output
 - A short summary: N forks total → X owned+logged, Y escalated (with the escalation records).

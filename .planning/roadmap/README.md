@@ -7,7 +7,7 @@ High-level навигация по дорожной карте. Phase-урове
 | Wave | Срок | Цель | Документ | Метрика успеха |
 |---|---|---|---|---|
 | **0. Foundation** | 3 нед | Internal demo: horizontal `productivity-core` team end-to-end («Market & content brief») | [wave-0/README.md](./wave-0-foundation/README.md) | Internal demo passes |
-| **1. Core MVP** | 6 нед | Pre-alpha: horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + Telegram Business API + memory + billing + RBAC | [wave-1/README.md](./wave-1-core-mvp/README.md) | 10–15 friends, ≥3 задачи/клиент, success ≥75% |
+| **1. Core MVP** | 6 нед | Pre-alpha: horizontal + 2 vertical (Marketing-agency + Telegram-крейтор) + memory + billing + RBAC + MCP (Telegram Business API → parked, RW-05) | [wave-1/README.md](./wave-1-core-mvp/README.md) | Технические пороги per [gate wave-1-to-2](../gates/wave-1-to-2.md) (ADR-040 D5): AC pass-rate ≥0.9 + must-фазы merged; friend-метрики → W2 фаза 02.0 |
 | **2. Pixel + каталог** | 9 нед | Public beta: 4 templates (horizontal + Marketing + Telegram + WB) + Pixel + Pyodide + Telegram Mini App + Master-Agent retrofit | [wave-2/README.md](./wave-2-pixel-catalog/README.md) | 100 регистраций/нед, TTFV ≤3 мин, конверсия ≥5% |
 | **3. Глубина** | 10 нед | GA: +ИП-Бух + СМБ-Sales vertical с Master-Agent + Vertical Rituals + PARA Workspace + corp connectors + CS | [wave-3/README.md](./wave-3-depth/README.md) | 500 платящих, MRR ≥3 млн ₽ |
 | **4. Масштаб + Partner** | 12 нед | K8s + Partner programme + dedicated namespace Pro + Telegram Stars billing | [wave-4/README.md](./wave-4-scale-partner/README.md) | 2000 платящих, MRR ≥15 млн ₽ |
@@ -58,18 +58,24 @@ wave-N-name/
     └── N.M-slug.md
 ```
 
-**Phase-spec'ы для будущих волн НЕ хранятся в репо** — генерируются JIT в начале волны через `gsd:plan-phase` под актуальную архитектуру. Wave 0 сейчас единственная wave с заполненной `phases/`.
+**Phase-spec'ы для будущих волн НЕ хранятся в репо** — генерируются JIT в начале волны под актуальную архитектуру. **Ревизия per [ADR-040 D1](../decisions/ADR-040-execution-spec-contract.md):** JIT сохраняется, но (а) каждая фаза **текущей** волны имеет **seed-spec** (5–15 строк констрейнтов) в `phases/` уже при регенерации PHASES.md; (б) доросшая спека валидируется против [`DEFINITION-OF-READY.md`](./DEFINITION-OF-READY.md) до execute; (в) первая фаза каждой волны — обязательная `NN.1-retro`, погашающая [`DEFERRED-VERIFICATION.md`](../DEFERRED-VERIFICATION.md) (ADR-040 D6); (г) реорганизация roadmap обязана в том же PR синхронизировать затронутые `gates/*.md` (ADR-040 D5).
 
 ## Phase-spec conventions
 
-- **Goal** (1 sentence)
-- **Dependencies** (что должно быть готово)
-- **Tasks** (список с estimates)
-- **Acceptance criteria** (testable)
+Нормативный чек-лист полноты — [`DEFINITION-OF-READY.md`](./DEFINITION-OF-READY.md) (ADR-040 D1). Базовые секции:
+
+- **Goal** (1 sentence, проверяемый исход)
+- **Dependencies** (что должно быть готово; статус проверен по факту)
+- **Founder-зависимости** (ссылки на [`FOUNDER-RUNWAY.md`](../FOUNDER-RUNWAY.md) или явное «нет»)
+- **Scope / Out-of-scope** (границы; всё исключённое имеет адрес)
+- **Acceptance criteria** (testable; мягкие AC → запись в DEFERRED-VERIFICATION до merge)
+- **Evidence-гейты + live-golden бюджет** (только где контрольная ценность, ADR-040 D11)
+- **Tripwire-прогноз** (категории `tripwire.yaml`, которые фаза заденет)
 - **Risks** (ссылки на R-NN из `risks/REGISTER.md`)
 - **ADR-refs** (ссылки на `decisions/`)
-- **Owner** (роль или persistent agent per ADR-023)
-- **Status** (Pending / In Progress / Done / Blocked)
+- **Status** (Pending / Parked / In Progress / Done / Blocked)
+
+Wave-0-эра дополнительно имела Owner + Tasks-with-estimates — в автономном контуре (ADR-037/040) исполнитель = runner, декомпозиция живёт в `NN-PLAN.md`.
 
 ## Cheat sheet
 
@@ -78,6 +84,9 @@ wave-N-name/
 | «Какая phase активна?» | [`../STATUS.md`](../STATUS.md) |
 | «Что в Wave N?» | `wave-N-name/README.md` + `PHASES.md` |
 | «Spec для Wave 0 phase X?» | `wave-0-foundation/phases/00.M-slug.md` |
-| «Spec для Wave 1+ phase?» | Генерируется в начале волны через `gsd:plan-phase` |
+| «Spec для Wave 1+ phase?» | Seed-spec в `phases/` текущей волны; дорастает на discuss-шаге, валидируется по [DoR](./DEFINITION-OF-READY.md) |
+| «Фаза готова к автономному execute?» | [`DEFINITION-OF-READY.md`](./DEFINITION-OF-READY.md) — 11 пунктов, `DoR: PASS` в PLAN.md |
+| «Что разблокирует parked-фазы?» | [`../FOUNDER-RUNWAY.md`](../FOUNDER-RUNWAY.md) |
+| «Какой AC закрыт частично?» | [`../DEFERRED-VERIFICATION.md`](../DEFERRED-VERIFICATION.md) |
 | «Каковы dependencies?» | Phase-spec → секция Dependencies |
 | «Какие риски в этой phase?» | Phase-spec → секция Risks |

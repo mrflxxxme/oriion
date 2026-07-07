@@ -1,13 +1,15 @@
-# TEAMLY_RU
+# Oriion
 
 Облачная платформа AI-команд для СМБ + personal-users сегмента РФ.
 
+> **Рабочее имя проекта — «Oriion»** (прежнее TEAMLY_RU; per [ADR-040 D3](.planning/decisions/ADR-040-execution-spec-contract.md); финальный бренд — OQ-09, до Wave 2). Остаточные упоминания TEAMLY_RU в коде убираются в Phase 01.8c.
+>
 > Universal team-preset **«Твои личные ассистенты»** (Coordinator + Researcher + Writer + Analyst) + 5 РФ-vertical-templates с Master-Agent layer. Подробнее — [.planning/PROJECT.md](.planning/PROJECT.md).
 
 ## Quickstart (target ≤10 min cold-start per AC1)
 
 ```bash
-git clone <repo-url> && cd teamly_ru
+git clone <repo-url> && cd oriion
 cp .env.example .env
 make dev-bootstrap
 ```
@@ -20,7 +22,7 @@ make dev-bootstrap
 
 Prerequisites: Docker Desktop, `uv`, Node ≥ 20, GNU make (доступно через Git Bash on Windows).
 
-## Stack (Wave 0)
+## Stack
 
 - **Backend:** Python 3.12 + FastAPI + Pydantic-AI + SQLAlchemy 2.0 async + Alembic
 - **Frontend:** Vite 6 + React 19 + TypeScript strict + TanStack Router + Tailwind v4 + shadcn/ui
@@ -63,7 +65,7 @@ make clean              # wipe everything (compose -v + .venv + node_modules)
 ## Project structure
 
 ```
-TEAMLY_RU/
+oriion/
 ├── backend/                # Python 3.12 + FastAPI + Pydantic-AI
 │   ├── pyproject.toml      # uv-managed deps + ruff/mypy/pytest config
 │   ├── src/                # backend package
@@ -97,7 +99,9 @@ TEAMLY_RU/
 
 ## Status
 
-Phase 00.1 (Repo & CI/CD) — current. См. [`.planning/STATUS.md`](.planning/STATUS.md) для деталей и target dates.
+**Wave 1 (Core MVP) — in progress.** Смержено: 01.1-retro … 01.8 (Master-Agent, billing-core, memory + auto-extraction, artifacts, security-substrate, RBAC, SMTP, 2FA/magic-link). Автономная очередь: `01.8c → 01.9 → 01.4-ui → 01.10 → 01.12` per [ADR-040](.planning/decisions/ADR-040-execution-spec-contract.md). Актуальное состояние — [`.planning/STATUS.md`](.planning/STATUS.md); разблокировки — [`.planning/FOUNDER-RUNWAY.md`](.planning/FOUNDER-RUNWAY.md).
+
+> Правило свежести (ADR-040 D9): эта секция обновляется в exit-ритуале каждой смерженной фазы.
 
 ## License
 

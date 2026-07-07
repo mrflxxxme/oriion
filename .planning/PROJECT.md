@@ -1,4 +1,6 @@
-# TEAMLY_RU — Project Overview
+# Oriion — Project Overview
+
+> Рабочее имя per [ADR-040 D3](./decisions/ADR-040-execution-spec-contract.md) (прежнее TEAMLY_RU; финальный бренд — OQ-09).
 
 > Облачная платформа AI-команд для СМБ + personal-users сегмента РФ. Пользователь начинает с универсальной команды («Твои личные ассистенты»), при необходимости расширяет до vertical-команды с domain-expertise. Coordinator декомпозирует задачи (или Master-Agent в vertical-режиме), агенты выполняют, результат — в Pixel Department.
 

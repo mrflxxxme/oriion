@@ -36,6 +36,7 @@
 | [ADR-034](./ADR-034-async-dispatch-redis-sse-ac8-reframe.md) | Async Dramatiq dispatch (POST /run → 202 <1s) + Redis-Streams SSE + AC8 reframe (dispatch-gate + generation-SLI) (Phase 01.1 infra-PR) |
 | [ADR-035](./ADR-035-deepseek-gated-web-search-tool-call.md) | Native web_search tool-call gated to DeepSeek + scripted failover fallback; Settings mock_mode bug fixed (infra-PR), native tool-loop implemented (Accepted, AC-W1-19 CLOSED) |
 | [ADR-036](./ADR-036-outbox-relay-self-scheduling.md) | Transactional-outbox relay drained by a self-rescheduling Dramatiq actor (no periodiq dep) + per-row failure isolation; Wave-0 bridge to the Wave-1 Redis-Streams consumer (Accepted, AC-W1-4 relay-gap closeout) |
+| [ADR-038](./ADR-038-artifacts-envelope-schema.md) | Artifacts envelope-схема 7 таблиц: append-only versions + Yjs bytea + S3 lifecycle + `artifact://` resolver (Phase 01.5) |
 
 ## LLM / AI
 
@@ -66,6 +67,8 @@
 | [ADR-023](./ADR-023-ai-team-runtime.md) | AI-team runtime: 11 persistent Opus-ролей + `.claude/agents/` структура + AgentDB namespaces (§8 расширен [ADR-037](./ADR-037-autonomous-multiphase-runner.md)) |
 | [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) | Solo + AI Git/PR workflow: tier-table re-thought + atomic commits + failure handling (§5 ревизован [ADR-037](./ADR-037-autonomous-multiphase-runner.md) — полная автономия мёржа) |
 | [ADR-037](./ADR-037-autonomous-multiphase-runner.md) | Autonomous multi-phase runner + gate-authority merge: full-autonomy мёрж + узкая растяжка + evidence/CI-verify + auto-revert/fix-loop (ревизует ADR-027 §5, расширяет ADR-023 §8 + ADR-015) |
+| [ADR-039](./ADR-039-security-guardrails-context.md) | Security guardrails: детерминированный слой B (DLP RU-ПДн + injection-эвристики + capability-классификатор), детекторы-порты с B→A швом (Phase 01.6; enforcement → 01.9 per ADR-040 D10) |
+| [ADR-040](./ADR-040-execution-spec-contract.md) | Spec-contract автономного исполнения (founder-интервью 2026-07-07): DoR + seed-specs, OpenAPI-snapshot растяжка, DEFERRED-VERIFICATION + обязательные retro-фазы, FOUNDER-RUNWAY preflight, технические wave-гейты, cost-budget v3 ($20/$40), рабочее имя Oriion (расширяет ADR-037 D4/D6) |
 
 ## Governance & policies
 
