@@ -1,4 +1,4 @@
-# Contributing — TEAMLY_RU
+# Contributing — Oriion
 
 Этот проект использует disciplined AI-agent workflow per [ADR-023](.planning/decisions/ADR-023-ai-team-runtime.md) (11 persistent Opus AI-агентов + non-persistent specialized roles).
 
@@ -20,19 +20,16 @@
 - **Commit format:** conventional commits с tier classification per ADR-027 tier-table в commit message
 - **Atomic commits** — каждая логическая единица = один commit
 - **Branch protection:** `--force-with-lease` only, no `--no-verify`, hook fail → fix
-- **PR tier 3+** требует **founder explicit approve** per [P-INIT-3](.planning/decisions/ADR-028-policies-registry.md)
-- **PR tier 4** требует founder approve + ADR-link
-- **Exit ritual** обязателен перед merge: JOURNAL + HANDOFF дописываются (см. [`agent-handbook/04-HANDOFF.md`](.planning/agent-handbook/04-HANDOFF.md))
+- **Merge authority = gate-stack** per [ADR-037 D1](.planning/decisions/ADR-037-autonomous-multiphase-runner.md) (ревизует прежнее «tier 3+ = founder approve»): auto-merge при всех зелёных гейтах + fresh evidence + tripwire exit 0; совпадение с [tripwire-категорией](.claude/autonomy/tripwire.yaml) → founder 1-click `/ack`
+- **Exit ritual** обязателен перед merge: JOURNAL + HANDOFF + doc-sync (README-фаза / runbook / статус фазного файла per [ADR-040 D9](.planning/decisions/ADR-040-execution-spec-contract.md)); см. [`agent-handbook/04-HANDOFF.md`](.planning/agent-handbook/04-HANDOFF.md)
 
-## Tier-table (per ADR-027)
+## Tier-table (per ADR-027; merge-колонка ревизована ADR-037)
 
-| Tier | Founder action | Когда |
+| Tier | Merge path (ADR-037/040) | Когда |
 |---|---|---|
-| 1 | auto-merge if CI green | docs, format, dep-patch |
-| 2 | skim diff, ack | tests, refactors, copy |
-| 3 | **explicit approve** | new endpoint, component, feature |
-| 4 | **explicit approve + ADR-link** | architecture, security, billing, migrations |
-| 5 | same-session approve | hotfix |
+| 1–2 | auto-merge (гейты + evidence зелёные, tripwire clean) | docs, format, dep-patch, tests, refactors |
+| 3–4 | auto-merge ИЛИ founder `/ack` при tripwire-совпадении (migrations / auth / billing / secrets / contracts) | endpoint, feature, architecture, security |
+| 5 | same-session `/ack` | hotfix |
 
 ## Architecture Decision Records (ADR)
 

@@ -63,6 +63,13 @@ categories:
     reason: "Слом публичных API/data-контрактов bounded-context (D2)"
     globs:
       - ".planning/contracts/**"
+    runner_nuance: |
+      ADR-040 D2 (2026-07-07): охраняемый публичный контракт = генерируемый
+      `.planning/contracts/openapi.snapshot.json` (экспорт живой FastAPI-схемы;
+      snapshot+CI-diff реализуются в Phase 01.8c). Рукописные contracts/<ctx>/api.yaml —
+      design-time черновики (расхождение с живым API не нарушение); contracts/<ctx>/schema.sql
+      остаются нормативными. Глоб выше уже покрывает будущий snapshot — до мержа 01.8c
+      категория работает по-старому (fail-safe).
 
 # Notes:
 # - Секции src/multitenancy, src/memory, src/tasks, src/agents, src/mcp, src/audit

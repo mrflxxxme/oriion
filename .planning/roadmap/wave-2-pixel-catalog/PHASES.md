@@ -5,6 +5,15 @@
 > - Wave 1 retro outcomes
 > - Актуальных ADR из [decisions/](../../decisions/README.md)
 
+## Обязательные фазы старта Wave 2 (ADR-040, интервью 2026-07-07)
+
+При регенерации phase-list'а Wave 2 первые фазы фиксированы (нумерация направлений ниже сдвигается):
+
+| Phase | Направление | Основание |
+|---|---|---|
+| **02.1-retro** | Обязательная wave-opening retro: гашение записей [`DEFERRED-VERIFICATION.md`](../../DEFERRED-VERIFICATION.md), адресованных Wave 2 (DV-01 Master live-golden evidence, DV-03 BYOK live, DV-10 worker-transport), + hardening backlog Wave 1 | [ADR-040 D6](../../decisions/ADR-040-execution-spec-contract.md) — retro = первая фаза каждой волны |
+| **02.0** | **Friend-validation** — первая пользовательская фаза: 10–15 ICP-друзей на 3 пресетах (horizontal + 2 вертикали), сбор task-completion телеметрии + качественного фидбека + NPS-**измерение** (не порог). **Неблокирующая** для остального трека Wave 2 — идёт параллельно после 02.1-retro | [ADR-040 D5](../../decisions/ADR-040-execution-spec-contract.md) — людская валидация перенесена из гейта W1→2 |
+
 ## Высокоуровневые phase-направления Wave 2
 
 | Phase | Направление | Owner | Релевантные ADR |

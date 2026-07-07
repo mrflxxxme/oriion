@@ -4,100 +4,65 @@
 
 ## Last updated
 
-- Date: 2026-07-04 (Phase 01.8 — auth extensions core: 2FA TOTP + magic-link + session-list)
-- Session: `auto-01.8` (worktree branch `claude/auto-01.8`, **stacked on `claude/auto-01.8-mail`**, base HEAD e2c575f)
-- Agent: @claude-opus (autonomous runner, ADR-037)
+- Date: 2026-07-07 (docs-refinement: founder-интервью → ADR-040 spec-contract автономного исполнения)
+- Session: `docs-refinement-interview` (branch `claude/docs-refinement-interview-z4soj2`)
+- Agent: @claude (remote session, интерактивное founder-интервью)
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP)
-- **Phase 01.6 (Security guardrails)**: ✅ Merged (PR #84).
-- **Phase 01.8-mail (Real Yandex SMTP sender)**: ✅ Code-complete on `claude/auto-01.8-mail` — pending PR + founder ack + merge.
-- **Phase 01.8 (Auth extensions core)**: ✅ Code-complete on `claude/auto-01.8` (stacked on 01.8-mail) — pending PR + **founder ack** (tripwire) + merge.
+- **Wave:** Wave 1 (Core MVP), смержено всё до 01.8 включительно (`origin/main = 0c1e9fc`).
+- **Эта сессия:** документационная (0 строк кода). Углублённое интервью с founder → 12 решений → [ADR-040](./decisions/ADR-040-execution-spec-contract.md) + новые нормативные артефакты + актуализация дрейфнувших доков.
 
-## What just happened (Phase 01.8)
+## What just happened
 
-2FA TOTP (pyotp) + magic-link passwordless login (on the existing `EmailSender`
-port, InMemory-tested) + a session-list backend, per the grill + founder-approved
-decision (2026-07-03, DECISIONS-LOG). Fully autonomous, no external creds.
-**OAuth (Yandex ID + VK ID) is DEFERRED to 01.8b** (needs client creds).
-**This branch is stacked on `claude/auto-01.8-mail`** — the PR diff base is that
-branch, NOT main.
+Вход: три параллельных исследования (методология+автономный контур / roadmap / код-vs-доки) выявили 10 разрывов, мешающих точному автономному исполнению дорожной карты. Интервью (3 раунда × 4 вопроса, по каждому — анализ и рекомендация) зафиксировало решения; всё внесено в канон.
 
-### Commits (branch `claude/auto-01.8`, off `claude/auto-01.8-mail` e2c575f)
+### Новые нормативные документы
 
-```
-[01.8] feat(iam): TOTP + magic-link + session tables & repos (ADR-024)   [coder]
-[01.8] feat(iam): 2FA TOTP + magic-link login + session-list backend      [coder]
-[01.8] test(iam): 2FA TOTP + magic-link + session-list unit & integration [tester]
-docs(autonomy): 01.8 phase spec + PLAN + decision log                     [reviewer]
-+ evidence/ commit (adversarial_audit + docker_integration + manifest)
-```
+| Документ | Что это |
+|---|---|
+| [`decisions/ADR-040-execution-spec-contract.md`](./decisions/ADR-040-execution-spec-contract.md) | 12 решений интервью (D1–D12), Accepted |
+| [`roadmap/DEFINITION-OF-READY.md`](./roadmap/DEFINITION-OF-READY.md) | 11-пунктовый DoR; `/autonomy:run` не исполняет фазу без `DoR: PASS` в PLAN.md |
+| [`DEFERRED-VERIFICATION.md`](./DEFERRED-VERIFICATION.md) | Реестр мягких AC (DV-01..DV-10); мягкий AC без записи = блокирующий review-flag; гасятся обязательными `NN.1-retro` |
+| [`FOUNDER-RUNWAY.md`](./FOUNDER-RUNWAY.md) | Манифест founder-зависимостей (RW-01..RW-09); раннер паркует гейтед-фазы на preflight |
+| Seed-specs `roadmap/wave-1-core-mvp/phases/{01.8c,01.9,01.4-ui,01.10,01.12}-*.md` | Констрейнты всех оставшихся W1-фаз; **01.8c autonomy-hardening — новая сервисная фаза** (роли→нативные сабагенты, OpenAPI-snapshot+CI, docs-freshness CI, код-ренейм Oriion) |
 
-### Gap analysis (existed vs added)
+### Ключевые изменения существующего канона
 
-- **Existed:** `iam.sessions/refresh_tokens` (+ rotation chain); the SHA-256 single-use token-table pattern (`email_verification_tokens`); the `EmailSender` port (+ `YandexSmtpEmailSender` from 01.8-mail); `session_repository.list_active_for_user`; `TokenService` (HS256 access + opaque refresh); rate-limit service; `LocalAESKMS` AES-256-GCM KMS provider.
-- **Added:** 2FA TOTP (`totp_credentials` + `totp_backup_codes` tables; `TotpService` enroll/confirm/verify/disable; login second-factor challenge); magic-link (`magic_link_tokens` table; `MagicLinkService` request/consume; `send_magic_link_email` on the port + all impls); session revoke endpoints (`revoke_for_user` user-scoped + `revoke_all_others` + refresh cascade); migration `iam_0007`.
+- **Гейт W1→2 переписан** (`gates/wave-1-to-2.md`): чисто технические пороги (AC pass-rate ≥0.9 + must-фазы merged + DV-clean); прежний кодировал до-2026-05-15 скоуп («5 вертикалей, 10 фаз, NPS≥30») и был невычислим. Friend-валидация → **W2 фаза 02.0** (неблокирующая), NPS — измерение, не порог.
+- **Очередь W1 (ADR-040 D4):** `01.8c → 01.9 → 01.4-ui → 01.10 → 01.12`; must-закрытие волны = 01.9+01.4-ui+01.10+01.12; 01.3b/01.8b/01.11 = 🅿️ Parked (RW-04/02/05), волну НЕ держат.
+- **`run.md`/`discuss.md`:** RUNWAY-preflight, DoR-gate перед execute, budget v3 ($20 soft → доводим фазу и паркуем очередь / $40 hard → stop), live-goldens только по контрольной ценности, doc-sync в exit-ритуале (README-фаза, runbook, статус фазного файла, sync гейтов при реорге).
+- **`cost-budget.yaml` → v3** (per-day 20/40, было 30/75 — founder-поправка к рекомендации).
+- **`tripwire.yaml`:** D2-нюанс — охраняемый контракт = будущий `.planning/contracts/openapi.snapshot.json` (реализация 01.8c; текущий глоб fail-safe покрывает).
+- **DLP (ADR-040 D10):** precision (ИНН FP ≤1%) → оба флага ON → только потом первый MCP-коннектор; блокирующий AC фазы 01.9.
+- **Ребрендинг:** рабочее имя **Oriion** (OQ-09 обновлён); README/CONTRIBUTING/Makefile переименованы + README-статус актуализирован (застыл на «Phase 00.1»); CONTRIBUTING tier-table приведён к ADR-037. Код-ренейм (main.py, тесты, role-prompts + SemVer bump) — в 01.8c, НЕ здесь.
+- Гигиена D12: статусы 00.5/00.8 синхронизированы; wave-0-to-1 gate проза = фронтматтер; ADR-index +038/039/040.
 
-### Migration
+## In progress / not done (deliberately)
 
-**`iam_0007_totp_and_magic_link`** — pure-CREATE, literal DDL (via `_rls.updated_at_trigger`). Three USER-scoped tables (no cell RLS — matches the existing iam token tables; GRANT to `oriion_app`): `totp_credentials` (secret_encrypted **bytea** AES-256-GCM at rest), `totp_backup_codes` (SHA-256), `magic_link_tokens` (SHA-256). `contracts/iam/schema.sql` updated 1:1.
+- **Реализация** snapshot-CI / docs-freshness CI / RUNWAY-preflight-скрипта / нативных сабагентов — всё это **фаза 01.8c** (seed-spec готов); данный PR — только документы и нормативка.
+- JOURNAL.md >170KB — архивация в `dev-log/archive/` внесена в scope 01.8c (maintenance).
+- RUN-QUEUE не трогался (нет блокирующих записей).
 
-### How the TOTP secret is stored at rest + login gate
+## Next steps
 
-- **At rest:** enroll → `KMSProvider.encrypt(secret)` (LocalAESKMS AES-256-GCM) → `secret_encrypted bytea`; decrypt in-memory only. Base32 plaintext leaves the service once (enroll response), never logged. Backup codes SHA-256 hashed, single-use.
-- **Login gate:** `AuthService.login` verifies password → if active 2FA, returns a short-lived HS256 `TotpChallenge` (type-guarded, no server state) with **no session minted on the password leg**; `POST /auth/login/totp` verifies challenge + a live TOTP or single-use backup code, then issues the pair. Password-only login unchanged for users without 2FA (TotpService seam defaults to None).
-
-### New endpoints
-
-`POST /auth/login/totp`, `POST /auth/magic-link/{request,consume}`,
-`POST /users/me/totp/{enroll,confirm,disable}`,
-`GET /users/me/sessions`, `DELETE /users/me/sessions/{id}`, `DELETE /users/me/sessions`.
-
-### Gate results
-
-```
-ruff check:      All checks passed
-ruff format:     clean (428 files)
-mypy --strict:   Success (228 source files)
-bandit -r src:   0 issues (any severity)
-pytest tests/iam/unit:        116 passed, 1 live-deselected
-pytest tests/iam/integration:   6 passed (real PG, testcontainers; migration 0007 applies)
-src/iam coverage: 92.14% (unit+integration; gate ≥85%)
-pip-audit: pyotp 2.10.0 → 0 vulns (pip/starlette findings pre-existing, not this phase)
-```
-
-### Adversarial audit (3 lenses, refute-by-default) — full JSON in evidence/
-
-- **SECURE ✅ PASS** (0 P0/P1): TOTP secret encrypted at rest + never logged (grep + integration ciphertext assertion); tokens hashed/single-use/expiry-enforced; no 2FA bypass (challenge ≠ tokens; no session on the password leg); challenge type-guarded (a real access token is rejected); cross-user session revoke → 404 with the target row untouched; magic-link anti-enum (no oracle).
-- **SOUND ✅ PASS**: second factor gates login when enabled; consumed/expired tokens → 410; backup-code replay → 401.
-- **NO-REGRESSIONS ✅ PASS**: password login / verify / reset / refresh green (116 iam unit); EmailSender port extended on ALL impls; pyotp CVE-clean.
-
-## Tripwire / founder action
-
-- **Tripwire:** `src/iam/**` + iam migration → `auth_rbac_sessions` → PR is **NOT** auto-merge; requires **founder ack**. `db_migrations` content-check **downgrades** (0007 provably pure-CREATE; `classify_tripwire.py` confirmed).
-- Founder: review + ack + merge the PR from `claude/auto-01.8`. **Base = `claude/auto-01.8-mail`** — merge 01.8-mail first (or retarget once it lands on main).
-
-## Residual follow-ups
-
-- **01.8b (deferred):** Yandex ID + VK ID OAuth — needs client creds.
-- P3: no "regenerate backup codes" endpoint; no admin-forced-2FA tenant policy.
-- P3: magic-link + TOTP-challenge live email-send depends on the deferred SMTP-creds gate (01.8-mail); flows exercised with the InMemory sender here.
-- `.planning/JOURNAL.md` ~700 lines → archive older quarters to `dev-log/archive/` (maintenance, separate task).
+1. Founder: merge этого PR (docs-only; правка `cost-budget.yaml` попадает под glob `secrets_keys_crypto` → ожидаем 1-click ack).
+2. `/autonomy:run 01.8c` — далее очередь по ADR-040 D4 автоматически.
+3. Founder (параллельно, по желанию): разблокировки RW-01 (SMTP) / RW-03 (bot-token — дёшево, держит вторую вертикаль) / RW-07 (staging anchor run — закрывает Wave 0 формально).
 
 ## Next agent — read first
 
 1. [`README.md`](./README.md) — what is this project
 2. **this HANDOFF.md** — snapshot
 3. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) — workflow protocol
-4. [01.8 spec](./roadmap/wave-1-core-mvp/phases/01.8-auth-extensions.md) + [PLAN](./roadmap/wave-1-core-mvp/phases/01.8-PLAN.md) + DECISIONS-LOG in `_session-context/`.
+4. Новые обязательные контракты раннера: [`roadmap/DEFINITION-OF-READY.md`](./roadmap/DEFINITION-OF-READY.md) + [`FOUNDER-RUNWAY.md`](./FOUNDER-RUNWAY.md) + [`DEFERRED-VERIFICATION.md`](./DEFERRED-VERIFICATION.md) (per `run.md` §Contracts п.4).
 
 ## Exit ritual completed (this session)
 
-- [x] 4 atomic commits (coder×2 + tester + reviewer) + evidence commit on `claude/auto-01.8`
-- [x] DECISIONS-LOG entries (3 impl forks: TOTP at-rest KMS; login challenge; user-scoped tables)
-- [x] JOURNAL.md entry appended (this date)
+- [x] ADR-040 + DoR + DEFERRED-VERIFICATION + FOUNDER-RUNWAY + 5 seed-specs written
+- [x] Gates wave-1-to-2 (rewrite) + wave-0-to-1 (prose sync) updated
+- [x] run.md / discuss.md / cost-budget.yaml v3 / tripwire.yaml updated
+- [x] JOURNAL.md entry appended (2026-07-07)
 - [x] HANDOFF.md rewritten (this file)
-- [x] Phase spec `01.8-auth-extensions.md` + `01.8-PLAN.md` written (in the WORKTREE tree)
-- [x] evidence/adversarial_audit.json + docker_integration.json + manifest.json (head_sha = final non-evidence commit)
-- [ ] PR opened — pending (orchestrator/founder action; tripwire needs founder ack; base = `claude/auto-01.8-mail`)
+- [x] Doc-sync per ADR-040 D9: README status actual · phase-file statuses synced · gate-files synced in the same PR
+- [ ] PR opened — this session's closing action (draft, tripwire ack expected)

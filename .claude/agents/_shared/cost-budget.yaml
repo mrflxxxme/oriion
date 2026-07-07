@@ -5,8 +5,8 @@
 # но не на числа (per P-AUDIT-1).
 # Reviewed at: every wave-N-to-N+1 gate transition.
 
-version: 2
-last_reviewed: 2026-05-13
+version: 3
+last_reviewed: 2026-07-07
 last_reviewed_by: founder
 review_trigger: wave-gate-transition
 restructure_rationale: |
@@ -15,6 +15,11 @@ restructure_rationale: |
     / memory-curator / architect / etc) — scales с phase-count, predictable
   - user_production: user-cells executing tasks через LLM gateway — scales с user-base,
     unpredictable, ДОЛЖЕН быть isolated от dev-policy для clean signal interpretation
+  v3 (founder-интервью 2026-07-07, ADR-040 D11): per-day caps ужаты 30/75 → 20/40.
+  Live-goldens — только там, где дают контрольную ценность (фаза трогает LLM-путь /
+  промпты / оркестрацию); детерминированные фазы объявляют N/A. Ожидаемый live-golden
+  бюджет — строка DoR каждой фазы. Soft-cap behavior: раннер доводит текущую фазу до
+  чистого конца и паркует очередь (не бросает фазу посередине).
 
 dev_team:
   description: "AI-team internal development loop (planner, implementers, reviewers, verifier, memory-curator, architect, designer, evaluator). Activates ALWAYS."
@@ -25,11 +30,13 @@ dev_team:
       Avg expected: $0.10-0.30 per task (Opus, ~3500 tokens out + 8000 in).
       Hard cap = 6x avg — accounts for retry storms / runaway loops.
   per_day:
-    team_soft_cap_usd: 30
-    team_hard_cap_usd: 75
+    team_soft_cap_usd: 20
+    team_hard_cap_usd: 40
     notes: |
-      Calibrated for 11 agents × ~5-10 tasks/day в active development.
-      Adjust upward during sprint-end pushes, downward during dormant phases.
+      v3 (ADR-040 D11): ужато с 30/75. Soft-cap → раннер доводит текущую фазу до чистого
+      конца и паркует очередь + notify; hard-cap → immediate stop. Live-goldens только
+      по контрольной ценности (см. restructure_rationale). Adjust upward during
+      sprint-end pushes, downward during dormant phases.
   per_month:
     team_kill_switch_usd: 500
     notes: |

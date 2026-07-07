@@ -12,22 +12,24 @@ You are the runner. The strengthened gate-stack is the merge authority — NOT t
 1. `.planning/agent-handbook/00-START-HERE.md` — bootstrap-4 + dual-tree guard.
 2. `.claude/autonomy/escalation-policy.md` (D4) + `judge-panel.md` (D5) + `tripwire.yaml` (D2).
 3. `.claude/agents/_shared/cost-budget.yaml` — dev_team caps; honor per-day soft/hard.
+4. `.planning/roadmap/DEFINITION-OF-READY.md` (ADR-040 D1) + `.planning/FOUNDER-RUNWAY.md` (D7) + `.planning/DEFERRED-VERIFICATION.md` (D6).
 
 ## Preflight (once per run)
 - `git rev-parse --show-toplevel` — anchor; sync `origin/main`; work off fresh `main`.
 - Docker: check `docker info`. **NEVER start Docker yourself** (founder-controlled). If down → integration/live gates are unavailable: phases whose manifest needs them go to RUN-QUEUE as `stuck`, pick the next phase that doesn't.
 - Funded `.env`: run `python scripts/autonomy/provision_env.py` — it copies the canonical funded `backend/.env` (kept git-ignored on the **main checkout**) into the active worktree if absent (idempotent; secret-safe: refuses if the dest isn't git-ignored; never prints values). Exit 0 = present/provisioned; exit 2 = no canonical env configured → live goldens unavailable, same stuck-path as Docker-down (proceed with phases that don't need them). NEVER commit `.env` (tripwire `secrets_keys_crypto` + gitleaks).
-- Note the per-run budget: dev_team per_day soft $30 / hard $75. Track approximate spend; STOP the run at hard cap (add `stuck` entry: budget).
+- **RUNWAY preflight (ADR-040 D7):** cross-check the queue against `.planning/FOUNDER-RUNWAY.md`. A phase whose runway dependency is not 🟢 ready is **parked BEFORE start** (RUN-QUEUE `parked` + notify once per run, not per phase) — continue with the next unblocked phase. A dependency that gates only part of a phase (e.g. RW-03 → live-демо only) does NOT park the phase; the gated part goes to DEFERRED-VERIFICATION.
+- Note the per-run budget: dev_team per_day **soft $20 / hard $40** (cost-budget.yaml v3, ADR-040 D11). Track approximate spend. At **soft cap**: finish the CURRENT phase to a clean stop (merge or documented-green), then park the rest of the queue + notify. At **hard cap**: STOP immediately (add `stuck` entry: budget).
 
 ## Per-phase loop
 For each phase P in the queue:
 
 1. **Branch** `claude/auto-<P>-<slug>` off fresh `origin/main`.
 2. **Discuss** — run the `/autonomy:discuss` routine for P (own+log via `log_decision.py`; wide forks → judge-panel; product/tripwire forks → escalate). If a fork escalates: RUN-QUEUE `escalation` + notify (see Interrupts); if it blocks the whole phase → skip P (leave branch), continue with the next INDEPENDENT phase; else proceed on the unblocked part.
-3. **Plan** — PLAN.md per planner role; pin tasks via TaskCreate.
+3. **Plan** — PLAN.md per planner role; pin tasks via TaskCreate. **DoR gate (ADR-040 D1):** validate the grown spec against `.planning/roadmap/DEFINITION-OF-READY.md` (11 items) and record `DoR: PASS (11/11)` in PLAN.md. A failed item you can fix (agent-owned gap) → fix the spec first; a failed item needing the founder (product/runway) → escalate. NEVER execute without DoR: PASS. Soft ACs planned in the spec MUST have their `DEFERRED-VERIFICATION.md` row in this same PR (D6 — reviewer flags the merge otherwise).
 4. **Execute** — atomic commits (ADR-027 format, `Pipeline-role:` field). Delegate to roles via Agent tool: compose prompts with `python scripts/autonomy/load_role.py --role <role> [--checklist <c>]` + task context. Reviews: relevant reviewer roles (parallel where independent). Stagnation kill-switch: no commit/file-write/status-update for 30 min wall-clock → abort task, RUN-QUEUE `stuck` + notify (ADR-015 §5).
-5. **Gates** — local CI-equivalent: `make lint typecheck test` (+ integration if Docker up) + per-module gates as the phase demands. Local-only gates (live goldens / docker-integration / adversarial audit / judge-panel) MUST write `evidence/<gate>.json` (schema `.claude/autonomy/evidence-schema.json`, `head_sha` = final commit) + declare in `evidence/manifest.json`. **Re-run evidence gates if you commit after generating them** (freshness is enforced by ci-evidence).
-6. **Exit ritual** — JOURNAL append + HANDOFF rewrite (house rule; review-gate blocks merge without it).
+5. **Gates** — local CI-equivalent: `make lint typecheck test` (+ integration if Docker up) + per-module gates as the phase demands. Local-only gates (live goldens / docker-integration / adversarial audit / judge-panel) MUST write `evidence/<gate>.json` (schema `.claude/autonomy/evidence-schema.json`, `head_sha` = final commit) + declare in `evidence/manifest.json`. **Re-run evidence gates if you commit after generating them** (freshness is enforced by ci-evidence). **Live goldens only where they buy control value (ADR-040 D11):** the phase touches an LLM path / prompts / orchestration → run them (budget line is in the spec per DoR #8); deterministic phases → declare N/A, don't burn budget.
+6. **Exit ritual** — JOURNAL append + HANDOFF rewrite (house rule; review-gate blocks merge without it) **+ doc-sync (ADR-040 D9):** (a) README «текущая фаза» actual; (b) runbook for the touched feature updated/created under `docs/runbooks/`; (c) the merged phase's spec-file Status is not Pending; (d) if the phase reorganized the roadmap → the affected `gates/*.md` are synced in the same PR (D5).
 7. **PR** — `gh pr create` (body: what/AC/verification/decisions-log refs). Watch `gh pr checks <N> --watch`; ALL checks green required — including path-filtered `ci-backend`/`ci-frontend` when they triggered (they are not branch-protection-required; YOU are the gate here). Red gate → fix and re-push, max 3 cycles → RUN-QUEUE `stuck` + notify, move on.
 8. **Tripwire classify (explicit step)** — `uv run --project backend python scripts/autonomy/classify_tripwire.py --diff-base origin/main` (exit 0 = clean; 10 = matched). The premerge hook re-checks this at the merge command — defense-in-depth.
    - **exit 0** → `gh pr merge <N> --squash --delete-branch` (linear history). 
@@ -49,8 +51,8 @@ Sequential is the DEFAULT. Parallelize ONLY when phases are **provably independe
 - **Merges stay SEQUENTIAL** through steps 8–9 in the main session (one merge → health-check → next merge). Never merge two tracks back-to-back without a health-check between — regression attribution (D7) needs one offender at a time.
 - On any doubt about independence — don't parallelize. Wall-clock saved is not worth a cross-track conflict.
 
-## Budget accounting (R-31)
-At run end estimate spend (phases × avg task cost vs `cost-budget.yaml` dev_team caps) and include it in the run's `complete` RUN-QUEUE entry. Judge-panels and heal fix-loops count toward the same per-day budget; degrade panel N=3→2 when tight (see judge-panel.md).
+## Budget accounting (R-31, ADR-040 D11)
+At run end estimate spend (phases × avg task cost vs `cost-budget.yaml` dev_team caps) and include it in the run's `complete` RUN-QUEUE entry. Judge-panels and heal fix-loops count toward the same per-day budget; degrade panel N=3→2 when tight (see judge-panel.md). Per-day caps: **soft $20 / hard $40** (v3). Soft-cap behavior: finish the current phase cleanly, then park the queue + notify — never abandon a phase mid-flight for the soft cap.
 
 ## Stop conditions (end the run cleanly)
 Queue empty · escalation/ack blocks all remaining phases · budget hard-cap · heal went `stuck` (unfixable regression) · founder says stop. On stop: RUN-QUEUE `complete` summary for the RUN (phases merged / pending acks / escalations / reverts+fixes / spend estimate) + notify.
