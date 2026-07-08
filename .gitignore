@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+# VPS minimal-pilot env holds real secrets (not named .env) — never commit it.
+# The committed template is infra/staging-minimal.env.example.
+infra/vps-minimal.env
 *.key
 *.pem
 secrets/
