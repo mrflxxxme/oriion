@@ -192,3 +192,21 @@
 - Decision: User-scoped, GRANT to oriion_app only, NO cell RLS policy (matches iam.sessions / email_verification_tokens / password_reset_tokens); authz enforced by user_id predicates in repos + get_current_user
 - Rationale: These are pre-auth / identity-level rows keyed on user_id, not tenant cell_id; the iam context is system-level (schema.sql: 'RLS not applicable'); adding a cell policy would be wrong + break the pure-CREATE tripwire shape
 - Reversibility: reversible
+
+### 2026-07-08T21:54:23Z | phase run-2026-07-09 | impl
+- Fork: Wave-1 phase ordering: D4 default queue (01.8c-first) vs product-must-set-first
+- Decision: Reorder to product-first: 01.4-ui -> 01.9 -> 01.10 -> 01.12; 01.8c (dev-infra service phase) deferred to end/only-if-warranted
+- Rationale: Founder run-args set explicit global goal = verifiably+fully complete Wave-1 PRODUCT, verified on VPS. 01.8c is not in the must-set and yields nothing server-verifiable. No hard dep (real independent audit subagents spawnable via Agent tool without 01.8c native-subagent files). Start with 01.4-ui: tripwire-free auto-merge, $0 live, server-verifiable -> validates full pipeline+deploy path before the hard/expensive 01.9. note#2 permits optimal ordering; note#6 'strictly follow workflow' governs merge/gate flow, not queue order.
+- Reversibility: reversible
+
+### 2026-07-08T21:56:27Z | phase 01.4-ui | impl
+- Fork: Memory delete/mutate rights in UI: Owner-only vs any cell member
+- Decision: Expose add+delete to any authenticated cell member (match live backend); confirm-dialog on delete
+- Rationale: Live memory endpoints (backend/src/memory/routers/memory.py) are cell-scoped via RLS + get_current_workspace_id with NO Owner/Member guard — any cell member already can add/delete via API. UI must mirror live authz, not invent stricter rules. Memory is collaborative working context (byproduct of Member-allowed task-create), consistent with 01.7 pattern where reads+task-ops are Member-level. Reversible.
+- Reversibility: reversible
+
+### 2026-07-08T21:56:27Z | phase 01.4-ui | impl
+- Fork: Edit semantics for memory entries (no PATCH endpoint exists)
+- Decision: Edit = delete + re-add (append-only); no new backend endpoint
+- Rationale: Router exposes only GET/POST/DELETE (no PATCH); backend memory is append-only by design (grill 2026-06-23). Adding PATCH is explicitly out-of-scope for 01.4-ui. delete+add preserves append-only + source provenance. Reversible.
+- Reversibility: reversible

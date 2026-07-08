@@ -4,65 +4,45 @@
 
 ## Last updated
 
-- Date: 2026-07-07 (docs-refinement: founder-интервью → ADR-040 spec-contract автономного исполнения)
-- Session: `docs-refinement-interview` (branch `claude/docs-refinement-interview-z4soj2`)
-- Agent: @claude (remote session, интерактивное founder-интервью)
+- Date: 2026-07-09
+- Session: `/autonomy:run` — Wave-1 completion (product-first reorder)
+- Agent: @claude (autonomous runner, ADR-037/040)
 
 ## Project status
 
-- **Wave:** Wave 1 (Core MVP), смержено всё до 01.8 включительно (`origin/main = 0c1e9fc`).
-- **Эта сессия:** документационная (0 строк кода). Углублённое интервью с founder → 12 решений → [ADR-040](./decisions/ADR-040-execution-spec-contract.md) + новые нормативные артефакты + актуализация дрейфнувших доков.
+- **Wave:** Wave 1 (Core MVP). Смержено всё до 01.8 включительно (`origin/main = 02cdb68`, #93) + инфра VPS-пилот (#91/#92) + search-fix (#93).
+- **Эта сессия:** автономный раннер к «проверенно и полнофункционально закончить Wave 1», верификация на **VPS `staging.профики.online` (194.87.187.207)**, не в Docker.
 
-## What just happened
+## Run decisions (this session)
 
-Вход: три параллельных исследования (методология+автономный контур / roadmap / код-vs-доки) выявили 10 разрывов, мешающих точному автономному исполнению дорожной карты. Интервью (3 раунда × 4 вопроса, по каждому — анализ и рекомендация) зафиксировало решения; всё внесено в канон.
+- **Reorder product-first** (DECISIONS-LOG `run-2026-07-09`): очередь исполнения **`01.4-ui → 01.9 → 01.10 → 01.12`**; **01.8c** (dev-infra service phase) отложена в конец / только-если-нужна. Причина: founder run-args = верифицируемое завершение **продукта** Wave 1 на сервере; 01.8c не в must-set и не даёт server-verifiable результата; нет жёсткой зависимости (независимые аудит-сабагенты спавнятся через Agent tool без нативных файлов 01.8c).
+- Локальные гейты без `make` (нет на Windows): `cd backend && uv run ruff check/format --check src tests`, `uv run mypy --strict src`, `uv run pytest ... -m "not integration"`, `uv run bandit -r src -c pyproject.toml`; frontend `npm run lint/format:check/typecheck/test`.
+- Deploy на VPS = ручной: GH Actions `build-images-ghcr` (main) → ssh `dc pull && dc up -d` (+ `alembic upgrade heads` при новых миграциях), где `dc='docker compose --env-file infra/vps-minimal.env -f infra/docker-compose.vps-minimal.yml'` (repo на боксе `/home/deploy/oriion`). Frontend server-verifiable (Caddy отдаёт `/srv/frontend` из one-shot-volume).
 
-### Новые нормативные документы
+## What just happened — Phase 01.4-ui MERGED-READY
 
-| Документ | Что это |
-|---|---|
-| [`decisions/ADR-040-execution-spec-contract.md`](./decisions/ADR-040-execution-spec-contract.md) | 12 решений интервью (D1–D12), Accepted |
-| [`roadmap/DEFINITION-OF-READY.md`](./roadmap/DEFINITION-OF-READY.md) | 11-пунктовый DoR; `/autonomy:run` не исполняет фазу без `DoR: PASS` в PLAN.md |
-| [`DEFERRED-VERIFICATION.md`](./DEFERRED-VERIFICATION.md) | Реестр мягких AC (DV-01..DV-10); мягкий AC без записи = блокирующий review-flag; гасятся обязательными `NN.1-retro` |
-| [`FOUNDER-RUNWAY.md`](./FOUNDER-RUNWAY.md) | Манифест founder-зависимостей (RW-01..RW-09); раннер паркует гейтед-фазы на preflight |
-| Seed-specs `roadmap/wave-1-core-mvp/phases/{01.8c,01.9,01.4-ui,01.10,01.12}-*.md` | Констрейнты всех оставшихся W1-фаз; **01.8c autonomy-hardening — новая сервисная фаза** (роли→нативные сабагенты, OpenAPI-snapshot+CI, docs-freshness CI, код-ренейм Oriion) |
-
-### Ключевые изменения существующего канона
-
-- **Гейт W1→2 переписан** (`gates/wave-1-to-2.md`): чисто технические пороги (AC pass-rate ≥0.9 + must-фазы merged + DV-clean); прежний кодировал до-2026-05-15 скоуп («5 вертикалей, 10 фаз, NPS≥30») и был невычислим. Friend-валидация → **W2 фаза 02.0** (неблокирующая), NPS — измерение, не порог.
-- **Очередь W1 (ADR-040 D4):** `01.8c → 01.9 → 01.4-ui → 01.10 → 01.12`; must-закрытие волны = 01.9+01.4-ui+01.10+01.12; 01.3b/01.8b/01.11 = 🅿️ Parked (RW-04/02/05), волну НЕ держат.
-- **`run.md`/`discuss.md`:** RUNWAY-preflight, DoR-gate перед execute, budget v3 ($20 soft → доводим фазу и паркуем очередь / $40 hard → stop), live-goldens только по контрольной ценности, doc-sync в exit-ритуале (README-фаза, runbook, статус фазного файла, sync гейтов при реорге).
-- **`cost-budget.yaml` → v3** (per-day 20/40, было 30/75 — founder-поправка к рекомендации).
-- **`tripwire.yaml`:** D2-нюанс — охраняемый контракт = будущий `.planning/contracts/openapi.snapshot.json` (реализация 01.8c; текущий глоб fail-safe покрывает).
-- **DLP (ADR-040 D10):** precision (ИНН FP ≤1%) → оба флага ON → только потом первый MCP-коннектор; блокирующий AC фазы 01.9.
-- **Ребрендинг:** рабочее имя **Oriion** (OQ-09 обновлён); README/CONTRIBUTING/Makefile переименованы + README-статус актуализирован (застыл на «Phase 00.1»); CONTRIBUTING tier-table приведён к ADR-037. Код-ренейм (main.py, тесты, role-prompts + SemVer bump) — в 01.8c, НЕ здесь.
-- Гигиена D12: статусы 00.5/00.8 синхронизированы; wave-0-to-1 gate проза = фронтматтер; ADR-index +038/039/040.
+**Memory panel «Что помнит команда/агент»** — code-complete + locally verified (branch `claude/auto-01.4-ui-memory-panel`). Frontend-фича поверх live `/api/v1/memory/*`:
+- Два таба: **Ячейка** (cell-memory) / **Агент** (role-memory, picker по `GET /cells/{id}/agents`).
+- list + семантический поиск (`?q=`) + add (`source=manual`) + delete c confirm (Radix Dialog); source-бейджи (manual/filter_agent/summary); edit = delete+add (append-only, PATCH нет).
+- API-клиенты `frontend/src/api/memory.ts` + `agents.ts` — схемы pinned к реальному бэку (проверено: поля MemoryEntryOut, param `q`, endpoint `/cells/{id}/agents` существует).
+- Форки (2, agent-owned, logged): delete-права = любой член cell (match live RLS, Owner-gate отсутствует); edit=delete+add.
+- **Гейты green (независимо перепрогнаны):** eslint --max-warnings=0 · prettier · tsc strict · vitest 181 pass / features-memory 94% cov · axe 0 violations (jest-axe).
+- Tripwire: чистый frontend → exit 0 → **auto-merge** (без founder ack). Live-golden **N/A ($0)**.
+- Артефакты: `PLAN.md`, `UI-SPEC-01.4-ui.md`, runbook `docs/runbooks/memory-panel.md`.
 
 ## In progress / not done (deliberately)
 
-- **Реализация** snapshot-CI / docs-freshness CI / RUNWAY-preflight-скрипта / нативных сабагентов — всё это **фаза 01.8c** (seed-spec готов); данный PR — только документы и нормативка.
-- JOURNAL.md >170KB — архивация в `dev-log/archive/` внесена в scope 01.8c (maintenance).
-- RUN-QUEUE не трогался (нет блокирующих записей).
-
-## Next steps
-
-1. Founder: merge этого PR (docs-only; правка `cost-budget.yaml` попадает под glob `secrets_keys_crypto` → ожидаем 1-click ack).
-2. `/autonomy:run 01.8c` — далее очередь по ADR-040 D4 автоматически.
-3. Founder (параллельно, по желанию): разблокировки RW-01 (SMTP) / RW-03 (bot-token — дёшево, держит вторую вертикаль) / RW-07 (staging anchor run — закрывает Wave 0 формально).
+- **Server-verify 01.4-ui** — после deploy на VPS (build-images-ghcr → dc pull frontend → браузер-проверка панели). Не блокирует merge (tripwire-free FE).
+- Следующая фаза: **01.9 MCP-серверы + DLP-активация** (hard, tripwire: secrets_keys_crypto + возможно db_migrations; live-golden ~$1-2; SECURE-priority adversarial audit). Ожидается founder ack на tripwire.
+- 01.8c отложена (см. Run decisions).
 
 ## Next agent — read first
 
-1. [`README.md`](./README.md) — what is this project
-2. **this HANDOFF.md** — snapshot
-3. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) — workflow protocol
-4. Новые обязательные контракты раннера: [`roadmap/DEFINITION-OF-READY.md`](./roadmap/DEFINITION-OF-READY.md) + [`FOUNDER-RUNWAY.md`](./FOUNDER-RUNWAY.md) + [`DEFERRED-VERIFICATION.md`](./DEFERRED-VERIFICATION.md) (per `run.md` §Contracts п.4).
+1. [`README.md`](./README.md) · 2. **this HANDOFF** · 3. [`agent-handbook/00-START-HERE.md`](./agent-handbook/00-START-HERE.md) · 4. раннер-контракты: [`DEFINITION-OF-READY.md`](./roadmap/DEFINITION-OF-READY.md) + [`FOUNDER-RUNWAY.md`](./FOUNDER-RUNWAY.md) + [`DEFERRED-VERIFICATION.md`](./DEFERRED-VERIFICATION.md).
 
-## Exit ritual completed (this session)
+## Exit ritual (this phase)
 
-- [x] ADR-040 + DoR + DEFERRED-VERIFICATION + FOUNDER-RUNWAY + 5 seed-specs written
-- [x] Gates wave-1-to-2 (rewrite) + wave-0-to-1 (prose sync) updated
-- [x] run.md / discuss.md / cost-budget.yaml v3 / tripwire.yaml updated
-- [x] JOURNAL.md entry appended (2026-07-07)
+- [x] JOURNAL.md entry appended (2026-07-09)
 - [x] HANDOFF.md rewritten (this file)
-- [x] Doc-sync per ADR-040 D9: README status actual · phase-file statuses synced · gate-files synced in the same PR
-- [ ] PR opened — this session's closing action (draft, tripwire ack expected)
+- [x] Doc-sync (ADR-040 D9): README status/queue actual · 01.4-ui spec Status ≠ Pending · runbook `docs/runbooks/memory-panel.md` created · no roadmap reorg → no gate-file sync needed
+- [ ] PR opened + CI green + tripwire exit 0 → auto-merge → deploy → server-verify
