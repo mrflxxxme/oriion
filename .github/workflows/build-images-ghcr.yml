@@ -1,0 +1,85 @@
+# .github/workflows/build-images-ghcr.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Builds the backend + frontend images and pushes them to GitHub Container
+# Registry (GHCR) — the FREE registry for the low-budget VPS pilot (Timeweb Cloud).
+#
+# This is intentionally separate from deploy-staging.yml, which targets Yandex
+# Container Registry for the managed-YC path. This workflow serves the minimal
+# self-hosted path: images land in ghcr.io/<owner>/oriion-{backend,frontend},
+# the VPS pulls them via infra/docker-compose.vps-minimal.yml
+# (set YC_CR_REGISTRY=ghcr.io/<owner> in infra/vps-minimal.env).
+#
+# Trigger: manual (workflow_dispatch) + on version tags (v*). NOT on every push
+# to main, to avoid duplicate builds with deploy-staging.yml.
+#
+# On the VPS, authenticate once so `docker compose pull` works:
+#   echo <GHCR_PAT_with_read:packages> | docker login ghcr.io -u <owner> --password-stdin
+# (or make the packages public in the repo's Packages settings — then no login).
+
+name: build-images-ghcr
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Extra image tag (defaults to the commit SHA + latest)"
+        required: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: build + push (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: backend
+            target: prod
+          - name: frontend
+            context: frontend
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      # The backend image COPYs backend/role_prompts, which is gitignored and
+      # synced from .planning/contracts/role-prompts/ at build time. No-op for
+      # the frontend.
+      - name: Sync role prompts (backend only)
+        if: matrix.name == 'backend'
+        run: sh scripts/sync_role_prompts.sh
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/oriion-${{ matrix.name }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event.inputs.tag != '' }}
+            type=ref,event=tag
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false

@@ -1,0 +1,218 @@
+# infra/docker-compose.vps-minimal.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# STANDALONE minimal single-box stack for a low-budget friends pilot on ONE VPS
+# (recommended: Timeweb Cloud, 2 vCPU / 4 GB, Ubuntu 24.04). It mirrors the app
+# services of docker-compose.staging.yml (backend / worker / frontend / caddy)
+# but WITHOUT the observability stack (prometheus/grafana/loki/tempo/alertmanager/
+# otel) and WITH inline postgres + redis + minio, so nothing managed/paid is
+# needed. Everything else (KMS, secrets) runs on the free local fallbacks the
+# code already supports (KMS_BACKEND=local, plain env — no Lockbox).
+#
+# SOURCE OF TRUTH for the backend/worker service shape is docker-compose.staging.yml.
+# If that file changes the image ref / command / hardening, re-sync this file.
+#
+# ── Why APP_ENV=staging (not dev) ────────────────────────────────────────────
+# get_email_sender() selects ConsoleEmailSender for dev/test and the real
+# YandexSmtpEmailSender only for staging/prod WITH SMTP creds. So for real
+# verification e-mails we run APP_ENV=staging — which also arms the boot guard
+# (_guard_no_dev_secrets): you MUST provide non-dev JWT_SECRET_ACCESS_V1,
+# BYOK_MASTER_KEY_B64 and DATABASE_URL (all satisfied below / in the env file).
+#
+# ── Usage (run FROM the repo root) ───────────────────────────────────────────
+#   cp infra/staging-minimal.env.example infra/vps-minimal.env   # then fill it
+#   # first boot: apply migrations, then bring the stack up
+#   docker compose --env-file infra/vps-minimal.env -f infra/docker-compose.vps-minimal.yml \
+#       run --rm backend alembic upgrade head
+#   docker compose --env-file infra/vps-minimal.env -f infra/docker-compose.vps-minimal.yml \
+#       up -d
+#
+# Images: by default pulled from ${YC_CR_REGISTRY}/oriion-*:${IMAGE_TAG} (set
+# YC_CR_REGISTRY=ghcr.io/<owner> after the GHCR build workflow runs). To build on
+# the VPS instead (no registry), add `--build` to the up command.
+
+name: oriion-vps-minimal
+
+# Shared app config injected into backend + worker. Secrets (JWT/BYOK/SMTP/LLM
+# keys) come from the env_file; this block is non-secret config only.
+x-app-config: &app-config
+  APP_ENV: staging
+  SSE_BACKEND: redis
+  DATABASE_URL: postgresql+asyncpg://oriion:${PG_PASSWORD:?set PG_PASSWORD in the env file}@postgres:5432/oriion
+  REDIS_URL: redis://redis:6379/0
+  # Observability off for the minimal box — no otel-collector to export to.
+  OTEL_TRACES_ENABLED: "false"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+  LOG_FORMAT: json
+  LOG_LEVEL: INFO
+  # S3 → the inline MinIO below (artifact assets).
+  MINIO_ENDPOINT: http://minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-oriion}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in the env file}
+  MINIO_REGION: ru-central1
+  ARTIFACTS_S3_BUCKET: oriion-artifacts
+  ARTIFACTS_S3_ENV: staging
+  FX_RATE_USD_TO_RUB: ${FX_RATE_USD_TO_RUB:-100.0}
+
+x-hardening: &hardening
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oriion
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?set PG_PASSWORD in the env file}
+      POSTGRES_DB: oriion
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oriion -d oriion"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-oriion}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in the env file}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # One-shot: create the artifacts bucket (idempotent), then exit.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-oriion}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in the env file}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+      mc mb --ignore-existing local/oriion-artifacts &&
+      mc anonymous set none local/oriion-artifacts;
+      echo 'bucket ready'"
+    restart: "no"
+
+  backend:
+    image: ${YC_CR_REGISTRY:-ghcr.io/CHANGE_ME}/oriion-backend:${IMAGE_TAG:-latest}
+    build:
+      context: ../backend
+      target: prod
+    restart: always
+    <<: *hardening
+    # Secrets (JWT_SECRET_ACCESS_V1, BYOK_MASTER_KEY_B64, SMTP_*, DEEPSEEK/YANDEX/
+    # GIGACHAT keys, …) are loaded from the env file INTO the container here.
+    env_file:
+      - vps-minimal.env
+    # Non-secret config overrides anything of the same name from the env file.
+    environment:
+      <<: *app-config
+      OTEL_SERVICE_NAME: oriion-backend
+    command: >
+      gunicorn src.main:app
+      -k uvicorn.workers.UvicornWorker
+      -w 1
+      -b 0.0.0.0:8000
+      --access-logfile -
+      --error-logfile -
+      --graceful-timeout 30
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker:
+    image: ${YC_CR_REGISTRY:-ghcr.io/CHANGE_ME}/oriion-backend:${IMAGE_TAG:-latest}
+    build:
+      context: ../backend
+      target: prod
+    restart: always
+    <<: *hardening
+    env_file:
+      - vps-minimal.env
+    environment:
+      <<: *app-config
+      OTEL_SERVICE_NAME: oriion-worker
+      WORKER_METRICS_PORT: "9191"
+    command: >
+      dramatiq src.runtime.queue.worker
+      --processes 1
+      --threads 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  frontend:
+    image: ${YC_CR_REGISTRY:-ghcr.io/CHANGE_ME}/oriion-frontend:${IMAGE_TAG:-latest}
+    build:
+      context: ../frontend
+    restart: always
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Real domain + Let's Encrypt: set CADDY_SITE_ADDR=staging.<your-domain> and
+      # leave CADDY_GLOBAL_OPTS empty (auto_https ON). IP-only test without a
+      # domain: CADDY_SITE_ADDR=:80 and CADDY_GLOBAL_OPTS="auto_https off".
+      CADDY_SITE_ADDR: ${CADDY_SITE_ADDR:?set CADDY_SITE_ADDR (e.g. staging.example.ru or :80)}
+      CADDY_GLOBAL_OPTS: ${CADDY_GLOBAL_OPTS-}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:?set CADDY_ACME_EMAIL}
+      CADDY_ADMIN_LISTEN: ${CADDY_ADMIN_LISTEN:-0.0.0.0:2019}
+    volumes:
+      - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  pg_data: {}
+  redis_data: {}
+  minio_data: {}
+  caddy_data: {}
+  caddy_config: {}
