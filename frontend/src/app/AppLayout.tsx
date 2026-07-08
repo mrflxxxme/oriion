@@ -3,7 +3,7 @@
  * with a sidebar nav + logout. Auth pages render outside this layout.
  */
 import { Outlet, useNavigate, Link } from "@tanstack/react-router";
-import { LayoutGrid } from "lucide-react";
+import { Brain, LayoutGrid } from "lucide-react";
 import { AppShell, Button } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
@@ -40,6 +40,13 @@ export function AppLayout() {
           >
             <LayoutGrid className="size-4" aria-hidden="true" />
             {t("cells.title")}
+          </Link>
+          <Link
+            to="/memory"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-page hover:text-primary [&.active]:bg-page [&.active]:text-primary"
+          >
+            <Brain className="size-4" aria-hidden="true" />
+            {t("memory.title")}
           </Link>
         </div>
       }
