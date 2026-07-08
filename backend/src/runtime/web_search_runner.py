@@ -197,6 +197,9 @@ def _default_web_search_tool(
         rate_limiter=rate_limiter,
         brave_api_key=settings.brave_search_api_key.get_secret_value() or None,
         yandex_api_key=settings.yandex_search_api_key.get_secret_value() or None,
+        # Folder (catalog) id required by the Yandex v2 searchAsync body; shared
+        # with the LLM-gateway modelUri scheme (settings.yandex_catalog_id).
+        yandex_folder_id=settings.yandex_catalog_id or None,
         # Settings is the source of truth — fixes AC-W1-19 bug where the tool read
         # os.environ directly so the .env WEB_SEARCH_MOCK_MODE flag was ignored
         # (live Brave 422 in the Track A run).
