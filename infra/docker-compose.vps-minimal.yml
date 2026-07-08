@@ -22,7 +22,7 @@
 #   cp infra/staging-minimal.env.example infra/vps-minimal.env   # then fill it
 #   # first boot: apply migrations, then bring the stack up
 #   docker compose --env-file infra/vps-minimal.env -f infra/docker-compose.vps-minimal.yml \
-#       run --rm backend alembic upgrade head
+#       run --rm backend alembic upgrade heads
 #   docker compose --env-file infra/vps-minimal.env -f infra/docker-compose.vps-minimal.yml \
 #       up -d
 #
@@ -180,11 +180,20 @@ services:
       minio:
         condition: service_healthy
 
+  # One-shot SPA publisher: the `prod` stage builds the Vite SPA and, on run,
+  # copies dist/ into the shared frontend_dist volume that Caddy serves from
+  # (Caddyfile.staging: root */srv/frontend + try_files {path} /index.html).
+  # Then it exits 0 → caddy waits on it via service_completed_successfully.
+  # The SPA calls the API same-origin (/api/v1) so NO build-arg is needed.
   frontend:
     image: ${YC_CR_REGISTRY:-ghcr.io/CHANGE_ME}/oriion-frontend:${IMAGE_TAG:-latest}
     build:
       context: ../frontend
-    restart: always
+      target: prod
+    # One-shot copier — publishes the built assets then exits; do not restart.
+    restart: "no"
+    volumes:
+      - frontend_dist:/srv/frontend
 
   caddy:
     image: caddy:2-alpine
@@ -202,13 +211,16 @@ services:
       CADDY_ADMIN_LISTEN: ${CADDY_ADMIN_LISTEN:-0.0.0.0:2019}
     volumes:
       - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      # Static SPA assets published by the one-shot `frontend` service, read-only.
+      - frontend_dist:/srv/frontend:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       backend:
         condition: service_healthy
+      # Wait until the SPA has been published into the volume before serving.
       frontend:
-        condition: service_started
+        condition: service_completed_successfully
 
 volumes:
   pg_data: {}
@@ -216,3 +228,4 @@ volumes:
   minio_data: {}
   caddy_data: {}
   caddy_config: {}
+  frontend_dist: {}

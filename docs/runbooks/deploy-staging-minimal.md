@@ -90,8 +90,8 @@ alias dc='docker compose --env-file infra/vps-minimal.env -f infra/docker-compos
 ```
 Apply DB migrations (first boot + after any release with new migrations):
 ```bash
-dc run --rm backend alembic upgrade head
-# if `alembic` isn't on PATH in the image, use:  dc run --rm backend uv run alembic upgrade head
+dc run --rm backend alembic upgrade heads
+# if `alembic` isn't on PATH in the image, use:  dc run --rm backend uv run alembic upgrade heads
 ```
 Start everything:
 ```bash
@@ -138,7 +138,7 @@ Also enable **Timeweb server snapshots** (covers the `minio_data` / `pg_data` vo
 ```bash
 # after build-images-ghcr publishes a new :latest (or set IMAGE_TAG to a sha):
 dc pull backend worker frontend
-dc run --rm backend alembic upgrade head   # only if the release added migrations
+dc run --rm backend alembic upgrade heads   # only if the release added migrations
 dc up -d
 ```
 
@@ -150,6 +150,38 @@ dc up -d
 - **Caddy no cert** → DNS/ports; temporarily use IP-only mode to isolate.
 - **`createbuckets` exited** → that's expected; it's a one-shot bucket creator.
 - **Out of RAM** → the observability stack is intentionally NOT in this compose; if you added it, drop back to this file.
+
+---
+
+## Known VPS gotchas (from the Timeweb pilot, 2026-07-08)
+Real issues hit on the first Timeweb deploy + their fixes (all applied on the box; the IPv6/SMTP ones are provider-specific so they live in VPS-local config, not the committed compose):
+
+1. **Docker Hub `429 Too Many Requests`** pulling base images (pgvector/redis/minio/caddy). Fix — Docker Hub pull-through mirror in `/etc/docker/daemon.json`, then `systemctl restart docker`:
+   ```json
+   { "registry-mirrors": ["https://dockerhub.timeweb.cloud"] }
+   ```
+2. **Alembic "Multiple head revisions"** — this project has branched migrations (iam/rbac/artifacts/…). Use `alembic upgrade heads` (plural), never `head`.
+3. **Outbound SMTP over IPv4 is BLOCKED by Timeweb** (register hangs → `SMTPConnectTimeoutError`, or `ENETUNREACH` from the container). Yandex SMTP works over **IPv6**. Fix — enable Docker IPv6 + pin the SMTP host to IPv6:
+   - add to `/etc/docker/daemon.json` (merge with the mirror): `"ipv6": true, "fixed-cidr-v6": "fd00:dead:beef::/64", "ip6tables": true` → `systemctl restart docker`;
+   - give the compose network IPv6 (append to `infra/docker-compose.vps-minimal.yml` **on the box only**):
+     ```yaml
+     networks:
+       default:
+         enable_ipv6: true
+         ipam:
+           config:
+             - subnet: fd00:dead:beef:1::/64
+     ```
+   - pin the host to its IPv6 so resolution skips the blocked IPv4 (TLS still verifies the hostname) — an override `infra/vps-smtp-ipv6.override.yml` adding to backend+worker:
+     ```yaml
+     services:
+       backend: { extra_hosts: { smtp.yandex.ru: "2a02:6b8::19d" } }
+       worker:  { extra_hosts: { smtp.yandex.ru: "2a02:6b8::19d" } }
+     ```
+     then include it: `docker compose … -f infra/docker-compose.vps-minimal.yml -f infra/vps-smtp-ipv6.override.yml up -d`.
+4. **Yandex SMTP `535 … does not have access rights`** — the app-password (id.yandex) is necessary but not sufficient. In **mail.yandex** → Настройки → Почтовые программы, tick "Разрешить доступ… с помощью почтовых клиентов" + enable IMAP, then wait ~5–10 min. (`@yandex.com` international accounts may not support SMTP at all → use `@yandex.ru` or an HTTP email provider.)
+5. **Frontend is served from a volume, not a server** — the `frontend` service is a one-shot that copies its built `dist/` into the `frontend_dist` volume; Caddy serves `/srv/frontend` from that same volume (`try_files … /index.html` SPA fallback). Redeploy the UI: rebuild the GHCR `oriion-frontend` image, then `dc pull frontend && dc up -d frontend caddy` (frontend runs once → `published` → exits; Caddy waits via `service_completed_successfully`).
+6. **Web search returns mock results / 0 citations** — two independent causes: (a) `web_search_mock_mode` defaults **true** → set `WEB_SEARCH_MOCK_MODE=false` in the env; (b) the search key must be **valid** — Brave (`brave.com/search/api`, primary; the app prefers Brave when `BRAVE_SEARCH_API_KEY` is set) or a working Yandex Search key. An invalid Brave token → `422 SUBSCRIPTION_TOKEN_INVALID`; an unauthorized Yandex key/IP → `403`. `read_url` then only sees the mock's fake URLs, so it looks mocked too. Verify from the container: construct `WebSearchTool(mock_mode=False)` and call `.search(...)`.
 
 ---
 
