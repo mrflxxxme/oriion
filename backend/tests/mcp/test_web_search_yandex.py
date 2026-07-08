@@ -1,6 +1,16 @@
-"""Unit: WebSearchTool — Yandex Search fallback + error paths."""
+"""Unit: WebSearchTool — Yandex Cloud Search API v2 (async) + Brave→Yandex fallback.
+
+The Yandex backend is the async v2 flow (module docstring): POST /v2/web/searchAsync
+returns an operation id → poll the Operation API until done → base64-decode the XML
+in response.rawData → parse with the existing `<yandexsearch>` parser. Tests mock
+both hops via httpx.MockTransport routed by host.
+"""
 
 from __future__ import annotations
+
+import base64
+import json
+from typing import Any
 
 import httpx
 import pytest
@@ -8,12 +18,9 @@ from src.mcp.exceptions import ToolRateLimitExceeded, WebSearchError
 from src.mcp.tools.rate_limit import ToolRateLimiter
 from src.mcp.tools.web_search import WebSearchTool
 
-YANDEX_JSON_PAYLOAD = {
-    "results": [
-        {"title": "Я-1", "url": "https://example.test/y1", "snippet": "snippet 1"},
-        {"title": "Я-2", "url": "https://example.test/y2", "snippet": "snippet 2"},
-    ],
-}
+_SEARCHAPI_HOST = "searchapi.api.cloud.yandex.net"
+_OPERATION_HOST = "operation.api.cloud.yandex.net"
+_BRAVE_HOST = "api.search.brave.com"
 
 
 def _install_transport(
@@ -29,27 +36,47 @@ def _install_transport(
     monkeypatch.setattr("src.mcp.tools.web_search.httpx.AsyncClient", patched)
 
 
-@pytest.mark.asyncio
-async def test_yandex_search_used_when_brave_unset(
-    fake_redis: object, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """No Brave key + Yandex key set → Yandex path runs."""
-    captured: dict[str, object] = {}
+def _no_poll_delay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zero the inter-poll sleep so the async v2 flow runs instantly in tests."""
+    monkeypatch.setattr("src.mcp.tools.web_search._YANDEX_POLL_INTERVAL_SECONDS", 0.0)
+
+
+def _yandex_v2_handler(
+    raw_xml: bytes,
+    *,
+    op_id: str = "op-abc123",
+    captured: dict[str, Any] | None = None,
+    poll_done_after: int = 1,
+) -> Any:
+    """Handler emulating the v2 async flow: submit → op id, poll → done+rawData."""
+    state = {"polls": 0}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        captured["url"] = str(request.url)
-        return httpx.Response(200, json=YANDEX_JSON_PAYLOAD)
+        host = request.url.host
+        if host == _SEARCHAPI_HOST:
+            if captured is not None:
+                captured["submit_method"] = request.method
+                captured["submit_url"] = str(request.url)
+                captured["submit_auth"] = request.headers.get("authorization")
+                captured["submit_body"] = json.loads(request.content)
+            return httpx.Response(200, json={"id": op_id, "done": False})
+        if host == _OPERATION_HOST:
+            state["polls"] += 1
+            if captured is not None:
+                captured["poll_auth"] = request.headers.get("authorization")
+                captured.setdefault("poll_urls", []).append(str(request.url))
+            if state["polls"] < poll_done_after:
+                return httpx.Response(200, json={"done": False})
+            return httpx.Response(
+                200,
+                json={
+                    "done": True,
+                    "response": {"rawData": base64.b64encode(raw_xml).decode("ascii")},
+                },
+            )
+        raise AssertionError(f"unexpected host {host!r}")
 
-    transport = httpx.MockTransport(handler)
-    _install_transport(monkeypatch, transport)
-    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
-
-    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="test-yandex")
-    results = await tool.search("привет", agent_id="agent-1", max_results=2)
-    assert len(results) == 2
-    assert results[0].url == "https://example.test/y1"
-    assert "yandex.ru" in str(captured["url"])
+    return handler
 
 
 _YANDEX_XML_PAYLOAD = b"""<?xml version="1.0" encoding="utf-8"?>
@@ -79,24 +106,59 @@ _YANDEX_XML_PAYLOAD = b"""<?xml version="1.0" encoding="utf-8"?>
 
 
 @pytest.mark.asyncio
-async def test_yandex_xml_response_parsed(
+async def test_yandex_v2_used_when_brave_unset_and_request_built_with_modern_auth(
     fake_redis: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC-W1-18: live Yandex XML is parsed (url + flattened title + passage)."""
+    """No Brave key + Yandex key/folder set → the modern v2 async path runs.
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            content=_YANDEX_XML_PAYLOAD,
-            headers={"content-type": "application/xml"},
-        )
-
-    transport = httpx.MockTransport(handler)
+    Asserts the submit hits /v2/web/searchAsync with an `Authorization: Api-Key`
+    header and a JSON body carrying folderId + query.queryText + groupsOnPage,
+    and that polling targets the Operation API with the same auth.
+    """
+    captured: dict[str, Any] = {}
+    transport = httpx.MockTransport(_yandex_v2_handler(_YANDEX_XML_PAYLOAD, captured=captured))
     _install_transport(monkeypatch, transport)
+    _no_poll_delay(monkeypatch)
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter,
+        brave_api_key=None,
+        yandex_api_key="test-yandex",
+        yandex_folder_id="folder-42",
+    )
+    results = await tool.search("привет", agent_id="agent-1", max_results=2)
+
+    assert len(results) == 2
+    assert results[0].url == "https://example.test/y1"
+    # Modern auth: Api-Key header (NOT the dead user/key query params).
+    assert captured["submit_method"] == "POST"
+    assert _SEARCHAPI_HOST in captured["submit_url"]
+    assert captured["submit_auth"] == "Api-Key test-yandex"
+    body = captured["submit_body"]
+    assert body["folderId"] == "folder-42"
+    assert body["query"]["queryText"] == "привет"
+    assert body["groupSpec"]["groupsOnPage"] == 2
+    # Poll targeted the Operation API with the op id and the same auth.
+    assert captured["poll_auth"] == "Api-Key test-yandex"
+    assert any("op-abc123" in u and _OPERATION_HOST in u for u in captured["poll_urls"])
+
+
+@pytest.mark.asyncio
+async def test_yandex_v2_xml_response_parsed(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """base64 rawData XML is decoded + parsed (url + flattened title + passage)."""
+    transport = httpx.MockTransport(_yandex_v2_handler(_YANDEX_XML_PAYLOAD))
+    _install_transport(monkeypatch, transport)
+    _no_poll_delay(monkeypatch)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     results = await tool.search("q", agent_id="a", max_results=5)
 
     assert len(results) == 2
@@ -110,28 +172,182 @@ async def test_yandex_xml_response_parsed(
 
 
 @pytest.mark.asyncio
-async def test_yandex_xml_error_returns_empty(
+async def test_yandex_v2_polls_until_done(
     fake_redis: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A Yandex <error> element degrades to [] (Researcher falls back to LLM)."""
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            content=(
-                b'<?xml version="1.0"?><yandexsearch><response>'
-                b'<error code="55">no rights</error></response></yandexsearch>'
-            ),
-            headers={"content-type": "application/xml"},
-        )
-
-    transport = httpx.MockTransport(handler)
-    _install_transport(monkeypatch, transport)
+    """A not-yet-done operation is polled again until done=true."""
+    handler = _yandex_v2_handler(_YANDEX_XML_PAYLOAD, poll_done_after=3)
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _no_poll_delay(monkeypatch)
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
+    results = await tool.search("q", agent_id="a", max_results=5)
+    assert len(results) == 2
+
+
+@pytest.mark.asyncio
+async def test_yandex_v2_poll_timeout_raises(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An operation that never completes raises WebSearchError (bounded poll)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == _SEARCHAPI_HOST:
+            return httpx.Response(200, json={"id": "op-x", "done": False})
+        return httpx.Response(200, json={"done": False})  # never done
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _no_poll_delay(monkeypatch)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
+    with pytest.raises(WebSearchError, match="poll timed out"):
+        await tool.search("q", agent_id="a", max_results=5)
+
+
+@pytest.mark.asyncio
+async def test_yandex_v2_xml_error_returns_empty(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Yandex <error> element in rawData degrades to [] (Researcher → LLM)."""
+    error_xml = (
+        b'<?xml version="1.0"?><yandexsearch><response>'
+        b'<error code="55">no rights</error></response></yandexsearch>'
+    )
+    _install_transport(monkeypatch, httpx.MockTransport(_yandex_v2_handler(error_xml)))
+    _no_poll_delay(monkeypatch)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     assert await tool.search("q", agent_id="a", max_results=5) == []
+
+
+@pytest.mark.asyncio
+async def test_yandex_folder_id_missing_raises(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Yandex key set but no folder id (YANDEX_CATALOG_ID) → WebSearchError."""
+    monkeypatch.delenv("YANDEX_CATALOG_ID", raising=False)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id=None
+    )
+    with pytest.raises(WebSearchError, match="yandex_folder_id"):
+        await tool.search("q", agent_id="a", max_results=5)
+
+
+@pytest.mark.asyncio
+async def test_brave_failure_falls_back_to_yandex(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Brave configured but failing (HTTP 500) + Yandex configured → fall back
+    to the Yandex v2 path and return its results."""
+    yandex_handler = _yandex_v2_handler(_YANDEX_XML_PAYLOAD)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == _BRAVE_HOST:
+            return httpx.Response(500, json={"error": "boom"})
+        return yandex_handler(request)
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _no_poll_delay(monkeypatch)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter,
+        brave_api_key="brave-k",
+        yandex_api_key="yandex-k",
+        yandex_folder_id="f",
+    )
+    results = await tool.search("q", agent_id="a", max_results=5)
+    assert len(results) == 2
+    assert results[0].url == "https://example.test/y1"
+
+
+@pytest.mark.asyncio
+async def test_brave_network_error_falls_back_to_yandex(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Brave *network* error also triggers the Yandex fallback."""
+    yandex_handler = _yandex_v2_handler(_YANDEX_XML_PAYLOAD)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == _BRAVE_HOST:
+            raise httpx.ConnectError("brave down")
+        return yandex_handler(request)
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _no_poll_delay(monkeypatch)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter,
+        brave_api_key="brave-k",
+        yandex_api_key="yandex-k",
+        yandex_folder_id="f",
+    )
+    results = await tool.search("q", agent_id="a", max_results=5)
+    assert len(results) == 2
+
+
+@pytest.mark.asyncio
+async def test_both_backends_fail_raises_primary_brave_error(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When Brave AND the Yandex fallback both fail, the primary (Brave) error
+    is surfaced (most-informative for the caller)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # Brave 500 → "brave http error"; Yandex submit 503 → "yandex http error".
+        if request.url.host == _BRAVE_HOST:
+            return httpx.Response(500, json={"error": "brave"})
+        return httpx.Response(503, json={"error": "yandex"})
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _no_poll_delay(monkeypatch)
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(
+        rate_limiter=limiter,
+        brave_api_key="brave-k",
+        yandex_api_key="yandex-k",
+        yandex_folder_id="f",
+    )
+    with pytest.raises(WebSearchError, match="brave http error"):
+        await tool.search("q", agent_id="a", max_results=5)
+
+
+@pytest.mark.asyncio
+async def test_brave_failure_no_yandex_reraises(
+    fake_redis: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Brave fails and NO Yandex key configured → the Brave error propagates
+    (no fallback attempted)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "boom"})
+
+    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
+
+    limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
+    tool = WebSearchTool(rate_limiter=limiter, brave_api_key="k", yandex_api_key=None)
+    with pytest.raises(WebSearchError, match="brave http error"):
+        await tool.search("q", agent_id="a")
 
 
 @pytest.mark.asyncio
@@ -178,7 +394,9 @@ async def test_yandex_network_error_wraps(
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     with pytest.raises(WebSearchError, match="yandex network error"):
         await tool.search("q", agent_id="a")
 
@@ -193,7 +411,9 @@ async def test_yandex_http_error_wraps(fake_redis: object, monkeypatch: pytest.M
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     with pytest.raises(WebSearchError, match="yandex http error"):
         await tool.search("q", agent_id="a")
 
@@ -245,17 +465,23 @@ async def test_env_var_picked_up_when_not_passed(
 async def test_search_body_size_cap_enforced(
     fake_redis: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An over-cap response body is aborted (memory-DoS guard) — audit P2."""
-    big = b"<yandexsearch>" + (b"x" * (6 * 1024 * 1024)) + b"</yandexsearch>"
+    """An over-cap response body is aborted (memory-DoS guard) — audit P2.
+
+    Here the v2 submit response itself is over-cap → the stream is aborted.
+    """
+    big = b"{" + (b"x" * (6 * 1024 * 1024)) + b"}"
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=big, headers={"content-type": "application/xml"})
+        return httpx.Response(200, content=big, headers={"content-type": "application/json"})
 
     _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _no_poll_delay(monkeypatch)
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     with pytest.raises(WebSearchError, match="exceeded"):
         await tool.search("q", agent_id="a", max_results=5)
 
@@ -264,21 +490,20 @@ async def test_search_body_size_cap_enforced(
 async def test_yandex_xml_truncated_returns_empty(
     fake_redis: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """recover=False: a truncated/partial XML body degrades to [] rather than
-    surfacing a half-streamed <title> as a real (mangled) hit — audit P3(b)."""
+    """recover=False: a truncated/partial XML body in rawData degrades to []
+    rather than surfacing a half-streamed <title> as a real hit — audit P3(b)."""
     truncated = (
         b'<?xml version="1.0"?><yandexsearch><response><results><grouping><group>'
         b"<doc><url>https://example.test/a</url><title>Tru"  # cut mid-title, unclosed
     )
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=truncated, headers={"content-type": "application/xml"})
-
-    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _install_transport(monkeypatch, httpx.MockTransport(_yandex_v2_handler(truncated)))
+    _no_poll_delay(monkeypatch)
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     assert await tool.search("q", agent_id="a", max_results=5) == []
 
 
@@ -295,15 +520,14 @@ async def test_yandex_xml_nested_error_does_not_nuke_results(
         b"<properties><error>0</error></properties></doc></group>"
         b"</grouping></results></response></yandexsearch>"
     )
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=xml, headers={"content-type": "application/xml"})
-
-    _install_transport(monkeypatch, httpx.MockTransport(handler))
+    _install_transport(monkeypatch, httpx.MockTransport(_yandex_v2_handler(xml)))
+    _no_poll_delay(monkeypatch)
     monkeypatch.delenv("WEB_SEARCH_MOCK_MODE", raising=False)
 
     limiter = ToolRateLimiter(redis=fake_redis)  # type: ignore[arg-type]
-    tool = WebSearchTool(rate_limiter=limiter, brave_api_key=None, yandex_api_key="k")
+    tool = WebSearchTool(
+        rate_limiter=limiter, brave_api_key=None, yandex_api_key="k", yandex_folder_id="f"
+    )
     results = await tool.search("q", agent_id="a", max_results=5)
     assert len(results) == 1
     assert results[0].url == "https://example.test/ok"

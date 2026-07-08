@@ -1,9 +1,11 @@
 """`web_search` built-in tool — Brave Search → Yandex Search fallback.
 
-Phase 00.4 § Task 14 — 30 req/min per agent_id. Tries Brave Search API
-first (``BRAVE_SEARCH_API_KEY``); if unset, falls back to Yandex Search
-(``YANDEX_SEARCH_API_KEY``). If neither key is set and mock mode is off,
-raises ``WebSearchError("no_search_backend_configured")``.
+Phase 00.4 § Task 14 — 30 req/min per agent_id. Brave Search API
+(``BRAVE_SEARCH_API_KEY``) is the PRIMARY backend; if a Brave call *fails*
+(network / HTTP / body-cap error) and a Yandex key is configured, we FALL
+BACK to Yandex Search. If Brave is unset entirely, Yandex is used directly.
+If neither backend is configured and mock mode is off, raises
+``WebSearchError("no_search_backend_configured")``.
 
 Mock mode
 ---------
@@ -13,14 +15,27 @@ Returns deterministic, predictable shape so consumers can assert on it.
 
 Why two backends?
     * Brave Search is the global-default with a permissive API.
-    * Yandex Search is required for RU-locale relevance + sovereignty
-      (Phase 00.4 broader context — RU primary market). One of the two
-      will always be available per environment; the gateway picks the
-      first configured.
+    * Yandex Search is the RU-sovereign fallback (Phase 00.4 broader context —
+      RU primary market) and a resilience path when Brave is degraded.
+
+Yandex backend — Cloud Search API v2 (async)
+--------------------------------------------
+The legacy synchronous XML interface (``yandex.ru/search/xml``) is DEAD: both
+the ``user``+``key`` auth (error 4001) and the newer ``folderid``+``apikey``
+sync-XML auth (error 4002 — "XML-search queries with the old version (v1) are
+forbidden. Please use Yandex Cloud") are now rejected. The only live path is
+the async Cloud Search API v2: ``POST /v2/web/searchAsync`` (``Authorization:
+Api-Key`` header + JSON body carrying ``folderId``) returns an operation id;
+we poll the Operation API until ``done`` and base64-decode the XML in
+``response.rawData`` — which still matches the existing ``_parse_yandex_xml``
+``<yandexsearch>`` shape. Docs: https://yandex.cloud/en/docs/search-api.
 """
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import binascii
 import json
 import os
 from dataclasses import dataclass
@@ -44,7 +59,15 @@ _DEFAULT_TIMEOUT_SECONDS: Final = 5.0
 _MAX_BODY_BYTES: Final = 5 * 1024 * 1024
 
 _BRAVE_API_URL: Final = "https://api.search.brave.com/res/v1/web/search"
-_YANDEX_API_URL: Final = "https://yandex.ru/search/xml"
+# Yandex Cloud Search API v2 (async): submit → poll → base64 XML. The legacy
+# sync-XML endpoint is forbidden now (see module docstring).
+_YANDEX_SEARCH_ASYNC_URL: Final = "https://searchapi.api.cloud.yandex.net/v2/web/searchAsync"
+_YANDEX_OPERATION_URL: Final = "https://operation.api.cloud.yandex.net/operations/"
+# Bounded poll loop kept inside the tool's timeout budget: if the operation
+# hasn't completed we raise WebSearchError (the Brave→Yandex fallback / the
+# Researcher's degrade-to-LLM path both handle it gracefully).
+_YANDEX_POLL_MAX_ATTEMPTS: Final = 10
+_YANDEX_POLL_INTERVAL_SECONDS: Final = 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +113,7 @@ class WebSearchTool:
         timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS,
         brave_api_key: str | None = None,
         yandex_api_key: str | None = None,
+        yandex_folder_id: str | None = None,
         mock_mode: bool | None = None,
     ) -> None:
         # rate_limiter is optional: the Wave-0 scripted-dispatch path
@@ -112,6 +136,12 @@ class WebSearchTool:
         )
         self._yandex_api_key = yandex_api_key or (
             os.environ.get("YANDEX_SEARCH_API_KEY", "").strip() or None
+        )
+        # Yandex Cloud folder (catalog) id — required by the v2 searchAsync body.
+        # Threaded from settings.yandex_catalog_id on the dispatch path; env-var
+        # fallback (YANDEX_CATALOG_ID) for the MCP-tool surface / legacy callers.
+        self._yandex_folder_id = yandex_folder_id or (
+            os.environ.get("YANDEX_CATALOG_ID", "").strip() or None
         )
 
     async def search(
@@ -153,9 +183,31 @@ class WebSearchTool:
             )
             return _canned_mock_results(query, max_results)
 
-        # Real backend dispatch ---------------------------------------------
+        # Real backend dispatch: Brave primary, Yandex fallback -------------
         if self._brave_api_key:
-            return await self._search_brave(query, max_results)
+            try:
+                return await self._search_brave(query, max_results)
+            except WebSearchError as brave_exc:
+                # Brave failed (network / HTTP / body-cap — all surfaced as
+                # WebSearchError). Fall back to Yandex when a key is configured.
+                if not self._yandex_api_key:
+                    raise
+                logger.warning(
+                    "mcp.tools.web_search.brave_failed_fallback_yandex",
+                    error=str(brave_exc),
+                    query=query,
+                )
+                try:
+                    return await self._search_yandex(query, max_results)
+                except WebSearchError as yandex_exc:
+                    # Both backends failed — surface the primary (Brave) error,
+                    # which is the most informative for the caller.
+                    logger.warning(
+                        "mcp.tools.web_search.yandex_fallback_failed",
+                        error=str(yandex_exc),
+                        query=query,
+                    )
+                    raise brave_exc from yandex_exc
         if self._yandex_api_key:
             return await self._search_yandex(query, max_results)
         raise WebSearchError("no_search_backend_configured")
@@ -189,54 +241,116 @@ class WebSearchTool:
         return _parse_brave(json.loads(body), max_results)
 
     async def _search_yandex(self, query: str, max_results: int) -> list[WebSearchResult]:
-        """Yandex Search XML API (yandex.ru/search/xml).
+        """Yandex Cloud Search API v2 (async) — submit → poll → base64 XML.
 
-        Real Yandex Search returns XML; test mocks send a normalised JSON shape.
-        We try ``.json()`` first (mocks) and fall back to the XML parser
-        (AC-W1-18) for the live RU-sovereign path.
+        The legacy sync-XML interface is forbidden now (module docstring): we
+        ``POST /v2/web/searchAsync`` (``Authorization: Api-Key`` header, JSON
+        body with ``folderId``) to get an operation id, poll the Operation API
+        until ``done``, then base64-decode the XML in ``response.rawData`` and
+        reuse ``_parse_yandex_xml`` (the ``<yandexsearch>`` shape is unchanged).
         """
-        # Type-narrow without bandit B101 — caller guarantees this by gating
+        # Type-narrow without bandit B101 — caller guarantees the key by gating
         # on self._yandex_api_key truthiness before dispatch.
         if self._yandex_api_key is None:
             raise WebSearchError("yandex_api_key not configured")
-        params: dict[str, Any] = {
-            "user": "oriion",
-            "key": self._yandex_api_key,
-            "query": query,
-            "l10n": "ru",
-            "groupby": f"attr=d.mode=deep.groups-on-page={max_results}",
+        if not self._yandex_folder_id:
+            raise WebSearchError("yandex_folder_id not configured (YANDEX_CATALOG_ID)")
+        headers = {"Authorization": f"Api-Key {self._yandex_api_key}"}
+        # Body mirrors the known-good v2 contract: deep grouping with one doc
+        # per domain group so ``groupsOnPage`` caps the result count.
+        request_body: dict[str, Any] = {
+            "query": {
+                "searchType": "SEARCH_TYPE_RU",
+                "queryText": query,
+                "familyMode": "FAMILY_MODE_NONE",
+                "page": 0,
+            },
+            "sortSpec": {
+                "sortMode": "SORT_MODE_BY_RELEVANCE",
+                "sortOrder": "SORT_ORDER_DESC",
+            },
+            "groupSpec": {
+                "groupMode": "GROUP_MODE_DEEP",
+                "groupsOnPage": max_results,
+                "docsInGroup": 1,
+            },
+            "maxPassages": 2,
+            "l10N": "LOCALIZATION_RU",
+            "folderId": self._yandex_folder_id,
         }
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(self._timeout_seconds)) as client:
-                body = await self._get_capped(client, _YANDEX_API_URL, params=params)
+                submit_body = await self._get_capped(
+                    client,
+                    _YANDEX_SEARCH_ASYNC_URL,
+                    method="POST",
+                    headers=headers,
+                    json_body=request_body,
+                )
+                operation_id = _parse_operation_id(submit_body)
+                xml_text = await self._poll_yandex_operation(client, operation_id, headers)
         except httpx.RequestError as exc:
             raise WebSearchError(f"yandex network error: {exc!s}") from exc
         except httpx.HTTPStatusError as exc:
             raise WebSearchError(f"yandex http error: {exc.response.status_code}") from exc
-        # Tests stub a JSON body; real Yandex returns XML. Be permissive.
-        try:
-            payload = json.loads(body)
-        except ValueError:
-            # XML path (AC-W1-18): parse the live Yandex Search XML.
-            return _parse_yandex_xml(body.decode("utf-8", errors="replace"), max_results)
-        return _parse_yandex(payload, max_results)
+        return _parse_yandex_xml(xml_text, max_results)
+
+    async def _poll_yandex_operation(
+        self,
+        client: httpx.AsyncClient,
+        operation_id: str,
+        headers: dict[str, str],
+    ) -> str:
+        """Poll the Operation API until ``done``; return the decoded XML text.
+
+        Bounded to ``_YANDEX_POLL_MAX_ATTEMPTS`` short async sleeps. Raises
+        ``WebSearchError`` on operation error, empty/undecodable ``rawData`` or
+        a timeout — all of which the caller's fallback path degrades gracefully.
+        """
+        url = _YANDEX_OPERATION_URL + operation_id
+        for _ in range(_YANDEX_POLL_MAX_ATTEMPTS):
+            await asyncio.sleep(_YANDEX_POLL_INTERVAL_SECONDS)
+            poll_body = await self._get_capped(client, url, headers=headers)
+            try:
+                payload = json.loads(poll_body)
+            except ValueError as exc:
+                raise WebSearchError("yandex operation poll: non-JSON response") from exc
+            if not payload.get("done"):
+                continue
+            error = payload.get("error")
+            if error:
+                raise WebSearchError(f"yandex operation error: {error}")
+            raw_data = (payload.get("response") or {}).get("rawData")
+            if not raw_data or not isinstance(raw_data, str):
+                raise WebSearchError("yandex operation done but rawData empty")
+            try:
+                xml_bytes = base64.b64decode(raw_data, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise WebSearchError("yandex operation rawData is not valid base64") from exc
+            return xml_bytes.decode("utf-8", errors="replace")
+        raise WebSearchError("yandex operation poll timed out before done")
 
     async def _get_capped(
         self,
         client: httpx.AsyncClient,
         url: str,
         *,
+        method: str = "GET",
         headers: dict[str, str] | None = None,
         params: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | None = None,
     ) -> bytes:
-        """GET ``url`` and return the body, streaming with a hard size cap.
+        """Request ``url`` and return the body, streaming with a hard size cap.
 
         Mirrors ``read_url``: the body is read chunk-by-chunk and aborted past
         ``_MAX_BODY_BYTES`` so an unbounded response (compromised/spoofed/buggy
         upstream) can't materialise into worker memory. ``raise_for_status``
-        runs before any body read so an error status short-circuits.
+        runs before any body read so an error status short-circuits. Supports a
+        JSON POST body (the Yandex v2 searchAsync submit) as well as GET.
         """
-        async with client.stream("GET", url, headers=headers, params=params) as response:
+        async with client.stream(
+            method, url, headers=headers, params=params, json=json_body
+        ) as response:
             response.raise_for_status()
             chunks: list[bytes] = []
             total = 0
@@ -266,25 +380,20 @@ def _parse_brave(payload: dict[str, Any], max_results: int) -> list[WebSearchRes
     return out
 
 
-def _parse_yandex(payload: dict[str, Any], max_results: int) -> list[WebSearchResult]:
-    """Parse Yandex Search-style JSON response → list[WebSearchResult].
+def _parse_operation_id(submit_body: bytes) -> str:
+    """Extract the operation id from a Yandex v2 ``searchAsync`` submit response.
 
-    Wave 0 expects a normalised shape from tests: {"results": [{...}]}.
-    Real Yandex XML conversion lands Wave 1+.
+    The submit returns an Operation object ``{"id": "...", "done": false, ...}``.
+    Raises ``WebSearchError`` if the body isn't JSON or carries no id.
     """
-    results_raw = payload.get("results") or []
-    out: list[WebSearchResult] = []
-    for item in results_raw[:max_results]:
-        if not isinstance(item, dict):
-            continue
-        out.append(
-            WebSearchResult(
-                title=str(item.get("title") or ""),
-                url=str(item.get("url") or ""),
-                snippet=str(item.get("snippet") or ""),
-            )
-        )
-    return out
+    try:
+        payload = json.loads(submit_body)
+    except ValueError as exc:
+        raise WebSearchError("yandex searchAsync: non-JSON submit response") from exc
+    operation_id = payload.get("id")
+    if not isinstance(operation_id, str) or not operation_id:
+        raise WebSearchError("yandex searchAsync: no operation id in response")
+    return operation_id
 
 
 def _flatten_xml_text(el: Any) -> str:
