@@ -29,6 +29,7 @@ import { CellsListPage } from "@/features/cells/CellsListPage";
 import { CellDetailPage } from "@/features/cells/CellDetailPage";
 import { TaskSubmitPage } from "@/features/tasks/TaskSubmitPage";
 import { TaskResultPage } from "@/features/tasks/TaskResultPage";
+import { MemoryPanelPage } from "@/features/memory/MemoryPanelPage";
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -98,11 +99,22 @@ const taskResultRoute = createRoute({
   path: "/cells/$cellId/tasks/$taskId",
   component: TaskResultPage,
 });
+const memoryRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/memory",
+  component: MemoryPanelPage,
+});
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   authLayoutRoute.addChildren([loginRoute, registerRoute]),
-  appLayoutRoute.addChildren([cellsRoute, cellDetailRoute, taskNewRoute, taskResultRoute]),
+  appLayoutRoute.addChildren([
+    cellsRoute,
+    cellDetailRoute,
+    taskNewRoute,
+    taskResultRoute,
+    memoryRoute,
+  ]),
 ]);
 
 export const router = createRouter({
