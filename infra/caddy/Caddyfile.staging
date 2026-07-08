@@ -98,7 +98,10 @@
 	# Wave-0 API-only demo flow OK с (founder hits /api/* directly через
 	# scripts/demo_market_brief.py).
 	handle {
-		@has_frontend file /srv/frontend/index.html
+		@has_frontend file {
+			root /srv/frontend
+			try_files /index.html
+		}
 		handle @has_frontend {
 			root * /srv/frontend
 			try_files {path} /index.html
