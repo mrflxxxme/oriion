@@ -228,3 +228,33 @@
 - Decision: Lean live-golden 7/7 (plan+synthesis contract + 5 adversarial, ~$0.03) this PR; full 30-task golden≥75% certification + draft→reviewed promotion deferred to the founder review-gate (DV-12 + DV-02)
 - Rationale: Prompts are draft (founder-reviewed per ADR-026 before reviewed); running the full judge-scored 30-task evaluator on draft prompts that may be revised = double-spend. Lean golden proves the Master-chain works on live LLM + adversarial-robust (the phase's core verification) at ~$0.03. Full certification + promotion is inherently a founder-gate step (note#5 defer founder-involvement) → runs when prompts finalized. Money-conscious (note#3). Reversible.
 - Reversibility: reversible
+
+### 2026-07-09T20:33:57Z | phase 01.8c | impl
+- Fork: 01.8c decomposition: bundle 5 scope items in one PR vs split rename out
+- Decision: Split into PR-1 (items 1,2,3,5 = subagents + openapi-CI + docs-freshness-CI + JOURNAL archival) and PR-2 (item 4 = Oriion rename)
+- Rationale: Reviewability: the 63-file rename is pure string-noise that would bury substantive review of subagent defs + CI logic; decoupling protects high-value infra from rename/iam-touch risk; matches founder pref for focused splits (memory infra-pr-scope-prefers-focused-splits). Both PRs this run, merges serialized w/ health-check.
+- Reversibility: reversible
+
+### 2026-07-09T20:33:57Z | phase 01.8c | impl
+- Fork: teamly->Oriion rename scope: literal grep=0 everywhere vs active-surface only
+- Decision: Rename Oriion across active code + config + instructions + user-facing strings + role-prompts (SemVer bump); PRESERVE immutable historical records (ADR bodies, dated AUDIT-*, JOURNAL history) + external memory-file-name ref in test_worker_sse_lifecycle.py
+- Rationale: ADR-040 D3: Oriion is the working name everywhere incl user-facing (OQ-09 final brand still open = future one-op swap), so already-decided/agent-owned, not a product escalation. Rewriting append-only historical records corrupts audit trail (00-START-HERE: old docs keep TEAMLY_RU as factual). AC refined to active-surface.
+- Reversibility: reversible
+
+### 2026-07-09T20:33:57Z | phase 01.8c | impl
+- Fork: Native subagent file shape (.claude/agents/<role>.md)
+- Decision: Claude Code subagent frontmatter (name/description/tools/model) synthesized from profile.md (name, model_tier->model, mandate->description) + tools-allowlist.md (tools) + system-prompt.md (body); role dir handbooks preserved as reference
+- Rationale: Reuses the existing rich role artifacts verbatim; model_tier maps opus->opus w/ tier_fallback roles->sonnet per cost-budget; file+dir coexist (stem vs dir). Closes ADR-037/D8 known gap so judge-panel + reviewer lenses spawn real isolated-context subagents.
+- Reversibility: reversible
+
+### 2026-07-09T20:33:57Z | phase 01.8c | impl
+- Fork: OpenAPI snapshot export tooling (D2)
+- Decision: Small script imports src.main:app, dumps app.openapi() to .planning/contracts/openapi.snapshot.json (sorted keys, stable format); CI job regenerates + git-diff --exit-code, breaking-diff = red + tripwire signal
+- Rationale: FastAPI native app.openapi() is the source of truth for the live contract (D2); deterministic sorted dump makes diff meaningful; no new deps.
+- Reversibility: reversible
+
+### 2026-07-09T20:33:58Z | phase 01.8c | impl
+- Fork: Docs-freshness CI mechanism (D9)
+- Decision: Python check: any phase spec-file whose slug is marked merged/complete in STATUS.md but still has 'Status: Pending' in its own spec = red; plus README 'текущая фаза' cross-checked vs STATUS.md active phase
+- Rationale: Directly implements D9 acceptance ('merged phase with Status Pending = red'); lightweight, stdlib-only, no external services.
+- Reversibility: reversible

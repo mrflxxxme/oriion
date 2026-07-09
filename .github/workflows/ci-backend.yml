@@ -11,6 +11,7 @@ on:
       - 'backend/**'
       - 'scripts/**'
       - '.planning/contracts/role-prompts/**'
+      - '.planning/contracts/openapi.snapshot.json'
       - '.github/workflows/ci-backend.yml'
   push:
     branches: [main]
@@ -18,6 +19,7 @@ on:
       - 'backend/**'
       - 'scripts/**'
       - '.planning/contracts/role-prompts/**'
+      - '.planning/contracts/openapi.snapshot.json'
       - '.github/workflows/ci-backend.yml'
 
 concurrency:
@@ -145,6 +147,15 @@ jobs:
       - name: Mypy strict
         working-directory: backend
         run: uv run mypy --strict src
+
+      - name: OpenAPI snapshot drift check (ADR-040 D2)
+        working-directory: backend
+        # The guarded public API contract is the generated snapshot of the live
+        # FastAPI schema. A route/schema change that does not regenerate
+        # .planning/contracts/openapi.snapshot.json fails here (drift) — and also
+        # trips the public_api_contracts tripwire. Regenerate locally with:
+        #   uv run --project backend python scripts/autonomy/export_openapi.py
+        run: uv run python ../scripts/autonomy/export_openapi.py --check
 
       - name: Pytest unit suite [AC2 ≥ 70% aggregate]
         working-directory: backend

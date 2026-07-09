@@ -16,6 +16,11 @@
 
 ## Phase deltas (свежее сверху)
 
+### 01.8c — Autonomy / dev-infra hardening (2026-07-10, PR-1 of 2) — сервисная фаза
+- **Тех:** 11 персистентных ролей → нативные спавнабельные сабагенты `.claude/agents/<role>.md` (ADR-040 D8, тонкий spawn-entry + указатель на хендбук) + conformance-гейт `check_subagents.py`; **OpenAPI-snapshot** `contracts/openapi.snapshot.json` (64 маршрута) + `export_openapi.py --check` drift-гейт в ci-backend (D2); **docs-freshness** `check_docs_freshness.py` + workflow `ci-autonomy.yml` (D9, поймал+починил stale-статусы 01.6/01.7); 10× `api.yaml` → non-normative header; **JOURNAL-архивация** D12 (189→46KB, 28 записей → `dev-log/archive/`, content-verified 46=46). Гейты: ruff/format/mypy **241**+3 scripts/bandit 0/unit **1160**/tooling **15**. Adversarial-аудит 3 линзы. Tripwire: `public_api_contracts` (contracts/, additive) → ack-needed.
+- **Сценарий:** нет прямого user-facing изменения (сервисная фаза автономного контура). Включает для будущих фаз: judge-panel/reviewer-линзы спавнят **реальные независимые сабагенты**; публичный контракт растягивается **машинно** (snapshot vs живой FastAPI); доки защищены от дрейфа CI-проверкой. Фундамент к старту Wave 2.
+- **Отложено:** Oriion-ренейм кода/промптов (D3) → **PR-2 `01.8c-rename`** (тот же ран). Parked (нужны founder-креды): 01.3b (RW-04) · 01.8b (RW-02) · 01.11 (RW-05).
+
 ### 01.12 — Dashboard + Onboarding (2026-07-09, PR #103) — WAVE-1 CLOSER
 - **Тех:** frontend `features/{dashboard,onboarding}` + api-клиенты (billing/artifacts/teams); backend `team_provisioning_service` 3-way preset-routing (`src/agents`). Гейты: agents 90 / frontend 201 / mypy 241. Auto-merge. Задеплоено+verified (routes 200).
 - **Сценарий:** пользователь проходит register → онбординг-визард (выбор пресета) → первая задача → результат на Dashboard **без инструкций**.

@@ -1,3 +1,11 @@
+# =============================================================================
+# DESIGN-TIME DRAFT - NON-NORMATIVE (ADR-040 D2).
+# The guarded public API contract is the GENERATED snapshot of the live FastAPI
+# schema: .planning/contracts/openapi.snapshot.json (drift-checked by ci-backend
+# via scripts/autonomy/export_openapi.py). Divergence between this hand-written
+# draft and the live API is NOT a contract violation. The sibling schema.sql
+# stays normative (verified by migrations).
+# =============================================================================
 openapi: 3.1.0
 info:
   title: Oriion Multitenancy API

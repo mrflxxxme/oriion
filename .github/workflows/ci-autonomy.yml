@@ -1,0 +1,58 @@
+name: ci-autonomy
+
+# ADR-040 D8/D9 — autonomy-contour integrity checks (stdlib-only, fast).
+#
+#  * subagent conformance (D8): every .claude/agents/<role>.md spawn-entry has
+#    valid frontmatter (name == file stem, description/tools/model) and a matching
+#    handbook dir; every role handbook has a spawn-entry. Keeps the judge-panel /
+#    reviewer lenses spawning real roles.
+#  * docs-freshness (D9): a phase MERGED per STATUS.md whose own spec-file Status
+#    is still Pending / In-progress = red (catches the drift the exit-ritual is
+#    meant to prevent).
+#
+# Both verifiers are stdlib-only -> bare `python`, no uv/venv. Path-filtered so
+# it only runs when the autonomy surface or planning canon changes.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.planning/**'
+      - '.claude/agents/**'
+      - 'scripts/autonomy/check_subagents.py'
+      - 'scripts/autonomy/check_docs_freshness.py'
+      - '.github/workflows/ci-autonomy.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.planning/**'
+      - '.claude/agents/**'
+      - 'scripts/autonomy/check_subagents.py'
+      - 'scripts/autonomy/check_docs_freshness.py'
+      - '.github/workflows/ci-autonomy.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  autonomy-integrity:
+    name: subagent conformance + docs freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Subagent conformance (ADR-040 D8)
+        run: python scripts/autonomy/check_subagents.py
+
+      - name: Docs freshness (ADR-040 D9)
+        run: python scripts/autonomy/check_docs_freshness.py

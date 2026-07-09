@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "gate": "adversarial_audit",
+  "head_sha": "e3e754f97e35fdd82e3fc01ccc2e95a4dea6d6b3",
+  "timestamp": "2026-07-09T21:58:33Z",
+  "verdict": "PASS",
+  "runner": "3 independent subagent spawns (SOUND / SECURE / NO-REGRESSIONS), refute-by-default",
+  "details": {
+    "scope": "01.8c PR-1 — native role subagents (D8) + OpenAPI-snapshot CI (D2) + docs-freshness CI (D9) + JOURNAL archival (D12)",
+    "p0": 0, "p1": 0, "p2": 2, "p3": 3,
+    "lenses": {
+      "SOUND": {
+        "verdict": "CONCERNS",
+        "findings": "P2 spec_status_line colon-optional regex could let a prose 'status …' bullet preempt the real ✅ header (false-red on 00.5); P3 terminal-token substring matched 'incomplete'/history-table docstring overclaim; P3 frontmatter block-style parser (speculative)",
+        "disposition": "P2 + P3(word-boundary) FOLDED (colon-required regex + word-bounded _has_terminal + 2 regression tests); P3 block-style SKIPPED (speculative, all 11 files use inline scalars); confirmed openapi determinism (4 seeds identical), snapshot freshness, import-only src.main, CI path/cwd resolution"
+      },
+      "SECURE": {
+        "verdict": "CONCERNS",
+        "findings": "P2 native subagent frontmatter grants coarse Bash/Write/Edit to read-only gate roles whose handbooks path-scope them (prompt-enforced, not capability-enforced)",
+        "disposition": "REAL but MITIGATED + PRE-EXISTING (pre-D8 roles ran via general-purpose spawns with ALL tools, so D8 is strictly an improvement); mitigated by tripwire+ack merge hook + backend CI backstops; AGENTS.md rule-7 over-claim corrected (coarse vs behavioral layers documented); compensating PreToolUse enforcement hook = follow-up chip task_dd666049 (founder arms hooks). Cleared: tripwire globs unchanged, api.yaml downgrade net-strengthening, snapshot leaks no secrets, CI permissions contents:read + pull_request (no secrets to fork code)"
+      },
+      "NO_REGRESSIONS": {
+        "verdict": "PASS",
+        "findings": "P3 file-level links to the moved 2026-05-15 JOURNAL entry (ADR-017/README/PROJECT) now land on the rolling journal",
+        "disposition": "self-mitigated by the archive breadcrumb at JOURNAL top (valid relative link); links are file-level (still 200), never anchored. Verified: JOURNAL archival byte-lossless (189218==189218, 46=46 entries, 0 body diffs); ci-backend openapi step exit 0 with zero env; 01.6/01.7 pure Status-line edits; ci-autonomy.yml valid YAML, workflow-scoped concurrency (cannot cancel ci-backend), green on real tree; tooling 53 passed"
+      }
+    },
+    "refute_by_default": true,
+    "gates_green": "ruff+format clean; mypy --strict 241 src + 3 scripts; bandit 0; unit 1160 pass (+15 tooling, +2 fold-in regression); openapi --check fresh; docs-freshness + subagent-lint pass"
+  }
+}
