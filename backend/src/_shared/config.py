@@ -373,27 +373,28 @@ class Settings(BaseSettings):
         description="Yandex Search API key. Fallback backend for mcp.tools.web_search.",
     )
 
-    # ── Security guardrails (Phase 01.6 — ADR-039) ──────────────────────
+    # ── Security guardrails (Phase 01.6 — ADR-039; activated 01.9a, ADR-040 D10) ──
     security_injection_scan_enabled: bool = Field(
-        default=False,
+        default=True,
         description=(
             "When True, external content (web_search / read_url results) is run "
             "through the heuristic prompt-injection scanner and flagged fragments "
-            "are B1-neutralized before reaching an agent. Default False in Wave-1: "
-            "the heuristics can mangle legitimate content that happens to quote an "
-            "attack or contain LLM-template markers, and there is no unattended "
-            "external-connector surface yet — enforcement activates at 01.9 "
-            "alongside DLP + owner-config. See ADR-039 §4."
+            "are B1-neutralized before reaching an agent. Default True since 01.9a: "
+            "the scanner is a conservative no-op on benign content (the trimmed "
+            "high-confidence heuristics passed the adversarial audit) and it guards "
+            "the only external channel (web results) that becomes live-facing as "
+            "connectors open in 01.9b. See ADR-039 §4 + ADR-040 D10."
         ),
     )
     security_dlp_enabled: bool = Field(
-        default=False,
+        default=True,
         description=(
             "When True, the output-DLP guard A3-hard-blocks a task whose final "
             "deliverable contains RU-PDN (INN/SNILS/passport/phone/email). Default "
-            "False in Wave-1 (no outward PII surface yet; artifacts are cell-scoped "
-            "under RLS): the guard is built + wired, enforcement flips on at the "
-            "first outward surface (01.9) with owner-config. See ADR-039 §4."
+            "True since 01.9a: the INN-10 detector is precision-tuned to context "
+            "(FP ≤1% on the golden corpus, DV-04/DV-05) so activation no longer "
+            "carries false-positive friction, and DLP must be live before the first "
+            "outward connector surface (01.9b). See ADR-039 §4 + ADR-040 D10."
         ),
     )
 

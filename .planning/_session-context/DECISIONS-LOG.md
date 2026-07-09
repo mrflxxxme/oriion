@@ -210,3 +210,9 @@
 - Decision: Edit = delete + re-add (append-only); no new backend endpoint
 - Rationale: Router exposes only GET/POST/DELETE (no PATCH); backend memory is append-only by design (grill 2026-06-23). Adding PATCH is explicitly out-of-scope for 01.4-ui. delete+add preserves append-only + source provenance. Reversible.
 - Reversibility: reversible
+
+### 2026-07-08T23:15:43Z | phase 01.9 | arch
+- Fork: 01.9 scope: single phase vs split (DLP-activation vs connectors)
+- Decision: Split 01.9 -> 01.9a (DLP precision-tune INN FP<=1% + flip both security flags ON; closes DV-04/05; wave-gate-critical; autonomous) + 01.9b (3 read+draft connector tools + capability gate + KMS creds store + registry + mock tests; live-smoke deferred to RW-01/RW-03 creds)
+- Rationale: DLP-activation is small, wave-gate-blocking (DV-04/05 = data-leak P1, blocks wave gate per DEFERRED-VERIFICATION protocol §3), fully autonomous+deterministically verifiable now, and tripwire-light (touches security/ + config, neither in tripwire) => likely auto-merge, lands the blocker fast+clean. Connectors are larger and their LIVE value is founder-cred-gated (RW-01 SMTP/IMAP, RW-03 Telegram) => build+mock now, live-smoke deferred (matches 01.8-mail pattern + seed 'dev-part autonomous with mocks'). Founder-preferred focused-split (infra-pr-scope memory). Reversible.
+- Reversibility: reversible
