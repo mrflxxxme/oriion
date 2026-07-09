@@ -76,7 +76,7 @@ Spawning runtime — native Claude Code `Task` tool с `subagent_type=<role>`. �
 
 6. **Memory persistence.** Каждая роль держит persistent state в своём `agent-memory:<role>` namespace. При context-overflow роль возобновляется из namespace + STATUS.md без потери знаний (см. [ADR-023 §7](../.planning/decisions/ADR-023-ai-team-runtime.md)).
 
-7. **Tools allowlist enforced per role.** Каждая роль имеет `tools-allowlist.md` — список разрешённых tools. Попытка использовать tool вне allowlist = немедленный stop + handoff к security-reviewer.
+7. **Tools allowlist per role — two layers.** Каждая роль имеет `tools-allowlist.md`. **Coarse layer (harness-enforced):** спавнабельный `agents/<role>.md` объявляет `tools:` — Claude Code реально ограничивает роль этим набором. **Fine layer (behaviorally-enforced):** path/sub-command-скоуп (например reviewer-security пишет ТОЛЬКО в `revisions/`, verifier — только test-runners) **нельзя** выразить во frontmatter — он держится системным промптом роли + review/tripwire-бэкстопом, а не capability-гейтом. Известный gap (01.8c SECURE-аудит P2): роль под prompt-injection формально имеет coarse `Write/Bash`; компенсирующий **PreToolUse-хук**, форсящий documented allowlist, — follow-up (хуки ставит founder). `check_subagents.py` проверяет наличие/конформность spawn-entry, НЕ enforce-скоуп. Попытка выйти за allowlist = немедленный stop + handoff к security-reviewer.
 
 8. **Cost numbers — только в `cost-budget.yaml`.** Per [P-AUDIT-1](../.planning/_meta/GRILL-DECISIONS-ORIION.md#3-policy-decisions-cross-session-stable) экономические числа НЕ живут в ADR / phase-spec / system-prompts. Только в `agents/_shared/cost-budget.yaml`, под founder control.
 

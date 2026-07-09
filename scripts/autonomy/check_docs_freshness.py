@@ -7,12 +7,14 @@ that has been MERGED but whose own spec-file still says ``Status: Pending`` (or
 which phases are done, and cross-checks each phase spec-file's own ``Status:``.
 
 Merged-detection is deliberately precise to avoid false reds: a phase counts as
-"done" only when STATUS.md has a **subject line** of the form
-``… Phase <id> [+ <id> …] — … <terminal-marker> …`` (the phase-status paragraphs
-and the history-table rows). An incidental "Next → 01.8c" mention on some other
-subject's ✅ line does NOT mark 01.8c done.
+"done" only when STATUS.md has a **"Phase <id>" subject line** of the form
+``… Phase <id> [+ <id> …] — … <terminal-marker> …`` (the phase-status paragraphs).
+An incidental "Next → 01.8c" mention on some other subject's ✅ line does NOT mark
+01.8c done; Wave-0 history-table rows (no "Phase" subject) are not detected either
+(under-detection is the safe direction — never a false-red).
 
-Terminal markers: ``✅``, ``MERGED``, ``COMPLETE``/``Code-complete``, ``Split``.
+Terminal markers (word-bounded so "incomplete" is not "complete"): ``✅``,
+``MERGED``, ``COMPLETE``/``Code-complete``, ``Split``.
 
 Run from the repo root (stdlib only, Python 3.12):
 
@@ -48,21 +50,33 @@ def _rel(path: Path) -> str:
     except ValueError:
         return path.as_posix()
 
-_TERMINAL_TOKENS = ("✅", "MERGED", "COMPLETE", "CODE-COMPLETE", "SPLIT")  # ✅
+
+# Terminal markers matched word-bounded so "COMPLETE" does NOT match "incomplete"
+# and "CODE-COMPLETE" still matches (the hyphen is a word boundary). ✅ is not a
+# word char so it is matched literally.
+_TERMINAL_RE = re.compile(r"✅|\b(?:MERGED|COMPLETE|SPLIT)\b", re.IGNORECASE)
 _NONTERMINAL_TOKENS = ("PENDING", "IN PROGRESS", "\U0001f504")  # 🔄
+
+
+def _has_terminal(text: str) -> bool:
+    """True if the text carries a terminal-status marker (✅ / MERGED / COMPLETE / SPLIT)."""
+    return bool(_TERMINAL_RE.search(text))
 
 
 def merged_phase_ids(status_text: str) -> set[str]:
     """Phase ids that STATUS.md marks done via a subject line + terminal marker.
 
-    A phase is "done" only when it is the SUBJECT of a status line — the clause
-    before the first em-dash names it (e.g. "**Phase 01.7 + 01.8-mail + 01.8 — ✅
-    MERGED**"). This deliberately ignores incidental post-dash mentions such as
-    "… — ✅ Complete. Next → 01.8c", so the next phase is not marked merged.
+    A phase is "done" only when it is the SUBJECT of a status paragraph — the
+    clause before the first em-dash names it (e.g. "**Phase 01.7 + 01.8-mail + 01.8
+    — ✅ MERGED**"). This deliberately ignores incidental post-dash mentions such as
+    "… — ✅ Complete. Next → 01.8c", so the next phase is not marked merged. Wave-0
+    history-table rows ("| 00.1 — Repo | ✅ Complete |") lack a "Phase" subject and
+    are intentionally NOT detected here — those specs are already terminal; missing
+    them only under-detects (the safe direction), never false-reds.
     """
     merged: set[str] = set()
     for line in status_text.splitlines():
-        if not any(tok in line.upper() for tok in _TERMINAL_TOKENS):
+        if not _has_terminal(line):
             continue
         subject = line.split("—", 1)[0]  # text before the first em-dash
         if "PHASE" not in subject.upper():
@@ -78,18 +92,25 @@ def spec_phase_id(spec_path: Path) -> str | None:
     return m.group(1) if m else None
 
 
+# A real Status FIELD: optional leading '>'/'-'/'*'/space, "status", optional bold
+# '*', optional space, then a REQUIRED colon. The required colon rejects prose lines
+# like "- status transitions: …" (word between "status" and ":") that would otherwise
+# preempt the true header and cause a false-red.
+_STATUS_FIELD_RE = re.compile(r"^[>*\s\-]*\**status\**\s*:", re.IGNORECASE)
+
+
 def spec_status_line(spec_path: Path) -> str | None:
-    """First ``Status:`` line of a spec file (the header status), or None."""
+    """First ``Status:`` field line of a spec file (the header status), or None."""
     for line in spec_path.read_text(encoding="utf-8").splitlines():
-        if re.match(r"^[>*\s\-]*\**status:?\**", line, re.IGNORECASE):
+        if _STATUS_FIELD_RE.match(line):
             return line
     return None
 
 
 def is_nonterminal(status_line: str) -> bool:
-    upper = status_line.upper()
-    if any(tok in upper for tok in _TERMINAL_TOKENS):
+    if _has_terminal(status_line):
         return False
+    upper = status_line.upper()
     return any(tok in upper for tok in _NONTERMINAL_TOKENS)
 
 
@@ -110,7 +131,9 @@ def find_stale(status_text: str, spec_paths: list[Path]) -> list[str]:
         if status_line is None:
             continue
         if is_nonterminal(status_line):
-            stale.append(f"{_rel(spec)}: merged ({pid}) but spec Status is still non-terminal ('{_ascii(status_line.strip()[:80])}')")
+            stale.append(
+                f"{_rel(spec)}: merged ({pid}) but spec Status is still non-terminal ('{_ascii(status_line.strip()[:80])}')"
+            )
     return stale
 
 
@@ -125,13 +148,19 @@ def main() -> int:
     stale = find_stale(status_text, spec_paths)
 
     if stale:
-        print("ADR-040 D9 docs-freshness FAILED -- merged phase(s) with a non-terminal spec Status:")
+        print(
+            "ADR-040 D9 docs-freshness FAILED -- merged phase(s) with a non-terminal spec Status:"
+        )
         for line in stale:
             print(f"  {line}")
-        print("\nFlip each spec's Status to its terminal state (exit-ritual doc-sync, ADR-040 D9c).")
+        print(
+            "\nFlip each spec's Status to its terminal state (exit-ritual doc-sync, ADR-040 D9c)."
+        )
         return 1
 
-    print(f"OK -- no merged phase left with a Pending/In-progress spec ({len(spec_paths)} specs scanned).")
+    print(
+        f"OK -- no merged phase left with a Pending/In-progress spec ({len(spec_paths)} specs scanned)."
+    )
     return 0
 
 

@@ -77,6 +77,35 @@ def test_no_status_line_is_skipped_not_failed(tmp_path: Path) -> None:
     assert mod.find_stale(_STATUS, [legacy]) == []
 
 
+def test_prose_status_line_does_not_preempt_real_header(tmp_path: Path) -> None:
+    """A prose bullet starting with 'status' must not shadow the real ✅ header
+    (SOUND P2: colon-optional regex false-red)."""
+    mod = _load()
+    spec_dir = tmp_path / "phases"
+    spec_dir.mkdir(parents=True)
+    spec = spec_dir / "01.6-security.md"
+    spec.write_text(
+        "# Phase 01.6\n\n"
+        "- **Status:** ✅ Merged — PR #84\n\n"
+        "## Notes\n- status transitions: draft -> pending -> done\n",
+        encoding="utf-8",
+    )
+    # The header (✅) must be the one picked, so 01.6 is NOT flagged stale.
+    assert mod.find_stale(_STATUS, [spec]) == []
+    assert "Status:" in (mod.spec_status_line(spec) or "")
+
+
+def test_incomplete_is_not_treated_as_terminal() -> None:
+    """'incomplete' must not substring-match the COMPLETE terminal token
+    (SOUND P3: word-boundary)."""
+    mod = _load()
+    assert mod._has_terminal("✅ done") is True
+    assert mod._has_terminal("Code-complete") is True
+    assert mod._has_terminal("🔀 Split") is True
+    assert mod._has_terminal("work is incomplete") is False
+    assert mod.is_nonterminal("- **Status:** incomplete / pending") is True
+
+
 def test_real_tree_is_fresh() -> None:
     res = subprocess.run(
         [sys.executable, str(SCRIPT)], cwd=REPO_ROOT, capture_output=True, text=True
