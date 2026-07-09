@@ -1,4 +1,0 @@
-{
-  "phase": "01.9a",
-  "required_gates": ["adversarial_audit"]
-}
