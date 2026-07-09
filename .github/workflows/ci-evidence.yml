@@ -49,5 +49,11 @@ jobs:
         id: sha
         run: echo "head_sha=${{ github.event.pull_request.head.sha || github.sha }}" >> "$GITHUB_OUTPUT"
 
+      # Fetch the base branch tip so verify_evidence can diff-scope: a required
+      # gate whose evidence THIS PR does not touch (inherited from a prior squash
+      # that left evidence/ on main) is skipped, not failed for staleness.
+      - name: Fetch base branch (gate diff-scoping)
+        run: git fetch --no-tags --depth=50 origin "${{ github.event.pull_request.base.ref }}"
+
       - name: Verify autonomy gate evidence
-        run: python scripts/autonomy/verify_evidence.py --head-sha "${{ steps.sha.outputs.head_sha }}"
+        run: python scripts/autonomy/verify_evidence.py --head-sha "${{ steps.sha.outputs.head_sha }}" --base-ref FETCH_HEAD

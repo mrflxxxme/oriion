@@ -92,6 +92,26 @@ def _last_non_evidence_commit(start_sha: str, evidence_dir: str) -> str:
     return sha
 
 
+def _changed_files(base_ref: str) -> set[str] | None:
+    """Repo-relative paths this PR changes vs ``base_ref`` (three-dot diff).
+
+    Three-dot (``base...HEAD``) diffs HEAD against the merge-base, i.e. exactly
+    the PR's own commits — so evidence left on the base branch by a PRIOR squash
+    (inherited unchanged into this PR) does NOT appear here. Returns None on any
+    git failure so the caller can fail-closed (verify all, never silently skip).
+    """
+    try:
+        out = subprocess.run(
+            ["git", "diff", "--name-only", f"{base_ref}...HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return {ln.strip().replace("\\", "/") for ln in out.stdout.splitlines() if ln.strip()}
+
+
 def _load_json(path: Path) -> Any:
     with path.open(encoding="utf-8") as fh:
         return json.load(fh)
@@ -139,6 +159,19 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Commit the gates must have run against. Defaults to `git rev-parse HEAD`.",
     )
+    parser.add_argument(
+        "--base-ref",
+        default=None,
+        help=(
+            "Base ref (e.g. origin/main / the PR base sha) to scope verification "
+            "to gates THIS PR adds or modifies. When set, a required gate whose "
+            "evidence file the PR does not touch — and whose manifest is unchanged "
+            "vs the base — is skipped as inherited, so a PR that merely inherits "
+            "evidence left on main by a prior squash is not failed for its "
+            "staleness. A PR that changes the manifest re-verifies ALL gates (must "
+            "ship fresh evidence). Omit for verify-all (backward-compatible)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     manifest_path = Path(args.manifest)
@@ -177,9 +210,25 @@ def main(argv: list[str] | None = None) -> int:
         expected_sha = resolved_sha
 
     evidence_dir = Path(args.evidence_dir)
+    # PR-scoping — fixes evidence inherited from a prior squash. With a base ref,
+    # only verify gates THIS PR introduces: its own evidence file changed, or the
+    # manifest changed (editing the manifest re-declares the whole gate set → all
+    # must ship fresh evidence). A PR that merely inherits evidence left on main by
+    # an earlier squash touches neither → the gate is skipped, not failed for
+    # staleness. `changed is None` (no base ref, or git failed) → fail-closed:
+    # verify everything, never silently skip a real gate.
+    ev_prefix = args.evidence_dir.rstrip("/\\")
+    changed = _changed_files(args.base_ref) if args.base_ref else None
+    manifest_touched = changed is not None and f"{ev_prefix}/manifest.json" in changed
+
     failures = 0
+    skipped = 0
     print(f"[ci-evidence] verifying {len(required)} gate(s) against {expected_sha[:12]}")
     for gate in required:
+        if changed is not None and not manifest_touched and f"{ev_prefix}/{gate}.json" not in changed:
+            print(f"  [SKIP] {gate}: inherited from {args.base_ref} (evidence not modified by this PR)")
+            skipped += 1
+            continue
         ev_path = evidence_dir / f"{gate}.json"
         if not ev_path.exists():
             print(f"  [MISS] {gate}: no evidence artifact at {ev_path}")
@@ -204,6 +253,12 @@ def main(argv: list[str] | None = None) -> int:
     if failures:
         print(f"[ci-evidence] FAIL: {failures} gate(s) missing/stale/failed -merge blocked.")
         return 1
+    if skipped and skipped == len(required):
+        print(
+            "[ci-evidence] all declared gates inherited-unchanged from base "
+            "(none introduced by this PR). OK."
+        )
+        return 0
     print("[ci-evidence] all declared gates verified fresh + PASS. OK.")
     return 0
 
