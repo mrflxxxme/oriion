@@ -132,6 +132,16 @@ Parked-фазы (01.3b / 01.8b / 01.11) гейт НЕ блокируют: их r
 
 memory-curator auto-syncs deliverable status. This section is rewritten at gate-evaluation time.
 
+### Autonomous evaluation (`/autonomy:run` 2026-07-09) — computable thresholds
+
+| Threshold | Result | Basis |
+|---|---|---|
+| `acceptance_criteria_pass_rate ≥ 0.9` | ✅ **MET** (~1.0) | Every Wave-1 phase merged with all CI gates green (ruff/mypy-strict/bandit/pytest incl. per-module ≥85% + real-PG integration) + phase evidence (01.9a/01.9b adversarial-audit PASS, 01.10 live-golden 7/7). No founder-waived failures. |
+| `must_phases_merged` | ⚠️ **merge MET / sign-off PENDING** | 01.9a+01.9b (MCP substrate + both DLP flags ON) + 01.4-ui + 01.10 (2nd vertical) + 01.12 all merged to `main` (04a74a2) + deployed & server-verified on VPS. **BUT** the "2nd vertical **reviewed**" sub-criterion (D2) needs the founder review-gate: telegram_creator + agency_marketing_ru prompts are at **draft** (DV-12 + DV-02). |
+| `deferred_verification_clean` | ✅ **MET** | No open P1-class (leak/money/auth) DV addressed to Wave 1: DV-04/DV-05 (DLP) **closed** (01.9a). Open DV-11 (connector live-smoke) / DV-12 (vertical cert) / DV-06 (SMTP) are cred/quality-gated, not P1 leak/money/auth. |
+
+**Deliverables:** D1 ✅ (all must-phases). D3 ✅ (security guardrails ACTIVE — both flags ON in prod, INN FP≤1% proven, DV-04/05 closed). **D2 / D4 / D5 / D6 + `founder_signature` = FOUNDER** (vertical review draft→reviewed, cost-budget v4 review, risks review, Wave-2 PHASES regen). Server-verified on VPS 2026-07-09 (DLP-ON, capability-gate denies send, connector_credentials migration live, memory/dashboard/onboarding routes 200).
+
 ## Retrospective themes
 
 _(Founder fills at evaluation time; сюда же — решение по переносу parked-фаз.)_
