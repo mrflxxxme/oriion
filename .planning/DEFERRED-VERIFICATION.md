@@ -17,7 +17,6 @@
 | DV-01 | 01.2 (AC-3.6) | Реальный пайплайн `resolve_master→DB→MasterAgent` — automated-проверка была stub-level | Live golden Master end-to-end на funded DeepSeek (уже прогнан 7/7 как F1-before-01.4 — нужна фиксация evidence-артефакта в каноне) | 02.1-retro | 🟡 open (частично прогнан, evidence не закреплён) |
 | DV-02 | 01.2 (AC-3.7) | Master-prompt `agency_marketing_ru` promotion `draft → reviewed` (evaluator-run + founder review per ADR-026) | Evaluator-run на golden-dataset ≥75% + adversarial 100% + подписанный REVIEW-CHECKLIST | 01.10 (вместе со второй вертикалью) | 🔴 open |
 | DV-03 | 01.3 (AC-01.3.7) | BYOK: только plumbing, живой путь = 501-стабы; flag-enforcement не проверен | Live BYOK-путь против реального провайдера + тест enforcement | 02.1-retro | 🔴 open |
-| DV-06 | 01.8-mail | Live-send реального SMTP не прогнан (нет кредов) | `pytest -m live` iam email suite при SMTP-кредах в каноне (см. RUNWAY RW-01) | по разблокировке RW-01 | 🔴 open (gated) |
 | DV-07 | 01.7 | `artifacts.visibility` — stub-колонка (default backfill, не enforced) | Enforcement Option B (private artifacts) + тесты | Wave 2 (02.6 RBAC-расширение) | 🔴 open |
 | DV-08 | Wave-0 gate | `internal_demo_passed` — founder staging 10× anchor run не выполнен | `summary.json` + 10× run_NNN.json в `.planning/gates/evidence/wave-0-to-1/` | founder-action (RW-07) | 🔴 open (founder) |
 | DV-09 | 00.8 | AC3/AC4 — `npm run e2e:live` (5-route axe + 3-agent demo) не прогнан на staging | e2e:live green на staging, evidence в gate wave-0-to-1 | вместе с DV-08 | 🔴 open (founder) |
@@ -31,6 +30,7 @@
 |---|---|---|
 | DV-04 | 01.9a | Оба флага (`security_dlp_enabled`, `security_injection_scan_enabled`) → **default True** в `backend/src/_shared/config.py`; тест дефолтов `backend/tests/security/test_security_flags_default.py`; success-path не ломается, реальный ПДн блокируется — `backend/tests/security/test_dlp_activation_pipeline.py`. Precision-предусловие закрыто через DV-05. |
 | DV-05 | 01.9a | Context-aware INN-10 (checksum **И** «ИНН»-контекст в окне 40 симв.) в `backend/src/security/detectors/pii.py`; golden-корпус `backend/tests/security/corpus/`; precision-тест `backend/tests/security/test_inn_precision.py` — baseline FP 100% (hard) / ~10% (random) → tuned **0% ≤ 1%**; recall на контекстных positives = 1.0 (`test_inn_recall.py`). |
+| DV-06 | 01.8-mail | **Live-send прогнан на staging (VPS Timeweb) 2026-07-09.** Реальный `YandexSmtpEmailSender` (`is_smtp_configured=True`, host `smtp.yandex.ru`, implicit TLS 465) подключился, аутентифицировался (прежняя `535` устранена) и Yandex **принял** verification-письмо → доставлено на `profiki.ai@yandex.com` (лог `smtp email sent kind=verification`). Креды — в `infra/vps-minimal.env` (RW-01 🟢). |
 
 ## Протокол
 
