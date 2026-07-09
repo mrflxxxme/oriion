@@ -20,7 +20,7 @@ Oriion исполняется в режиме **solo founder + 11 persistent Opu
 
 Все persistent роли подняты на **Opus как primary model-tier** (full quality budget). Tier 1-2 routine задачи могут fallback на Sonnet через `agents/_shared/cost-budget.yaml` (см. global rule §4 ниже). Tier 3+ задачи всегда Opus.
 
-Spawning runtime — native Claude Code `Task` tool с `subagent_type=<role>`, где `<role>` определён в `agents/<role>/profile.md`. Long-term role memory + handoff persistence — AgentDB через `claude-flow` MCP (ONNX 384-dim embeddings).
+Spawning runtime — native Claude Code `Task` tool с `subagent_type=<role>`. Каждая из 11 ролей — **спавнабельный нативный сабагент** `agents/<role>.md` (ADR-040 D8, добавлены в 01.8c): тонкий spawn-entry (frontmatter `name`/`description`/`tools`/`model`) + указатель на полный хендбук в `agents/<role>/` (profile · system-prompt · tools-allowlist · workflows · checklists — единый источник истины). Конформность spawn-entry ↔ хендбук проверяет `scripts/autonomy/check_subagents.py` (CI-гейт `ci-autonomy`). Long-term role memory + handoff persistence — AgentDB через `claude-flow` MCP (ONNX 384-dim embeddings).
 
 ---
 
