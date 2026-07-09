@@ -57,7 +57,7 @@
 | `TBD_YC_FOLDER_ID_STAGING` | Folder ID для staging environment | ⏳ |
 | `TBD_YC_FOLDER_ID_PROD` | Folder ID для production | ⏳ |
 | `TBD_YC_SERVICE_ACCOUNT_DEPLOY` | Service Account для CI/CD deploy | ⏳ |
-| `TBD_YC_OBJECT_STORAGE_BUCKET` | S3 bucket name (например, teamly-ru-prod) | ⏳ |
+| `TBD_YC_OBJECT_STORAGE_BUCKET` | S3 bucket name (например, profiki-prod) | ⏳ |
 | `TBD_YC_OBJECT_STORAGE_BUCKET_STAGING` | Same для staging | ⏳ |
 | `TBD_YC_LOCKBOX_FOLDER_ID` | Folder для secrets | ⏳ |
 | `TBD_YC_DATABASE_HOST` | Managed PostgreSQL hostname | ⏳ |
@@ -70,7 +70,7 @@
 | Token | Назначение | Status |
 |---|---|---|
 | `TBD_GITHUB_ORG` | GitHub organization name | ⏳ |
-| `TBD_GITHUB_REPO` | Main repo name (например, teamly-ru) | ⏳ |
+| `TBD_GITHUB_REPO` | Main repo name (например, profiki-ru) | ⏳ |
 | `TBD_GITLAB_SELFHOST_URL` | URL self-hosted GitLab mirror | ⏳ deferred Wave 1+ per Phase 00.1 trim (Session-2026-05-17) |
 | `TBD_GITLAB_REPO` | Mirror repo URL | ⏳ deferred Wave 1+ |
 
