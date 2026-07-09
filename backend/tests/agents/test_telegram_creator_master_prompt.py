@@ -24,7 +24,7 @@ def test_real_telegram_creator_master_prompt_is_contract_valid() -> None:
     # deliverables reviewed-quality, TG-008 anti-fabrication fixed + re-run clean) +
     # founder approval. Closes DV-12.
     assert prompt.status == "reviewed"
-    assert prompt.version == "1.0.0"
+    assert prompt.version == "1.0.1"
     assert prompt.model_default == "deepseek-chat"
     assert len(prompt.sections) == 9
     # composed prompt drops the frontmatter.

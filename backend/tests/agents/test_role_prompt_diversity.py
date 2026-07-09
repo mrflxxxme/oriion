@@ -17,10 +17,10 @@ from src.agents.services.role_prompt_loader import load_role_prompt
 # writer bumped to 1.1.0 by the 2026-07-10 anti-fabrication hardening (zero-fabrication
 # output-discipline constraint added to §3 after TG-008 fabricated case-study metrics).
 _ROLE_MIN_EXAMPLES = [
-    ("coordinator", 3, "1.0.0"),
-    ("researcher", 4, "1.0.0"),
-    ("analyst", 5, "1.0.0"),
-    ("writer", 4, "1.1.0"),
+    ("coordinator", 3, "1.0.1"),
+    ("researcher", 4, "1.0.1"),
+    ("analyst", 5, "1.0.1"),
+    ("writer", 4, "1.1.1"),
 ]
 
 
