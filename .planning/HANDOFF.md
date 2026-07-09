@@ -4,34 +4,26 @@
 
 ## Last updated
 - Date: 2026-07-10
-- Session: `/autonomy:run` — Wave-1 нереализованные фазы (готовим инфру к Wave 2)
+- Session: `/autonomy:run` 01.8c (PR-1 merged) → chip 01.8c-rename (PR-2, brand=profiki)
 - Agent: @claude (autonomous runner, ADR-037/040)
 
-## This run — 01.8c autonomy/dev-infra hardening (PR-1 of 2)
-Founder-запрос: «выполни нереализованные phases in wave 1 … подготовить всю инфру и функционал к Wave 2».
-Из 4 нереализованных W1-фаз **3 runway-blocked** (parked до founder-кредов):
-- **01.3b** ЮKassa → RW-04 🔴 (внешний счёт, 5–10 дней) · **01.8b** OAuth → RW-02 🔴 · **01.11** Telegram Business → RW-05 🔴 (юрист).
-Единственная незаблокированная — **01.8c** (нет founder-зависимостей). Именно она = «инфра к Wave 2».
+## 01.8c — ПОЛНОСТЬЮ завершена (2 PR)
+- **PR-1 (autonomy dev-infra) — MERGED #109 `857e09d`:** нативные ролевые сабагенты (D8), OpenAPI-snapshot+drift-CI (D2), docs-freshness CI (D9), JOURNAL-архивация (D12). Founder in-session ack (public_api_contracts). main HEALTHY.
+- **PR-2 (brand-rename teamly→profiki, D3) — code-complete, ack-needed:** OQ-09 решён founder = **profiki**.
+  - **Scope-решение founder:** только `teamly→profiki` (потребительский бренд, 18→ файлов); `oriion` **оставлен внутренним codename** (JWT iss/aud, RLS-роль `oriion_app`, CloudEvents-namespace, бакеты/сервисы — 0 functional identifiers тронуто; oriion→profiki = отдельная рискованная инфра-миграция, НЕ сделана).
+  - **Формы:** Cyrillic **«Профики»** в UI (email/`<title>`/промпты) + Latin **`Profiki`/`profiki`** в коде/пакетах/доменах.
+  - 74 замены / 29 файлов; 6 role-prompts + PATCH SemVer + test-pins lockstep; uv.lock + openapi.snapshot regen.
+  - **Carve-outs:** `oriion`, `@teamly-ai` (author-conv, ADR-027), `teamly.to` (внешний реф), memory-file-name, immutable ADR/AUDIT/JOURNAL, filesystem `TEAMLY_RU`.
+  - Гейты: ruff/format/mypy 241/bandit 0/**unit 1162**/openapi-fresh; **golden-smoke 7/7 PASS** (~$0.016). Tripwire `auth_rbac_sessions`+`public_api_contracts` → **ack-needed**.
 
-**01.8c split на 2 PR** (DECISIONS-LOG fork-1; reviewability + decoupling риска ренейма):
-- **PR-1 (branch `claude/auto-01.8c-autonomy-hardening`, HEAD после exit-ritual):** items 1/2/3/5.
-  - **D8 нативные сабагенты:** 11 `.claude/agents/<role>.md` (тонкий spawn-entry → хендбук) + `check_subagents.py`; снят known-gap в judge-panel/AGENTS/BUILD-PLAN.
-  - **D2 OpenAPI-snapshot:** `scripts/autonomy/export_openapi.py` → `contracts/openapi.snapshot.json` (64 route) + drift-step в ci-backend; 10× api.yaml → non-normative; tripwire-коммент обновлён (glob НЕ сужен).
-  - **D9 docs-freshness:** `scripts/autonomy/check_docs_freshness.py` + `ci-autonomy.yml`; починил stale 01.6/01.7 spec-статусы.
-  - **D12 JOURNAL-архивация:** 189→46KB, 28 записей → `dev-log/archive/JOURNAL-2026-05-to-06.md` (content-verified 46=46).
-  - Гейты: ruff/format/mypy **241**+3 scripts/bandit 0/**unit 1160**/tooling **15**/openapi `--check` fresh. Adversarial 3 линзы → evidence.
-  - **Tripwire: `public_api_contracts`** (contracts/, additive) → **ack-needed** (НЕ auto-merge). Ждёт founder `/autonomy:ack` или in-session «мержи».
-- **PR-2 `01.8c-rename` (D3 Oriion-ренейм):** item 4 — следующий в этом ране (после PR-1 в очередь merge). 63 файла (код+промпты+user-facing строки; SemVer-бамп role-prompts). Историч. записи (ADR/AUDIT/JOURNAL) НЕ трогаем. Tripwire: auth_rbac_sessions (iam) + public_api_contracts (role-prompts). Live golden-smoke ~$0.05 после ренейма.
+## Founder actions
+1. **Ack PR-2** (tripwire iam+contracts; brand-rename, oriion internal preserved) → merge.
+2. **Wave-1 formal closure** (всё за founder): vertical review draft→reviewed (DV-12/02 — уже promoted #110?), cost/risk review, подпись `gates/wave-1-to-2`.
+3. **Parked фазы (нужны креды):** 01.3b ЮKassa (RW-04) · 01.8b OAuth (RW-02) · 01.11 TG-Business (RW-05). Drop creds → «RW-0N ready» → unpark.
+4. **Chips:** `task_dd666049` (PreToolUse hook — role tool-scope enforcement, SECURE-P2) · (rename chip `task_4e7f04db` — закрыт этим PR-2).
 
-## Remaining to FORMALLY close Wave 1 — все FOUNDER-действия
-1. **Ack PR-1 01.8c** (tripwire public_api_contracts additive) → merge.
-2. Обзор вертикалей draft→reviewed (telegram_creator + agency_marketing_ru) → DV-12/DV-02.
-3. Cost/risk review + `founder_signature` на [`gates/wave-1-to-2.md`](./gates/wave-1-to-2.md).
-4. **Креды для parked/live:** RW-04 (ЮKassa→01.3b) · RW-02 (OAuth→01.8b) · RW-05 (consent/РКН→01.11) · RW-01/03 (SMTP/TG→DV-06/11 + live-демо).
-5. (Опц.) RW-07 staging anchor (DV-08/09).
-
-## Gate commands (no `make` on Windows)
-backend (cwd=backend): `uv run ruff check src tests` · `uv run ruff format --check src tests` · `uv run mypy --strict src` · `uv run pytest -m "not integration"` · `uv run bandit -r src -c pyproject.toml` · `uv run python ../scripts/autonomy/export_openapi.py --check`. autonomy (cwd=root): `python scripts/autonomy/check_subagents.py` · `python scripts/autonomy/check_docs_freshness.py`.
+## Gate commands (no `make`; use subshells `(cd backend && …)` — armed premerge-hook брикует cwd вне root/backend)
+backend: `uv run ruff check/format --check src tests` · `uv run mypy --strict src` · `uv run pytest -m "not integration"` · `uv run bandit -r src -c pyproject.toml` · `uv run python ../scripts/autonomy/export_openapi.py --check`. autonomy (root): `python scripts/autonomy/check_subagents.py` · `check_docs_freshness.py`. golden: `PYTHONIOENCODING=utf-8 uv run python scripts/live_golden_master.py`.
 
 ## Read first
 README · this HANDOFF · PROJECT-STATE · STATUS · `agent-handbook/00-START-HERE.md` · runner contracts (DoR + FOUNDER-RUNWAY + DEFERRED-VERIFICATION).

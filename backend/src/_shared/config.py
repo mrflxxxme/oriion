@@ -212,7 +212,7 @@ class Settings(BaseSettings):
     smtp_user: str = Field(
         default="",
         description=(
-            "SMTP auth username (full Yandex 360 mailbox, e.g. no-reply@teamly.ru). "
+            "SMTP auth username (full Yandex 360 mailbox, e.g. no-reply@profiki.online). "
             "Empty = SMTP not configured → sender selection falls back to NoOp."
         ),
     )
@@ -240,7 +240,7 @@ class Settings(BaseSettings):
         default="",
         description=(
             "Optional public base URL for the verification/reset flow (e.g. "
-            "https://app.teamly.ru). When set, the email body includes a full "
+            "https://app.profiki.online). When set, the email body includes a full "
             "clickable link (<base>/auth/verify-email?token=…); when empty the "
             "body carries the bare token + the API path, matching "
             "ConsoleEmailSender semantics."

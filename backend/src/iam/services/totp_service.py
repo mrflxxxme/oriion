@@ -38,7 +38,7 @@ from src.iam.repositories.totp_repository import (
 from src.iam.repositories.user_repository import UserRepository
 from src.llm_gateway.services.kms_provider import KMSProvider
 
-_ISSUER = "TEAMLY"
+_ISSUER = "Profiki"
 _BACKUP_CODE_COUNT = 10
 _BACKUP_CODE_BYTES = 5  # 10 hex chars per code
 

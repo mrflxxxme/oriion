@@ -1,1 +1,1 @@
-{ "phase": "01.8c", "required_gates": ["adversarial_audit"] }
+{"phase": "01.8c-rename", "required_gates": ["live_golden"]}

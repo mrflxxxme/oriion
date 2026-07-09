@@ -1,4 +1,4 @@
-"""TEAMLY_RU backend package."""
+"""Profiki backend package."""
 
 from __future__ import annotations
 

@@ -53,7 +53,7 @@ def test_prod_without_creds_falls_back_to_noop() -> None:
 
 
 def test_prod_with_only_user_still_noop() -> None:
-    sender = get_email_sender(_settings(app_env="prod", smtp_user="no-reply@teamly.ru"))
+    sender = get_email_sender(_settings(app_env="prod", smtp_user="no-reply@profiki.online"))
     assert isinstance(sender, NoOpEmailSender)
 
 
@@ -66,7 +66,7 @@ def test_prod_with_creds_selects_yandex_smtp() -> None:
     sender = get_email_sender(
         _settings(
             app_env="prod",
-            smtp_user="no-reply@teamly.ru",
+            smtp_user="no-reply@profiki.online",
             smtp_password=SecretStr("app-pass"),
         )
     )
@@ -84,7 +84,7 @@ def test_is_smtp_configured_helper() -> None:
 
 
 def test_smtp_sender_address_defaults_to_user() -> None:
-    s = _settings(smtp_user="user@teamly.ru")
-    assert s.smtp_sender_address == "user@teamly.ru"
-    s2 = _settings(smtp_user="user@teamly.ru", smtp_from="brand@teamly.ru")
-    assert s2.smtp_sender_address == "brand@teamly.ru"
+    s = _settings(smtp_user="user@profiki.online")
+    assert s.smtp_sender_address == "user@profiki.online"
+    s2 = _settings(smtp_user="user@profiki.online", smtp_from="brand@profiki.online")
+    assert s2.smtp_sender_address == "brand@profiki.online"

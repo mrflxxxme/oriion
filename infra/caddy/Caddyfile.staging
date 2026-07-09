@@ -110,7 +110,7 @@
 		# No frontend present yet — return 503 с pointer.
 		respond <<HTML
             <!doctype html>
-            <html><head><title>TEAMLY_RU Staging</title></head>
+            <html><head><title>Профики Staging</title></head>
             <body><h1>Phase 00.6 Stage A — API up; frontend lands в Phase 00.7</h1>
             <p>Try <a href="/healthz">/healthz</a> · <a href="/metrics">/metrics</a> · <a href="/api/v1/llm/providers">/api/v1/llm/providers</a></p>
             </body></html>

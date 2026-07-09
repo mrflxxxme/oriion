@@ -139,9 +139,9 @@ class InMemoryEmailSender:
 
 # ── Phase 01.8 — real Yandex 360 SMTP sender ────────────────────────────────
 
-_VERIFY_SUBJECT = "Подтвердите email — TEAMLY"
-_RESET_SUBJECT = "Сброс пароля — TEAMLY"
-_MAGIC_LINK_SUBJECT = "Вход в TEAMLY по ссылке"
+_VERIFY_SUBJECT = "Подтвердите email — Профики"
+_RESET_SUBJECT = "Сброс пароля — Профики"
+_MAGIC_LINK_SUBJECT = "Вход в Профики по ссылке"
 
 
 class YandexSmtpEmailSender:
@@ -225,7 +225,7 @@ class YandexSmtpEmailSender:
         ref = self._action_ref("/auth/verify-email", token)
         body = (
             "Здравствуйте!\n\n"
-            "Подтвердите ваш email для доступа к TEAMLY.\n\n"
+            "Подтвердите ваш email для доступа к Профики.\n\n"
             f"{ref}\n\n"
             f"Ссылка действительна до {expires_at.isoformat()}.\n\n"
             "Если вы не создавали аккаунт, просто проигнорируйте это письмо.\n"
@@ -237,7 +237,7 @@ class YandexSmtpEmailSender:
         ref = self._action_ref("/auth/reset-password", token)
         body = (
             "Здравствуйте!\n\n"
-            "Мы получили запрос на сброс пароля для вашего аккаунта TEAMLY.\n\n"
+            "Мы получили запрос на сброс пароля для вашего аккаунта Профики.\n\n"
             f"{ref}\n\n"
             f"Ссылка действительна до {expires_at.isoformat()}.\n\n"
             "Если вы не запрашивали сброс, проигнорируйте это письмо — "
@@ -250,7 +250,7 @@ class YandexSmtpEmailSender:
         ref = self._action_ref("/auth/magic-link/consume", token)
         body = (
             "Здравствуйте!\n\n"
-            "Вы запросили вход в TEAMLY по ссылке.\n\n"
+            "Вы запросили вход в Профики по ссылке.\n\n"
             f"{ref}\n\n"
             f"Ссылка действительна до {expires_at.isoformat()} и работает один раз.\n\n"
             "Если вы не запрашивали вход, просто проигнорируйте это письмо.\n"

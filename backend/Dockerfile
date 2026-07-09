@@ -70,7 +70,7 @@ FROM base AS prod
 # AC-W1-1). Frozen lockfile so prod build is reproducible.
 #
 # Build order matters: COPY src/ ДО `uv sync --frozen` — hatchling treats
-# `teamly-backend` as a local editable install, and the sync resolves
+# `profiki-backend` as a local editable install, and the sync resolves
 # package metadata from src/ (pyproject.toml `[tool.hatch.build.targets.
 # wheel] packages = ["src"]`).
 

@@ -58,7 +58,7 @@ from src.tasks.exceptions import TasksError
 from src.tasks.routers.stream import router as task_stream_router
 from src.tasks.routers.tasks import router as tasks_router
 
-API_TITLE: Final[str] = "TEAMLY_RU Backend"
+API_TITLE: Final[str] = "Profiki Backend"
 API_DESCRIPTION: Final[str] = (
     "Cloud-платформа AI-команд для СМБ + personal-users сегмента РФ. "
     "Phase 00.5b — iam + multitenancy + llm_gateway routers wired under /api/v1."

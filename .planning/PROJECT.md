@@ -1,6 +1,6 @@
 # Oriion — Project Overview
 
-> Рабочее имя per [ADR-040 D3](./decisions/ADR-040-execution-spec-contract.md) (прежнее TEAMLY_RU; финальный бренд — OQ-09).
+> Потребительский бренд — **«Профики»** (`профики.online`; OQ-09 решён 2026-07-10). **«Oriion»** — внутреннее кодовое имя инфраструктуры (per [ADR-040 D3](./decisions/ADR-040-execution-spec-contract.md); JWT/RLS-роль/события/сервисы — не меняется). Прежнее TEAMLY_RU убрано из активного кода (Phase 01.8c).
 
 > Облачная платформа AI-команд для СМБ + personal-users сегмента РФ. Пользователь начинает с универсальной команды («Твои личные ассистенты»), при необходимости расширяет до vertical-команды с domain-expertise. Coordinator декомпозирует задачи (или Master-Agent в vertical-режиме), агенты выполняют, результат — в Pixel Department.
 

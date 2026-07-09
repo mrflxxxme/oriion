@@ -65,9 +65,9 @@ def _implicit_tls_sender(**overrides: object) -> YandexSmtpEmailSender:
     kwargs: dict[str, object] = {
         "host": "smtp.yandex.ru",
         "port": 465,
-        "username": "no-reply@teamly.ru",
+        "username": "no-reply@profiki.online",
         "password": "app-pass-secret",
-        "sender": "no-reply@teamly.ru",
+        "sender": "no-reply@profiki.online",
         "use_tls": True,
         "timeout": 30.0,
         "url_base": "",
@@ -92,13 +92,13 @@ async def test_smtp_verification_builds_message_and_calls_transport() -> None:
     assert kwargs["start_tls"] is False
     assert kwargs["timeout"] == 30.0
     # auth called with configured creds
-    assert kwargs["username"] == "no-reply@teamly.ru"
+    assert kwargs["username"] == "no-reply@profiki.online"
     assert kwargs["password"] == "app-pass-secret"
     # MIME message: correct recipient / subject / token-in-body
     message = args[0]
     assert isinstance(message, EmailMessage)
     assert message["To"] == "user@example.com"
-    assert message["From"] == "no-reply@teamly.ru"
+    assert message["From"] == "no-reply@profiki.online"
     assert "Подтвердите" in str(message["Subject"])
     body = message.get_content()
     assert "VTOKEN123" in body
@@ -152,13 +152,13 @@ async def test_smtp_starttls_mode_uses_start_tls_not_implicit() -> None:
 
 @pytest.mark.asyncio
 async def test_smtp_url_base_produces_clickable_link() -> None:
-    sender = _implicit_tls_sender(url_base="https://app.teamly.ru/")
+    sender = _implicit_tls_sender(url_base="https://app.profiki.online/")
     with patch("src.iam.services.email_service.aiosmtplib.send", AsyncMock()) as mock_send:
         await sender.send_verification_email("u@example.com", "LINKTOK", datetime.now(UTC))
 
     message = mock_send.await_args.args[0]
     body = message.get_content()
-    assert "https://app.teamly.ru/auth/verify-email?token=LINKTOK" in body
+    assert "https://app.profiki.online/auth/verify-email?token=LINKTOK" in body
 
 
 @pytest.mark.asyncio

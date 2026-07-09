@@ -2,7 +2,7 @@
 
 Облачная платформа AI-команд для СМБ + personal-users сегмента РФ.
 
-> **Рабочее имя проекта — «Oriion»** (прежнее TEAMLY_RU; per [ADR-040 D3](.planning/decisions/ADR-040-execution-spec-contract.md); финальный бренд — OQ-09, до Wave 2). Остаточные упоминания TEAMLY_RU в коде убираются в Phase 01.8c.
+> **Потребительский бренд — «Профики»** (`профики.online`; OQ-09 решён 2026-07-10). **«Oriion»** остаётся внутренним кодовым именем инфраструктуры (репозиторий, JWT iss/aud, RLS-роль БД, CloudEvents-namespace, сервисы/бакеты — намеренно НЕ меняется). Прежнее имя **TEAMLY_RU** убрано из активного кода/промптов/UI в Phase 01.8c (teamly→profiki); в immutable ADR / истории / внешних ссылках (`teamly.to`) сохранено как факт.
 >
 > Universal team-preset **«Твои личные ассистенты»** (Coordinator + Researcher + Writer + Analyst) + 5 РФ-vertical-templates с Master-Agent layer. Подробнее — [.planning/PROJECT.md](.planning/PROJECT.md).
 

@@ -1,4 +1,4 @@
-"""Alembic env — async migrations runner for TEAMLY_RU multi-version directory.
+"""Alembic env — async migrations runner for Profiki multi-version directory.
 
 Phase 00.1: skeleton env.py. Реальный target_metadata подключается в Phase 00.3
 когда появятся domain models.

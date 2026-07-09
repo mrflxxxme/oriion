@@ -60,7 +60,7 @@ async def test_enroll_persists_encrypted_secret_never_plaintext(local_kms: Local
     # Provisioning material is returned once.
     assert enrollment.secret
     assert enrollment.provisioning_uri.startswith("otpauth://totp/")
-    assert "issuer=TEAMLY" in enrollment.provisioning_uri
+    assert "issuer=Profiki" in enrollment.provisioning_uri
 
     # The persisted secret is CIPHERTEXT, and it decrypts back to the base32 secret.
     _, kwargs = cred_repo.create.call_args
