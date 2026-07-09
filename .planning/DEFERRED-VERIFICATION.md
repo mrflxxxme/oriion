@@ -23,6 +23,7 @@
 | DV-09 | 00.8 | AC3/AC4 — `npm run e2e:live` (5-route axe + 3-agent demo) не прогнан на staging | e2e:live green на staging, evidence в gate wave-0-to-1 | вместе с DV-08 | 🔴 open (founder) |
 | DV-10 | 01.4b | Dramatiq+Redis worker-**transport** live-прогон (Linux) — memory-extraction проверена in-process, не через реальный транспорт | Live worker-транспорт прогон на Docker-стенде | 02.1-retro | 🟡 open |
 | DV-11 | 01.9b | Live connector round-trip (telegram-bot / yandex-disk / imap-smtp против реального API) — коннекторы построены + mock-проверены, но не прогнаны на живых кредах | `pytest -m live` connector suite при кредах в каноне `.env` (TG bot-token RW-03, Yandex Disk OAuth, IMAP/SMTP RW-01) | по разблокировке кредов (founder предоставит отдельно) | 🔴 open (gated) |
+| DV-12 | 01.10 | telegram_creator full certification: golden ≥75% на 30-task golden-dataset + adversarial 100% + `draft → reviewed` promotion (REVIEW-CHECKLIST) — прогнан только lean live-golden 7/7 (plan+synthesis contract + 5 adversarial), не полный 30-task judge-scored evaluator | Full evaluator-run на 30-task golden ≥75% + adversarial 100% + подписанный founder REVIEW-CHECKLIST (вместе с DV-02 agency_marketing_ru — тот же review-gate) | founder review-gate (планируемый ack) | 🟡 open (lean-proven) |
 
 ## Закрытые записи
 

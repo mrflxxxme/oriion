@@ -1,6 +1,6 @@
 ﻿# ADR-026: Vertical-expertise pipeline — D-pattern + anti-hallucination protocol
 
-- **Status:** Accepted
+- **Status:** Accepted (amended: 2026-07-09 — §7 research-first canva, Phase 01.10)
 
 ## Decision
 
@@ -101,6 +101,52 @@ memory-curator (см. ADR-023) ежедневно сканирует все `ver
 - Если `next-verification - today < 7 days` → создать PR с заголовком `chore(vertical): re-verify <vertical>/<role>`.
 - PR прикрепляет: actual evaluator rerun results, diff'ы к `verified-sources` URLs, suggested updates.
 - Founder review → либо approve (bump `next-verification` на 90 дней), либо revise (back to draft).
+
+### 7. Research-first canva (amendment, 2026-07-09, grill-mandated)
+
+Adds a step **before** Pattern-D step 1 (vertical-prompt-author drafts): the
+AI author must first produce a **cited domain-research brief** grounding the
+vertical's ICP/JTBD/domain facts, before writing any prompt, golden-dataset
+task, or role-doc content for that vertical.
+
+```
+0. domain-research (AI, WebSearch-grounded)
+   → verticals/<slug>/domain-brief.md — cited ICP/JTBD/domain facts
+1. vertical-prompt-author (AI, Sonnet или Opus)
+   → черновик coordinator.md + researcher.md + Master-prompt + остальные роли,
+     grounded in domain-brief.md (AI baseline)
+2. Founder edit
+   → правки на основе personal operating expertise
+3. evaluator (LLM-as-judge, AgentDB-backed)
+   → golden-dataset run + adversarial probes
+4. Wave 1+ only: ICP-friends-loop validation
+5. status: locked → промпт становится production-ready
+```
+
+**Normative requirements:**
+
+- `verticals/<slug>/domain-brief.md` is a required artifact for every new
+  vertical-template going forward. It MUST cite real, verifiable sources
+  (URLs + accessed-date, mirroring the `verified-sources` frontmatter
+  contract in §5) for every non-obvious domain claim (ICP composition,
+  monetization/pricing figures, regulatory specifics, engagement
+  benchmarks, etc.).
+- The brief is explicitly an **AI-baseline research pass**, not a substitute
+  for the founder's personal-operating-expertise edit (Pattern-D step 2) —
+  it feeds that step, it does not replace it.
+- Figures sourced from secondary write-ups of third-party research (e.g. a
+  blog post summarizing a Telemetr/TGStat study) must be flagged as such —
+  the brief's "Known gaps" section records what was NOT independently
+  re-verified against a primary source, so the founder review knows exactly
+  where to double-check before promotion.
+- This is a **process amendment, not retroactive**: already-shipped verticals
+  (`wb-seller`, `agency-marketing-ru`) are not required to backfill a
+  `domain-brief.md` before their next scheduled re-verification cycle, but
+  SHOULD add one at that point per §6 (90-day cycle) if one does not already
+  exist.
+- First applied instance: `telegram_creator` (Phase 01.10, second Wave-1
+  vertical per ADR-017) — see
+  [`verticals/telegram-creator/domain-brief.md`](../verticals/telegram-creator/domain-brief.md).
 
 ## Consequences
 

@@ -222,3 +222,9 @@
 - Decision: Native-tool callables (WebSearchTool/ReadURLTool pattern) + KMS creds-store + mcp.mcp_connections registry; real MCP-protocol transport deferred to Wave-2
 - Rationale: 00.4 MCP client is a Wave-0 stub (empty connect(), no protocol); real tools reach pydantic-ai agents as native Agent(tools=[...]) callables. Wave-1 value = read+draft (grill), delivered identically by native tools at far lower cost/complexity vs building a full protocol layer + 3 server processes on a single-box VPS. MCP-protocol infra is Wave-2 (community/vertical connectors). Rubric: correctness+security tie, simplicity+cost decisively favor native. Judge-panel skipped (unambiguous winner, ADR-041 records the weighing). Reversible-ish (Wave-2 can add protocol transport on the same registry seam).
 - Reversibility: reversible (registry + MCPClient stub are the forward seam for Wave-2 protocol)
+
+### 2026-07-09T15:45:25Z | phase 01.10 | impl
+- Fork: 01.10 evaluator: full 30-task judge-scored golden now vs lean live-golden + defer full cert to founder review-gate
+- Decision: Lean live-golden 7/7 (plan+synthesis contract + 5 adversarial, ~$0.03) this PR; full 30-task golden≥75% certification + draft→reviewed promotion deferred to the founder review-gate (DV-12 + DV-02)
+- Rationale: Prompts are draft (founder-reviewed per ADR-026 before reviewed); running the full judge-scored 30-task evaluator on draft prompts that may be revised = double-spend. Lean golden proves the Master-chain works on live LLM + adversarial-robust (the phase's core verification) at ~$0.03. Full certification + promotion is inherently a founder-gate step (note#5 defer founder-involvement) → runs when prompts finalized. Money-conscious (note#3). Reversible.
+- Reversibility: reversible
