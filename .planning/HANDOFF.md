@@ -4,26 +4,28 @@
 
 ## Last updated
 - Date: 2026-07-09
-- Session: `/autonomy:run` — Wave-1 completion (product-first reorder; budget raised to $50/$75)
+- Session: `/autonomy:run` — Wave-1 completion (product-first; budget $50/$75)
 - Agent: @claude (autonomous runner, ADR-037/040)
 
 ## Project status
-- **Wave 1 (Core MVP).** VPS `staging.профики.online` (194.87.187.207) — full stack; DLP ON in prod.
-- **Merged this run:** 01.4-ui memory panel (#94) · 01.9a DLP activation (#95) · evidence-lifecycle fix (#98) · budget-cap v4 50/75 (#97) · run-queue/park bookkeeping (#96).
-- **01.9b connectors — code-complete + SECURE-audit PASS, PR pending** (branch `claude/auto-01.9b-connectors`).
-- **Run queue:** `01.9b (finalizing) → 01.10 → 01.12` → wave close. 01.8c (dev-infra) after.
+- **Wave 1 (Core MVP).** VPS `staging.профики.online` (194.87.187.207); DLP ON in prod.
+- **Merged this run:** 01.4-ui (#94) · 01.9a DLP (#95) · budget-cap (#97) · evidence-fix (#98) · 01.9b connectors (#99) · run bookkeeping (#96).
+- **01.10 telegram_creator vertical — code-complete + live-golden 7/7, PR pending** (branch `claude/auto-01.10-telegram-creator`).
+- **Remaining to close wave: 01.12** (dashboard+onboarding, frontend, autonomous, server-verifiable). Then consolidated VPS server-verify + wave gate. 01.8c (dev-infra) optional after.
 
-## 01.9b — Connectors (read+draft) — ready to merge
-ADR-041 (native-tool callables, not full MCP-protocol — 00.4 client is a Wave-0 stub; real transport → Wave-2). Two passes:
-- **A (security core):** `mcp.connector_credentials` KMS table (workspace-RLS default-deny) + `connector_credential_service` (mirror BYOK) + migration `mcp/0002` (pure-CREATE) + `runtime/tool_gating.py` capability-gate activation (DANGEROUS `send_*` always denied → deny-until-01.12; `tools_allowed` scoping, empty=all-non-DANGEROUS backward-compat) wired into `dispatch.build_leaf_runner`; `agent_archetypes.tools_allowed` first runtime enforcement.
-- **B (connectors):** telegram-bot / yandex-disk / imap-smtp — READ + DRAFT tools (READ_ONLY/INTERNAL); `send_*` = DANGEROUS guarded stubs. Outgoing-args DLP screen BEFORE every transport call (exfil guard). Creds via KMS service, graceful no-cred degradation. Hardcoded hosts (can't be aimed at attacker endpoint). `build_connector_tools` NOT yet wired into the live `dispatch_task` path — dormant until a vertical archetype opts in (01.10).
-- **SECURE audit: PASS 0 P0/P1.** 2 P3 hygiene fixes folded (secret-in-URL redaction; KMSError→degrade). 2 items DEFERRED to 01.12 (before autonomous send turns on): fail-open scoping → fail-closed; layer-B detector gaps (obfuscated/non-RU PII) → layer-A ML.
-- Gates: ruff/format · mypy **240** · bandit 0 · pytest **1119 pass**. Integration (connector RLS + creds round-trip) runs in ci-backend real-PG. Tripwire: **ack-needed** (db_migrations pure-CREATE + secrets_keys_crypto) → **self-acked per founder "продолжай до конца волны"** (analysis in RUN-QUEUE). Live-smoke deferred → **DV-11** (needs TG/Disk/IMAP creds; founder provides separately).
+## 01.10 — ready to merge
+Second vertical `telegram_creator`: research-brief (17 cited) + seed (`community-manager` archetype wired to 01.9b `telegram_read_updates`/`telegram_draft_message`, send excluded) + Master/role **draft** prompts (SemVer) + 30-task golden + 5 adversarial + ADR-026 §7 (research-first normative). **Live golden 7/7 PASS** (~$0.03; plan+synthesis contract + 5/5 adversarial). Gates green (mypy 241, pytest 1127, bandit 0). Tripwire `public_api_contracts` (new role-prompt, additive) → self-ack. Evidence: `live_golden`.
+- **Deferred (founder review-gate, planned ack):** DV-12 full 30-task golden≥75% certification + `draft→reviewed` promotion (telegram_creator) + DV-02 (agency_marketing_ru) — same review. Present prompts + golden to founder.
+- **Follow-ups:** AC-W1-25 horizontal prompt-hardening (chip); live Bot-API demo → RW-03.
 
-## Next
-- **01.10** Telegram-creator vertical (dev autonomous: research-brief + Master-prompt + golden; carries DV-02 prompt-promotion; live-демо → RW-03). Can wire a vertical archetype to the 01.9b connectors' `tools_allowed`.
-- **01.12** dashboard + onboarding (frontend, autonomous, server-verifiable; wave closer). Also the home for the 2 deferred 01.9b security-hardening items (fail-closed scoping) since it activates approval-UI/send.
-- **Consolidated VPS server-verify** after backend phases: build-images-ghcr → `dc pull && dc up -d` (+`alembic upgrade heads` for the connector_credentials migration) → container-exec checks (migration applied, gate denies send).
+## Founder action items (accumulated, non-blocking)
+- **Vertical review-gate:** review telegram_creator + agency_marketing_ru draft prompts → `reviewed` (DV-12 + DV-02).
+- **Creds for live verification (provide separately):** RW-03 Telegram bot-token, RW-01 SMTP/IMAP, Yandex Disk OAuth → closes DV-11 (connector live-smoke) + 01.10 live Bot-API demo + 01.8-mail live-send (DV-06).
+- **RW-07** staging anchor run (formally closes Wave 0; DV-08/09).
+
+## Next (this run)
+- **01.12** dashboard + onboarding (frontend feature over live APIs; tripwire-free auto-merge; server-verifiable like 01.4-ui). Also the home for 01.9b's 2 deferred security items (fail-closed scoping) since it activates approval-UI.
+- **Consolidated VPS server-verify:** build-images-ghcr → `dc pull && dc up -d` (+`alembic upgrade heads` for connector_credentials) → container-exec checks (migration applied, capability gate denies send, memory panel + dashboard render).
 - **Wave-1 gate** `gates/wave-1-to-2.md`: AC pass-rate ≥0.9 + must-phases merged + DV-clean-for-wave.
 
 ## Gate commands (no `make` on Windows)
