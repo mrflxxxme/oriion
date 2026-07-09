@@ -13,6 +13,14 @@ from typing import Any
 
 import pytest
 
+# mcp models declare cross-schema string FKs (e.g. ConnectorCredential.workspace_id
+# -> "multitenancy.workspaces.id"). Importing the target model registers its Table
+# in Base.metadata so SQLAlchemy can resolve the FK when the `tests/mcp` subtree
+# runs in ISOLATION (the per-module coverage gate). The app loads every model at
+# startup, but an isolated test run does not — which made test_workspace_fk_cascades
+# order-dependent (green on the full suite, red when tests/mcp ran alone).
+import src.multitenancy.models  # noqa: F401  (SQLAlchemy model registration)
+
 
 def pytest_configure(config: pytest.Config) -> None:
     """Register the `live` marker locally so strict-markers passes.
