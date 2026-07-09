@@ -216,3 +216,9 @@
 - Decision: Split 01.9 -> 01.9a (DLP precision-tune INN FP<=1% + flip both security flags ON; closes DV-04/05; wave-gate-critical; autonomous) + 01.9b (3 read+draft connector tools + capability gate + KMS creds store + registry + mock tests; live-smoke deferred to RW-01/RW-03 creds)
 - Rationale: DLP-activation is small, wave-gate-blocking (DV-04/05 = data-leak P1, blocks wave gate per DEFERRED-VERIFICATION protocol §3), fully autonomous+deterministically verifiable now, and tripwire-light (touches security/ + config, neither in tripwire) => likely auto-merge, lands the blocker fast+clean. Connectors are larger and their LIVE value is founder-cred-gated (RW-01 SMTP/IMAP, RW-03 Telegram) => build+mock now, live-smoke deferred (matches 01.8-mail pattern + seed 'dev-part autonomous with mocks'). Founder-preferred focused-split (infra-pr-scope memory). Reversible.
 - Reversibility: reversible
+
+### 2026-07-09T11:34:29Z | phase 01.9b | arch | ADR-041
+- Fork: Connector integration mechanism: full MCP-protocol servers vs native-tool callables
+- Decision: Native-tool callables (WebSearchTool/ReadURLTool pattern) + KMS creds-store + mcp.mcp_connections registry; real MCP-protocol transport deferred to Wave-2
+- Rationale: 00.4 MCP client is a Wave-0 stub (empty connect(), no protocol); real tools reach pydantic-ai agents as native Agent(tools=[...]) callables. Wave-1 value = read+draft (grill), delivered identically by native tools at far lower cost/complexity vs building a full protocol layer + 3 server processes on a single-box VPS. MCP-protocol infra is Wave-2 (community/vertical connectors). Rubric: correctness+security tie, simplicity+cost decisively favor native. Judge-panel skipped (unambiguous winner, ADR-041 records the weighing). Reversible-ish (Wave-2 can add protocol transport on the same registry seam).
+- Reversibility: reversible (registry + MCPClient stub are the forward seam for Wave-2 protocol)

@@ -34,8 +34,9 @@ infra-PR follow-up.
 
 from __future__ import annotations
 
+import inspect
 import warnings
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -92,6 +93,11 @@ from src.runtime.orchestrator import (
     execute_agent_task,
 )
 from src.runtime.sse_publisher import SSEPublisher, get_sse_publisher
+from src.runtime.tool_gating import (
+    EmitToolDenyAuditSink,
+    ToolDenyAuditSink,
+    gate_agent_tools,
+)
 from src.runtime.web_search_runner import (
     WEB_SEARCH_MAX_RESULTS,
     _default_web_search_tool,
@@ -201,6 +207,32 @@ async def _resolve_archetype_id(
             f"no active agent_archetype for slug={slug!r} " f"(vertical_slug={vertical_slug!r})"
         )
     return archetype_id
+
+
+async def resolve_tools_allowed_by_slug(
+    session: AsyncSession, slugs: Sequence[str]
+) -> dict[str, list[str]]:
+    """Map each active archetype slug → its ``tools_allowed`` allowlist (01.9b gate).
+
+    Feeds the capability gate in ``build_leaf_runner`` so per-role scoping is real
+    on the live dispatch path. Best-effort: returns ``{}`` when the session cannot
+    serve the query (the duck-typed unit-test fakes expose only ``get``/``add``/
+    ``flush``). A resolution miss fails OPEN on allowlist SCOPING only — the gate's
+    DANGEROUS-tool denial is independent of the allowlist and always enforced. An
+    EMPTY allowlist for a slug means "all non-DANGEROUS tools allowed"
+    (backward-compat; see ``tool_gating.evaluate_tools``).
+    """
+    if not slugs or getattr(session, "execute", None) is None:
+        return {}
+    stmt = select(AgentArchetype.slug, AgentArchetype.tools_allowed).where(
+        AgentArchetype.slug.in_(list(slugs)),
+        AgentArchetype.is_active.is_(True),
+    )
+    rows = (await session.execute(stmt)).all()
+    resolved: dict[str, list[str]] = {}
+    for row in rows:
+        resolved.setdefault(str(row[0]), list(row[1] or []))
+    return resolved
 
 
 async def record_delegation_step(session: AsyncSession, billing: StepBilling) -> Decimal:
@@ -417,6 +449,25 @@ def _extract_usage(run_result: Any) -> tuple[int, int]:
     return input_tokens, output_tokens
 
 
+def _builder_accepts(build: Callable[..., Any], param: str) -> bool:
+    """True if the leaf builder accepts a keyword ``param`` (or ``**kwargs``).
+
+    Guards the 01.9b connector attachment: the gated connector tools are only
+    passed to builders that actually accept ``connector_tools`` — the horizontal
+    researcher/analyst/writer builders do not, so connectors register solely for a
+    vertical archetype that opts in (01.10). Fails closed (False) on an
+    un-introspectable callable.
+    """
+    try:
+        signature = inspect.signature(build)
+    except (TypeError, ValueError):
+        return False
+    for parameter in signature.parameters.values():
+        if parameter.name == param or parameter.kind is inspect.Parameter.VAR_KEYWORD:
+            return True
+    return False
+
+
 def build_leaf_runner(
     *,
     llm_router: LLMRouter,
@@ -431,6 +482,9 @@ def build_leaf_runner(
     native_read_url: Callable[[str], Awaitable[str]] | None = None,
     user_prompt: str = "",
     step_recorder: StepRecorder | None = None,
+    tools_allowed_by_slug: Mapping[str, Sequence[str]] | None = None,
+    tool_deny_audit: ToolDenyAuditSink | None = None,
+    connector_tools: Mapping[str, Callable[[str], Awaitable[str]]] | None = None,
 ) -> Callable[[DelegateInput, OrchestratorContext], Awaitable[DelegateResult]]:
     """Build the production leaf-dispatch callable.
 
@@ -471,11 +525,31 @@ def build_leaf_runner(
         if inp.target_agent_slug == "researcher":
             if native_web_search is not None:
                 # DeepSeek path: the model owns the search loop (no pre-fetch).
-                build_kwargs["web_search"] = native_web_search
-                # AC-W1-18: pair read_url with web_search on the native path so
-                # the model can deep-read a source beyond snippets.
+                # 01.9b capability gate: the native tools pass through the gate
+                # before they are attached to the Agent. web_search/read_url are
+                # READ_ONLY so they pass; the gate denies any DANGEROUS/unknown
+                # tool and (when a non-empty allowlist is resolved) scopes per
+                # role — the SAME seam pass B's connector tools flow through.
+                # AC-W1-18: read_url is paired with web_search on this path.
+                candidate_tools: dict[str, Callable[[str], Awaitable[str]]] = {
+                    "web_search": native_web_search
+                }
                 if native_read_url is not None:
-                    build_kwargs["read_url"] = native_read_url
+                    candidate_tools["read_url"] = native_read_url
+                allowed_tools = await gate_agent_tools(
+                    candidate_tools,
+                    tools_allowed=(
+                        tools_allowed_by_slug.get(inp.target_agent_slug, ())
+                        if tools_allowed_by_slug is not None
+                        else ()
+                    ),
+                    agent_slug=inp.target_agent_slug,
+                    audit=tool_deny_audit,
+                    task_id=parent_task_id,
+                    cell_id=cell_id,
+                    workspace_id=workspace_id,
+                )
+                build_kwargs.update(allowed_tools)
             elif web_search_tool is not None:
                 # Failover path: prepend scripted live context (founder 2026-06-07).
                 context = await fetch_research_context(
@@ -483,6 +557,30 @@ def build_leaf_runner(
                 )
                 if context:
                     sub_prompt = f"{context}\n\n{inp.sub_prompt}"
+
+        # 01.9b connector gate: thread any candidate connector tools through the
+        # SAME capability gate as web_search/read_url, scoped to THIS archetype's
+        # allowlist (DANGEROUS send_* denied, unlisted tools scoped out, each
+        # denial audited). Attached only when the leaf builder accepts a
+        # ``connector_tools`` kwarg — the horizontal researcher/analyst/writer
+        # builders do not, so connectors register only for a vertical archetype
+        # that opts in (01.10). This proves connectors are registrable + gated.
+        if connector_tools:
+            allowed_connectors = await gate_agent_tools(
+                dict(connector_tools),
+                tools_allowed=(
+                    tools_allowed_by_slug.get(inp.target_agent_slug, ())
+                    if tools_allowed_by_slug is not None
+                    else ()
+                ),
+                agent_slug=inp.target_agent_slug,
+                audit=tool_deny_audit,
+                task_id=parent_task_id,
+                cell_id=cell_id,
+                workspace_id=workspace_id,
+            )
+            if allowed_connectors and _builder_accepts(spec.build, "connector_tools"):
+                build_kwargs["connector_tools"] = allowed_connectors
 
         agent = spec.build(**build_kwargs)
         call_start = perf_counter()
@@ -1040,6 +1138,11 @@ async def dispatch_task(
     if isinstance(task.input_jsonb, dict):
         user_prompt = str(task.input_jsonb.get("prompt", ""))
 
+    # 01.9b capability gate: resolve per-role allowlists so tool scoping is real on
+    # the live path, and wire the audit sink for any denial. Resolution is
+    # best-effort (fails open on SCOPING only; DANGEROUS denial is always on).
+    tools_allowed_by_slug = await resolve_tools_allowed_by_slug(session, slugs)
+
     leaf_runner = build_leaf_runner(
         llm_router=llm_router,
         session=session,
@@ -1051,6 +1154,8 @@ async def dispatch_task(
         native_read_url=native_read_url,
         user_prompt=user_prompt,
         step_recorder=step_recorder,
+        tools_allowed_by_slug=tools_allowed_by_slug,
+        tool_deny_audit=EmitToolDenyAuditSink(session),
     )
 
     return await execute_agent_task(
@@ -1090,5 +1195,6 @@ __all__ = [
     "record_master_call_step",
     "record_memory_call_step",
     "resolve_master",
+    "resolve_tools_allowed_by_slug",
     "strip_wrapping_fence",
 ]
