@@ -163,6 +163,9 @@ ignore = [
 # chars are intentional content, same rationale as canned_pydantic_ai above.
 "tests/agents/*.py" = ["RUF001", "RUF002", "RUF003"]
 "src/agents/seed_data/agency_marketing_ru_v1.py" = ["RUF001", "RUF002", "RUF003"]
+# Phase 01.10 (second Wave-1 vertical, telegram_creator): same RU domain
+# content + confusable-char rationale as agency_marketing_ru_v1.py above.
+"src/agents/seed_data/telegram_creator_v1.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.format]
 quote-style = "double"

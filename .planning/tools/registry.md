@@ -1,9 +1,9 @@
 ﻿---
 title: "Oriion Tool Registry — Single Source of Truth"
-version: 0.1.0
+version: 0.2.0
 status: living-document
-last-updated: 2026-05-13
-last-updated-context: "Session 3 audit, Milestone B.5"
+last-updated: 2026-07-09
+last-updated-context: "Phase 01.10 — registered the 01.9b connector READ/DRAFT tool surface"
 owners: [architect, reviewer-backend]
 ---
 
@@ -118,6 +118,31 @@ per OpenAPI spec.
 
 ---
 
+## 4. Connector tools — READ/DRAFT surface (01.9b, ADR-041)
+
+External-service connector tools already implemented + risk-classified in
+[`src/security/capability.py`](../../backend/src/security/capability.py)
+`TOOL_RISK` (READ_ONLY / INTERNAL tiers pass the capability gate without
+approval; the paired `send_*` DANGEROUS tools below are **intentionally NOT
+registered here** — they stay deny-until-approval-UI per 01.12 and must never
+appear in a vertical prompt's `tools_allowed`).
+
+| Slug | Risk tier | Purpose | Used by roles |
+|---|---|---|---|
+| `telegram_read_updates` | READ_ONLY | Read Telegram channel/bot updates (posts, reactions, comments, DMs) — no side-effect | telegram-creator `community-manager` |
+| `telegram_draft_message` | INTERNAL | Prepare a Telegram message draft artifact — no outward send | telegram-creator `community-manager` |
+| `yandex_disk_list` | READ_ONLY | List files on a connected Yandex.Disk | (reserved — no vertical role uses it yet) |
+| `yandex_disk_read_file` | READ_ONLY | Read a file's contents from Yandex.Disk | (reserved — no vertical role uses it yet) |
+| `yandex_disk_draft` | INTERNAL | Prepare a Yandex.Disk file draft — no outward write | (reserved — no vertical role uses it yet) |
+| `imap_read_inbox` | READ_ONLY | Read email inbox via IMAP — no side-effect | (reserved — no vertical role uses it yet) |
+| `email_draft` | INTERNAL | Prepare an email draft artifact — no outward send | (reserved — no vertical role uses it yet) |
+
+**Not registered (by design):** `send_telegram`, `send_email` — DANGEROUS
+tier. A vertical prompt referencing either fails this gate deliberately; they
+activate only once the 01.12 approval-UI ships.
+
+---
+
 ## Naming conventions
 
 - All slugs lowercase, dot-separated: `<namespace>.<verb>[_<noun>]`
@@ -162,4 +187,9 @@ per OpenAPI spec.
 
 ## Changelog
 
+- **0.2.0** (2026-07-09) — Phase 01.10: registered the 01.9b connector
+  READ/DRAFT tool surface (category 4) so `telegram-creator/prompts/community_manager.md`'s
+  `tools_allowed` passes the P-AUDIT-3 conformance gate
+  (`scripts/check_tools_allowlist.py`). DANGEROUS `send_*` tools intentionally
+  excluded.
 - **0.1.0** (2026-05-13) — Initial registry, Milestone B.5 audit fix. Covers MCP + 5 REST contexts + built-ins. Bootstrap entries ~35 slugs.
