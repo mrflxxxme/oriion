@@ -136,6 +136,90 @@ const ru = {
   "memory.empty.role.title": "Пока нет ничего в памяти агента",
   "memory.empty.role.description": "Добавьте первую запись вручную — агент будет её учитывать.",
   "memory.error.list": "Не удалось загрузить память",
+
+  "nav.dashboard": "Дашборд",
+
+  "dashboard.title": "Дашборд",
+  "dashboard.crumb": "Дашборд",
+
+  "dashboard.balance.title": "Баланс кредитов",
+  "dashboard.balance.available": "T-кредитов доступно",
+  "dashboard.balance.periodUsage": "Использовано за период",
+  "dashboard.balance.dailyUsage": "Использовано сегодня",
+  "dashboard.balance.error": "Не удалось загрузить баланс",
+
+  "dashboard.tasks.title": "Недавние задачи",
+  "dashboard.tasks.empty.title": "Пока нет задач",
+  "dashboard.tasks.empty.description":
+    "Пройдите мастер настройки, чтобы поставить первую задачу команде агентов.",
+  "dashboard.tasks.empty.action": "Начать мастер настройки",
+  "dashboard.tasks.error": "Ошибка",
+  "dashboard.tasks.col.title": "Задача",
+  "dashboard.tasks.col.status": "Статус",
+  "dashboard.tasks.col.created": "Создана",
+
+  "dashboard.artifacts.title": "Артефакты",
+  "dashboard.artifacts.empty.title": "Пока нет артефактов",
+  "dashboard.artifacts.empty.description": "Артефакты появятся после выполнения задач.",
+  "dashboard.artifacts.error": "Не удалось загрузить артефакты",
+  "dashboard.artifacts.col.title": "Название",
+  "dashboard.artifacts.col.type": "Тип",
+  "dashboard.artifacts.col.updated": "Обновлён",
+
+  "dashboard.memory.title": "Память команды",
+  "dashboard.memory.description": "Посмотрите, что помнит команда и агенты.",
+  "dashboard.memory.link": "Открыть память",
+
+  "onboarding.crumb": "Мастер настройки",
+  "onboarding.title": "Мастер настройки",
+  "onboarding.skip": "Пропустить настройку",
+  "onboarding.error.cell": "Не удалось загрузить вашу ячейку",
+
+  "onboarding.stepBadge1": "Шаг 1 из 3",
+  "onboarding.stepBadge2": "Шаг 2 из 3",
+  "onboarding.stepBadge3": "Шаг 3 из 3",
+
+  "onboarding.welcome.title": "Добро пожаловать в Oriion",
+  "onboarding.welcome.description":
+    "За 3 шага вы выберете команду AI-агентов и поставите ей первую задачу — результат появится на дашборде. Ячейка для команды уже создана автоматически.",
+  "onboarding.welcome.next": "Далее",
+
+  "onboarding.preset.title": "Выберите команду агентов",
+  "onboarding.preset.description":
+    "Пресет определяет, какие агенты будут работать над вашими задачами.",
+  "onboarding.preset.back": "Назад",
+  "onboarding.preset.next": "Продолжить",
+  "onboarding.preset.error": "Не удалось подключить команду",
+
+  "onboarding.preset.productivityCore.title": "Твои личные ассистенты",
+  "onboarding.preset.productivityCore.description":
+    "Координатор, Исследователь, Копирайтер и Аналитик — универсальная команда для любых задач.",
+  "onboarding.preset.productivityCore.demoTitle": "Рыночный бриф для SMB",
+  "onboarding.preset.productivityCore.demoPrompt":
+    "Помоги подготовить короткий рыночный бриф: 3 тренда для малого бизнеса в РФ, 3 риска и 3 идеи для контента на ближайший месяц.",
+
+  "onboarding.preset.agencyMarketingRu.title": "Маркетинговое агентство",
+  "onboarding.preset.agencyMarketingRu.description":
+    "Master-агент ведёт маркетинговую команду: бриф, конкурентный анализ, контент-план.",
+  "onboarding.preset.agencyMarketingRu.demoTitle": "Маркетинговый пакет для нового продукта",
+  "onboarding.preset.agencyMarketingRu.demoPrompt":
+    "Подготовь маркетинговый пакет для нового SMB-продукта: краткий рыночный бриф, конкурентную матрицу (3 строки) и план на 3 поста для Telegram и vc.ru.",
+
+  "onboarding.preset.telegramCreator.title": "Telegram-крейтор",
+  "onboarding.preset.telegramCreator.description":
+    "Master-агент и комьюнити-менеджер готовят контент-план и черновики постов для Telegram-канала.",
+  "onboarding.preset.telegramCreator.demoTitle": "Контент-план Telegram-канала",
+  "onboarding.preset.telegramCreator.demoPrompt":
+    "Подготовь контент-план на 3 поста для Telegram-канала о продукте и черновик одного рекламного поста с учётом требований к маркировке рекламы.",
+
+  "onboarding.task.title": "Поставьте первую задачу",
+  "onboarding.task.description":
+    "Мы подготовили демо-запрос для выбранной команды — можно отправить как есть или отредактировать.",
+  "onboarding.task.prompt": "Описание задачи",
+  "onboarding.task.submit": "Запустить задачу",
+  "onboarding.task.back": "Назад",
+  "onboarding.task.progressTitle": "Ход выполнения",
+  "onboarding.task.toDashboard": "Перейти к дашборду",
 } as const;
 
 export type I18nKey = keyof typeof ru;

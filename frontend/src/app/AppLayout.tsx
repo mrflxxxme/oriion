@@ -3,7 +3,7 @@
  * with a sidebar nav + logout. Auth pages render outside this layout.
  */
 import { Outlet, useNavigate, Link } from "@tanstack/react-router";
-import { Brain, LayoutGrid } from "lucide-react";
+import { Brain, LayoutDashboard, LayoutGrid } from "lucide-react";
 import { AppShell, Button } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 import { authApi } from "@/api/auth";
@@ -34,6 +34,13 @@ export function AppLayout() {
       sidebar={
         // AppShell already provides the <nav> landmark — just the links here.
         <div className="flex flex-col gap-1 p-4">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-page hover:text-primary [&.active]:bg-page [&.active]:text-primary"
+          >
+            <LayoutDashboard className="size-4" aria-hidden="true" />
+            {t("nav.dashboard")}
+          </Link>
           <Link
             to="/cells"
             className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-secondary hover:bg-page hover:text-primary [&.active]:bg-page [&.active]:text-primary"

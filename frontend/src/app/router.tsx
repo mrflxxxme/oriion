@@ -30,6 +30,8 @@ import { CellDetailPage } from "@/features/cells/CellDetailPage";
 import { TaskSubmitPage } from "@/features/tasks/TaskSubmitPage";
 import { TaskResultPage } from "@/features/tasks/TaskResultPage";
 import { MemoryPanelPage } from "@/features/memory/MemoryPanelPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { OnboardingPage } from "@/features/onboarding/OnboardingPage";
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -104,6 +106,16 @@ const memoryRoute = createRoute({
   path: "/memory",
   component: MemoryPanelPage,
 });
+const dashboardRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/dashboard",
+  component: DashboardPage,
+});
+const onboardingRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: "/onboarding",
+  component: OnboardingPage,
+});
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -114,6 +126,8 @@ export const routeTree = rootRoute.addChildren([
     taskNewRoute,
     taskResultRoute,
     memoryRoute,
+    dashboardRoute,
+    onboardingRoute,
   ]),
 ]);
 
