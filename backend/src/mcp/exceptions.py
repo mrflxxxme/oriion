@@ -59,6 +59,20 @@ class WebSearchError(MCPError):
     title = "web_search tool error"
 
 
+class ConnectorCredentialNotFound(MCPError):
+    """Connector credential absent, revoked, or inactive for the workspace.
+
+    Raised by ``connector_credential_service.get_credential_plaintext`` /
+    ``revoke_credential`` when the (id, workspace) lookup yields no usable row —
+    the belt-and-suspenders workspace filter on top of RLS. The message never
+    echoes the secret (nothing to leak — only the id + workspace scope).
+    """
+
+    code = "mcp.connector_credential.not_found"
+    status_code = 404
+    title = "Connector credential not found"
+
+
 class ToolRateLimitExceeded(MCPError):
     """Per-agent rate limit tripped for a built-in or MCP tool invocation.
 

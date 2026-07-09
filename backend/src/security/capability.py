@@ -21,8 +21,19 @@ TOOL_RISK: dict[str, RiskLevel] = {
     "web_search": RiskLevel.READ_ONLY,
     "read_url": RiskLevel.READ_ONLY,
     "delegate_task": RiskLevel.INTERNAL,
-    # Outward-action tools land with connectors (01.9+). Declared now so the
-    # classifier + approval seam is ready; the real gate activates in 01.9.
+    # Wave-1 connector READ/DRAFT tools (01.9b, ADR-041). READ = external read,
+    # no side-effect (READ_ONLY); DRAFT = prepare content for an artifact, no
+    # outward action (INTERNAL). Both pass the gate; the paired ``send_*`` tools
+    # below stay DANGEROUS (deny-until-approval-UI 01.12).
+    "telegram_read_updates": RiskLevel.READ_ONLY,
+    "telegram_draft_message": RiskLevel.INTERNAL,
+    "yandex_disk_list": RiskLevel.READ_ONLY,
+    "yandex_disk_read_file": RiskLevel.READ_ONLY,
+    "yandex_disk_draft": RiskLevel.INTERNAL,
+    "imap_read_inbox": RiskLevel.READ_ONLY,
+    "email_draft": RiskLevel.INTERNAL,
+    # Outward-action tools. The connector ``send_*`` tools (01.9b) join the
+    # pre-declared DANGEROUS set — the gate denies them until the approval UI.
     "send_email": RiskLevel.DANGEROUS,
     "send_telegram": RiskLevel.DANGEROUS,
     "transfer_money": RiskLevel.DANGEROUS,
