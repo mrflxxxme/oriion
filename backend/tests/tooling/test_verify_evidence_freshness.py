@@ -115,3 +115,102 @@ def test_mixed_commit_after_gate_stales_evidence(
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "STALE" in result.stdout
+
+
+# ── PR diff-scoping (--base-ref): evidence inherited from a prior squash ──────
+
+
+def _run_verifier_scoped(repo: Path, base_ref: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(VERIFIER), "--base-ref", base_ref],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_inherited_evidence_unchanged_is_skipped(
+    evidence_repo: tuple[Path, str],
+) -> None:
+    """The core fix: evidence left on the base by a prior squash that THIS PR does
+    NOT touch is skipped, not failed for staleness."""
+    repo, _ = evidence_repo
+    _commit_all(repo, "docs(evidence): gate artifacts")
+    (repo / "unrelated.py").write_text("X = 1\n", encoding="utf-8")
+    base_sha = _commit_all(repo, "feat: base advances past the gate (evidence stale)")
+    # The PR: a code-only commit off base — touches no evidence/.
+    (repo / "code.py").write_text("VALUE = 99\n", encoding="utf-8")
+    _commit_all(repo, "feat: PR touches code only")
+
+    # Legacy (unscoped) still stales — proves the bug the scoping fixes.
+    legacy = _run_verifier(repo)
+    assert legacy.returncode == 1 and "STALE" in legacy.stdout
+
+    scoped = _run_verifier_scoped(repo, base_sha)
+    assert scoped.returncode == 0, scoped.stdout + scoped.stderr
+    assert "SKIP" in scoped.stdout and "inherited" in scoped.stdout
+
+
+def _init_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "test@teamly-ai")
+    _git(repo, "config", "user.name", "tooling-test")
+    return repo
+
+
+def _write_evidence(repo: Path, gates: list[str], head_sha: str) -> None:
+    ev = repo / "evidence"
+    ev.mkdir(exist_ok=True)
+    (ev / "manifest.json").write_text(
+        json.dumps({"phase": "p", "required_gates": gates}), encoding="utf-8"
+    )
+    for gate in gates:
+        (ev / f"{gate}.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "gate": gate,
+                    "head_sha": head_sha,
+                    "timestamp": "2026-07-09T00:00:00Z",
+                    "verdict": "PASS",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+
+def test_scoped_pr_shipping_fresh_evidence_is_verified(tmp_path: Path) -> None:
+    """Teeth kept: a PR that ships its OWN fresh evidence is still verified."""
+    repo = _init_repo(tmp_path)
+    (repo / "code.py").write_text("VALUE = 1\n", encoding="utf-8")
+    base_sha = _commit_all(repo, "feat: base (no evidence)")
+    (repo / "code.py").write_text("VALUE = 2\n", encoding="utf-8")
+    pr_code_sha = _commit_all(repo, "feat: PR code")
+    _write_evidence(repo, ["docker_integration"], head_sha=pr_code_sha)
+    _commit_all(repo, "docs(evidence): fresh gate artifacts")
+
+    result = _run_verifier_scoped(repo, base_sha)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[OK]" in result.stdout and "docker_integration" in result.stdout
+
+
+def test_scoped_manifest_change_without_evidence_fails(tmp_path: Path) -> None:
+    """Teeth kept: editing the manifest re-declares the gate set, so a newly
+    declared gate with no evidence still fails under scoping."""
+    repo = _init_repo(tmp_path)
+    (repo / "code.py").write_text("VALUE = 1\n", encoding="utf-8")
+    gate_sha = _commit_all(repo, "feat: base code")
+    _write_evidence(repo, ["docker_integration"], head_sha=gate_sha)
+    base_sha = _commit_all(repo, "docs(evidence): base gate")
+    # PR: declare a new gate in the manifest but ship no artifact for it.
+    (repo / "evidence" / "manifest.json").write_text(
+        json.dumps({"phase": "p", "required_gates": ["docker_integration", "live_golden"]}),
+        encoding="utf-8",
+    )
+    _commit_all(repo, "docs(evidence): declare live_golden (no artifact)")
+
+    result = _run_verifier_scoped(repo, base_sha)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "live_golden" in result.stdout and "MISS" in result.stdout
