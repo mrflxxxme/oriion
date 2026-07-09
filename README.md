@@ -99,7 +99,7 @@ oriion/
 
 ## Status
 
-**Wave 1 (Core MVP) — must-set code-complete.** Смержено: 01.1-retro … 01.8 + **01.4-ui memory panel · 01.9a DLP activation · 01.9b connectors · 01.10 telegram_creator vertical · 01.12 dashboard+onboarding** (must-множество Wave 1). Осталось для формального закрытия: consolidated VPS server-verify + Wave-1 gate ([`gates/wave-1-to-2.md`](.planning/gates/wave-1-to-2.md)). Founder-гейты (не блокируют код): vertical review draft→reviewed, live-креды (RW-01/03), staging anchor (RW-07). 01.8c (dev-infra) — post-wave. Актуальное состояние — [`.planning/STATUS.md`](.planning/STATUS.md); разблокировки — [`.planning/FOUNDER-RUNWAY.md`](.planning/FOUNDER-RUNWAY.md).
+**Wave 1 (Core MVP) — must-set code-complete; dev-infra hardening (01.8c) in flight.** Смержено: 01.1-retro … 01.8 + **01.4-ui memory panel · 01.9a DLP activation · 01.9b connectors · 01.10 telegram_creator vertical · 01.12 dashboard+onboarding** (must-множество Wave 1). **01.8c (autonomy dev-infra)** — PR-1 (нативные ролевые сабагенты ADR-040 D8 · OpenAPI-snapshot + drift-CI D2 · docs-freshness CI D9 · JOURNAL-архивация D12) готовится к мержу; PR-2 (Oriion-ренейм D3) — следом. Осталось для формального закрытия волны: consolidated VPS server-verify + Wave-1 gate ([`gates/wave-1-to-2.md`](.planning/gates/wave-1-to-2.md)). Founder-гейты (не блокируют код): vertical review draft→reviewed, live-креды (RW-01/03), staging anchor (RW-07). Parked (нужны креды): 01.3b ЮKassa (RW-04) · 01.8b OAuth (RW-02) · 01.11 Telegram Business (RW-05). Актуальное состояние — [`.planning/STATUS.md`](.planning/STATUS.md); разблокировки — [`.planning/FOUNDER-RUNWAY.md`](.planning/FOUNDER-RUNWAY.md).
 
 > Правило свежести (ADR-040 D9): эта секция обновляется в exit-ритуале каждой смерженной фазы.
 
