@@ -99,7 +99,7 @@ oriion/
 
 ## Status
 
-**Wave 1 (Core MVP) — in progress.** Смержено: 01.1-retro … 01.8 (Master-Agent, billing-core, memory + auto-extraction, artifacts, security-substrate, RBAC, SMTP, 2FA/magic-link) + **01.4-ui memory panel**. Автономная очередь (product-first reorder, `/autonomy:run` 2026-07-09): **`01.4-ui ✅ → 01.9 → 01.10 → 01.12`**; 01.8c (dev-infra) отложена в конец. Актуальное состояние — [`.planning/STATUS.md`](.planning/STATUS.md); разблокировки — [`.planning/FOUNDER-RUNWAY.md`](.planning/FOUNDER-RUNWAY.md).
+**Wave 1 (Core MVP) — must-set code-complete.** Смержено: 01.1-retro … 01.8 + **01.4-ui memory panel · 01.9a DLP activation · 01.9b connectors · 01.10 telegram_creator vertical · 01.12 dashboard+onboarding** (must-множество Wave 1). Осталось для формального закрытия: consolidated VPS server-verify + Wave-1 gate ([`gates/wave-1-to-2.md`](.planning/gates/wave-1-to-2.md)). Founder-гейты (не блокируют код): vertical review draft→reviewed, live-креды (RW-01/03), staging anchor (RW-07). 01.8c (dev-infra) — post-wave. Актуальное состояние — [`.planning/STATUS.md`](.planning/STATUS.md); разблокировки — [`.planning/FOUNDER-RUNWAY.md`](.planning/FOUNDER-RUNWAY.md).
 
 > Правило свежести (ADR-040 D9): эта секция обновляется в exit-ритуале каждой смерженной фазы.
 

@@ -1,8 +1,12 @@
 """TeamProvisioningService — provision a team-preset into a cell.
 
 Wave 0 single-team-per-cell happy path:
-    1. Ensure productivity-core seed exists (idempotent — uses ON CONFLICT
-       DO NOTHING on the unique key for archetypes).
+    1. Ensure the requested preset's seed exists (idempotent — uses ON
+       CONFLICT DO NOTHING / natural-key lookups for archetypes). All 3
+       catalog presets route here (01.12): the horizontal `productivity-core`
+       base, and the two Wave-1 verticals `agency-marketing-ru` and
+       `telegram-creator` (each layering a Master + specialist(s) on top of
+       the horizontal base — see their `ensure_*_seed` docstrings).
     2. Look up the preset by slug.
     3. Insert one agent_instance per archetype_id under the cell.
     4. Emit team_provisioned.v1 + instance_created.v1 CloudEvents.
@@ -30,6 +34,10 @@ from src.agents.seed_data.agency_marketing_ru_v1 import (
 from src.agents.seed_data.agency_marketing_ru_v1 import ensure_agency_marketing_ru_seed
 from src.agents.seed_data.memory_curator_v1 import ensure_memory_curator_archetype
 from src.agents.seed_data.productivity_core_v1 import ensure_productivity_core_seed
+from src.agents.seed_data.telegram_creator_v1 import (
+    PRESET_SLUG as TELEGRAM_CREATOR_PRESET_SLUG,
+)
+from src.agents.seed_data.telegram_creator_v1 import ensure_telegram_creator_seed
 
 logger = structlog.get_logger(__name__)
 
@@ -66,12 +74,16 @@ class TeamProvisioningService:
         Idempotent: re-running for an already-provisioned cell is a no-op
         (returns the existing instances).
         """
-        # Idempotent seed. AC-W1-3: the Marketing-agency vertical seed adds its
-        # Master archetype + preset on top of the horizontal specialists (it
-        # ensures the productivity-core base itself); every other preset just
-        # needs the horizontal base.
+        # Idempotent seed. AC-W1-3 / 01.12: the two vertical seeds
+        # (Marketing-agency, Telegram-creator) each add their own Master
+        # archetype (+ vertical specialist, for telegram-creator) on top of
+        # the horizontal specialists — they ensure the productivity-core base
+        # themselves. Every other preset (currently just `productivity-core`)
+        # falls through to the horizontal-only seed.
         if preset_slug == AGENCY_MARKETING_PRESET_SLUG:
             await ensure_agency_marketing_ru_seed(self._session)
+        elif preset_slug == TELEGRAM_CREATOR_PRESET_SLUG:
+            await ensure_telegram_creator_seed(self._session)
         else:
             await ensure_productivity_core_seed(self._session)
 
