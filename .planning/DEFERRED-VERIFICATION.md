@@ -22,6 +22,7 @@
 | DV-08 | Wave-0 gate | `internal_demo_passed` — founder staging 10× anchor run не выполнен | `summary.json` + 10× run_NNN.json в `.planning/gates/evidence/wave-0-to-1/` | founder-action (RW-07) | 🔴 open (founder) |
 | DV-09 | 00.8 | AC3/AC4 — `npm run e2e:live` (5-route axe + 3-agent demo) не прогнан на staging | e2e:live green на staging, evidence в gate wave-0-to-1 | вместе с DV-08 | 🔴 open (founder) |
 | DV-10 | 01.4b | Dramatiq+Redis worker-**transport** live-прогон (Linux) — memory-extraction проверена in-process, не через реальный транспорт | Live worker-транспорт прогон на Docker-стенде | 02.1-retro | 🟡 open |
+| DV-11 | 01.9b | Live connector round-trip (telegram-bot / yandex-disk / imap-smtp против реального API) — коннекторы построены + mock-проверены, но не прогнаны на живых кредах | `pytest -m live` connector suite при кредах в каноне `.env` (TG bot-token RW-03, Yandex Disk OAuth, IMAP/SMTP RW-01) | по разблокировке кредов (founder предоставит отдельно) | 🔴 open (gated) |
 
 ## Закрытые записи
 
