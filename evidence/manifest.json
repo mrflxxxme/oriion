@@ -1,1 +1,1 @@
-{ "phase": "01.10", "required_gates": ["live_golden"] }
+{ "phase": "01.8c", "required_gates": ["adversarial_audit"] }
