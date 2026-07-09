@@ -5,8 +5,8 @@
 # но не на числа (per P-AUDIT-1).
 # Reviewed at: every wave-N-to-N+1 gate transition.
 
-version: 3
-last_reviewed: 2026-07-07
+version: 4
+last_reviewed: 2026-07-09
 last_reviewed_by: founder
 review_trigger: wave-gate-transition
 restructure_rationale: |
@@ -30,13 +30,15 @@ dev_team:
       Avg expected: $0.10-0.30 per task (Opus, ~3500 tokens out + 8000 in).
       Hard cap = 6x avg — accounts for retry storms / runaway loops.
   per_day:
-    team_soft_cap_usd: 20
-    team_hard_cap_usd: 40
+    team_soft_cap_usd: 50
+    team_hard_cap_usd: 75
     notes: |
-      v3 (ADR-040 D11): ужато с 30/75. Soft-cap → раннер доводит текущую фазу до чистого
-      конца и паркует очередь + notify; hard-cap → immediate stop. Live-goldens только
-      по контрольной ценности (см. restructure_rationale). Adjust upward during
-      sprint-end pushes, downward during dormant phases.
+      v4 (founder 2026-07-09): подняты 20/40 → 50/75, чтобы дожать Wave 1 в автономных
+      прогонах. Это ВНУТРЕННИЙ бюджет Claude-agent-team (мои токены + токены сабагентов),
+      НЕ live-LLM (user_production / live-goldens — отдельно). Soft-cap → раннер доводит
+      текущую фазу до чистого конца и паркует очередь + notify; hard-cap → immediate stop.
+      Live-goldens только по контрольной ценности. NB: раннер меряет spend ПРИБЛИЗИТЕЛЬНО
+      (нет live-метра токенов Claude Code) — порог-ориентир, не точный счётчик.
   per_month:
     team_kill_switch_usd: 500
     notes: |
