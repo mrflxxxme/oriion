@@ -20,8 +20,11 @@ def test_real_telegram_creator_master_prompt_is_contract_valid() -> None:
     prompt = load_master_prompt("telegram_creator")
     assert prompt.role_id == "master-telegram-creator"
     assert prompt.contract_type == "role-prompt"
-    assert prompt.status == "draft"
-    assert prompt.version == "0.1.0"
+    # Promoted draft → reviewed after the live review-run 2026-07-09 (5/5 adversarial,
+    # deliverables reviewed-quality, TG-008 anti-fabrication fixed + re-run clean) +
+    # founder approval. Closes DV-12.
+    assert prompt.status == "reviewed"
+    assert prompt.version == "1.0.0"
     assert prompt.model_default == "deepseek-chat"
     assert len(prompt.sections) == 9
     # composed prompt drops the frontmatter.

@@ -13,23 +13,26 @@ from __future__ import annotations
 import pytest
 from src.agents.services.role_prompt_loader import load_role_prompt
 
-# (slug, minimum total §6 examples after diversification)
+# (slug, minimum total §6 examples after diversification, pinned SemVer)
+# writer bumped to 1.1.0 by the 2026-07-10 anti-fabrication hardening (zero-fabrication
+# output-discipline constraint added to §3 after TG-008 fabricated case-study metrics).
 _ROLE_MIN_EXAMPLES = [
-    ("coordinator", 3),
-    ("researcher", 4),
-    ("analyst", 5),
-    ("writer", 4),
+    ("coordinator", 3, "1.0.0"),
+    ("researcher", 4, "1.0.0"),
+    ("analyst", 5, "1.0.0"),
+    ("writer", 4, "1.1.0"),
 ]
 
 
-@pytest.mark.parametrize(("slug", "min_examples"), _ROLE_MIN_EXAMPLES)
-def test_role_prompt_parses_and_is_hardened(slug: str, min_examples: int) -> None:
-    """load_role_prompt enforces the 9-section structure; we add the v1.0.0
+@pytest.mark.parametrize(("slug", "min_examples", "version"), _ROLE_MIN_EXAMPLES)
+def test_role_prompt_parses_and_is_hardened(slug: str, min_examples: int, version: str) -> None:
+    """load_role_prompt enforces the 9-section structure; we add the stable
     hardening contract + the §6 diversification floor on top."""
     rp = load_role_prompt(slug)
 
-    # v1.0.0 stable hardening contract (ADR-010 hardening pass at Phase 01.1).
-    assert rp.version == "1.0.0", f"{slug}: version not bumped to 1.0.0"
+    # Stable hardening contract (ADR-010 hardening pass at Phase 01.1); writer carries
+    # the 1.1.0 anti-fabrication bump on top.
+    assert rp.version == version, f"{slug}: version not pinned to {version}"
     assert rp.frontmatter.get("quality_bar") == "stable", f"{slug}: quality_bar not stable"
 
     # §6 few-shot diversification (AC-W1-25): ≥2 examples beyond the brief demo.
