@@ -1,9 +1,9 @@
 {
-  "name": "teamly-frontend",
+  "name": "profiki-frontend",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "TEAMLY_RU frontend — Vite + React 19 + TypeScript + Tailwind v4 + TanStack",
+  "description": "Profiki frontend — Vite + React 19 + TypeScript + Tailwind v4 + TanStack",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b --noEmit && vite build",

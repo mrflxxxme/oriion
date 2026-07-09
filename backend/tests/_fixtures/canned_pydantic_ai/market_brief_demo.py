@@ -66,7 +66,7 @@ _BRIEF_INTRO = """\
 
 Российский SMB-сегмент к Q2 2026 готов к адаптации AI-команд, но
 существующие решения провалены по трём осям: locality, compliance,
-интеграция с RU-стеком. Платформа TEAMLY_RU выходит с дуальным
+интеграция с RU-стеком. Платформа Профики выходит с дуальным
 позиционированием «универсальная команда + вертикальные шаблоны»,
 закрывающим горизонтальные задачи через productivity-core preset
 (Coordinator + Researcher + Writer + Analyst) и domain-heavy сценарии
@@ -88,7 +88,7 @@ ChatGPT Team и Claude Pro доступны только через VPN и за�
 ФЗ-152-conformant обработку персональных данных и не имеют РКН-уведомления
 как оператор; (3) разрыв с RU-стеком — Яндекс Cloud, ВКонтакте, Тинькофф API,
 1С — типичный SMB живёт внутри этих сервисов, но универсальные ассистенты
-не интегрируются. TEAMLY_RU закрывает все три барьера: ценообразование в
+не интегрируются. Профики закрывает все три барьера: ценообразование в
 рублях через ЮKassa, ФЗ-152-conformant архитектура с RKN-уведомлением как
 оператор ПДн, и нативные коннекторы к ключевым RU-сервисам через MCP-протокол.
 """,
@@ -228,7 +228,7 @@ _BRIEF_CONCLUSION = """\
 RU-compliance и не интегрированы с RU-стеком, локальные игроки
 (YandexGPT, GigaChat) не имеют агентского runtime и multi-agent
 координации, а DIY-решения требуют технической экспертизы, недоступной
-типичному SMB-founder'у. TEAMLY_RU занимает середину этой матрицы:
+типичному SMB-founder'у. Профики занимает середину этой матрицы:
 управляемая платформа с RU-compliance, готовыми вертикалями и
 ценой на 40% ниже зарубежных аналогов. Wave 0 internal demo —
 первая публичная проверка тезиса; Wave 1 pre-alpha с 10-15 friends —
@@ -238,7 +238,7 @@ RU-compliance и не интегрированы с RU-стеком, локал�
 
 В горизонте ближайших 60 дней: завершение Wave 0 (internal demo passed
 к 2026-06-09), открытие ЮKassa и юридического лица под оператора ПДн,
-финализация бренда и domain (oriion.app + teamly.ru как vertical entry),
+финализация бренда и domain (oriion.app + профики.online как vertical entry),
 запуск 3 каналов привлечения первых 100 leads (Telegram Ads на агентские
 каналы, гостевые публикации в каналах роста экспертизы, SEO-кампания
 на 50 ключевых запросов). В горизонте 90-120 дней — pre-alpha с 10-15
@@ -266,7 +266,7 @@ _WRITER_BRIEF_AND_PLAN = (
 6. **«5 ошибок при найме первого AI-ассистента (и как их избежать с командой)»** — educational, team-first UX positioning.
 7. **«BYOK для параноиков: как принести свой OpenAI-ключ и не зависеть от платформы»** — trust-signal для технических founders.
 8. **«MCP-протокол на простом языке: чем мы отличаемся от плагинов ChatGPT»** — техническое отличие, для devtool-аудитории.
-9. **«Сравнительная таблица: TEAMLY_RU vs ChatGPT Team vs YandexGPT Team»** — feature parity matrix, sales enablement.
+9. **«Сравнительная таблица: Профики vs ChatGPT Team vs YandexGPT Team»** — feature parity matrix, sales enablement.
 10. **«Что дальше: roadmap до Q4 2026 и как клиенты влияют на приоритеты»** — community trust, founder voice.
 """
 )
@@ -297,7 +297,7 @@ _ANALYST_OUTPUT = """\
   высокая locality, без team-runtime.
 * Quadrant «global team»: ChatGPT Team, Claude Team — высокая capability,
   низкая locality, есть team-features (но не agent-team в нашем смысле).
-* **Quadrant «RU team» (наш)**: TEAMLY_RU — единственный игрок с
+* **Quadrant «RU team» (наш)**: Профики — единственный игрок с
   agent-team + RU-locality + RU-billing + ФЗ-152.
 
 ## Допущения и ограничения

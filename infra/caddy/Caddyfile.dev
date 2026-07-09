@@ -1,4 +1,4 @@
-# Caddyfile.dev — dev reverse proxy для TEAMLY_RU local stack
+# Caddyfile.dev — dev reverse proxy для Profiki local stack
 #
 # - / → frontend dev server (Vite HMR через ws)
 # - /api/* → backend FastAPI (uvicorn с hot-reload)

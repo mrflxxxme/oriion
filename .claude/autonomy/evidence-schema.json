@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://teamly.ai/schemas/autonomy-evidence.v1.json",
+  "$id": "https://profiki.online/schemas/autonomy-evidence.v1.json",
   "title": "Autonomy gate evidence artifact",
   "description": "Per ADR-037 D3. Emitted by a local-only gate (live golden, Docker integration, adversarial audit) that GitHub CI cannot run. Committed to the PR branch under evidence/<gate>.json. The ci-evidence job asserts freshness (head_sha == PR head) + verdict == PASS for every gate the phase declares in evidence/manifest.json. Makes local gates un-fakeable at merge and doubles as founder's post-hoc audit trail.",
   "type": "object",

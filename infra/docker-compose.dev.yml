@@ -9,7 +9,7 @@
 #
 # Healthchecks: AC6 требует все services healthy в течение 180s после `compose up`.
 
-name: teamly-dev
+name: profiki-dev
 
 services:
   postgres:
