@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001, RUF002, RUF003 — RU-PDN detector tests mix Cyrillic + Latin by domain
 """Unit tests for the deterministic RU-PDN DLP detector (ADR-039, layer B).
 
 No DB, no network. Validates checksum discrimination (valid INN/SNILS detected,
@@ -56,6 +57,67 @@ class TestInnChecksum:
         assert _inn12_ok([int(c) for c in VALID_INN12]) is True
         assert _inn12_ok([int(c) for c in "500100732258"]) is False
         assert _inn12_ok([1, 2, 3]) is False
+
+
+class TestInnContext:
+    """01.9a context-gate (DV-04/DV-05): a checksum-valid INN-10 is a finding
+    only with an INN-labelling token near it (Cyrillic «ИНН», Latin `inn`/
+    `tax_id`, spelled-out label); INN-12 stays context-free (double checksum)."""
+
+    def test_bare_checksum_valid_inn10_not_flagged(self) -> None:
+        # The core FP fix: a valid-checksum 10-digit run with no label nearby is
+        # not identifiable PII, so it is NOT flagged (unlike pre-01.9a).
+        assert PiiCategory.INN.value not in _cats(f"номер {VALID_INN10} в реестре")
+
+    def test_contextual_inn10_flagged(self) -> None:
+        assert PiiCategory.INN.value in _cats(f"ИНН {VALID_INN10}")
+
+    def test_structural_inn10_no_space_flagged(self) -> None:
+        assert PiiCategory.INN.value in _cats(f"ИНН:{VALID_INN10}")
+
+    def test_lowercase_keyword_flagged(self) -> None:
+        assert PiiCategory.INN.value in _cats(f"инн {VALID_INN10} проверьте")
+
+    def test_latin_json_key_flagged(self) -> None:
+        # model_dump() serialises artifacts as {"inn": "NNN"} — the default form.
+        assert PiiCategory.INN.value in _cats('{"inn": "' + VALID_INN10 + '"}')
+
+    def test_latin_tax_id_key_flagged(self) -> None:
+        assert PiiCategory.INN.value in _cats('{"tax_id": "' + VALID_INN10 + '"}')
+
+    def test_spelled_out_label_flagged(self) -> None:
+        assert PiiCategory.INN.value in _cats(f"Налогоплательщик {VALID_INN10} на учёте")
+
+    def test_keyword_after_number_flagged(self) -> None:
+        # RU word order can place the label AFTER the run (same line).
+        assert PiiCategory.INN.value in _cats(f"{VALID_INN10} — это ИНН поставщика")
+
+    def test_table_header_one_line_up_flagged(self) -> None:
+        text = "| Орг | ИНН | Город |\n| ООО | " + VALID_INN10 + " | Москва |"
+        assert PiiCategory.INN.value in _cats(text)
+
+    def test_word_containing_inn_is_not_context(self) -> None:
+        # «длинный» contains и-н-н but is not the «ИНН» token; Latin «winner»/
+        # «inner» likewise must not manufacture context for a nearby run.
+        assert PiiCategory.INN.value not in _cats(f"длинный список {VALID_INN10} позиций")
+        assert PiiCategory.INN.value not in _cats(f"winner number {VALID_INN10} announced")
+
+    def test_keyword_on_distant_line_not_context(self) -> None:
+        # New semantics: context is the run's line + a bounded look-behind/ahead.
+        # An «ИНН» in a far earlier paragraph (beyond the window, not on the run's
+        # line) does not attach to an unrelated order number.
+        text = (
+            "ИНН компании указан в шапке документа.\n"
+            + "заполнитель " * 20
+            + "\nЗаказ "
+            + VALID_INN10
+            + " отгружен со склада"
+        )
+        assert PiiCategory.INN.value not in _cats(text)
+
+    def test_bare_inn12_still_flagged(self) -> None:
+        # INN-12 keeps its context-free rule (double control digit ~1% FP).
+        assert PiiCategory.INN.value in _cats(f"код {VALID_INN12} присвоен")
 
 
 class TestSnilsChecksum:
