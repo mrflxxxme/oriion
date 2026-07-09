@@ -4,17 +4,17 @@ role_ui_name: Продюсер канала
 preset: telegram-creator
 preset_ui_name: Telegram-крейтор
 vertical_tag: telegram_creator
-status: draft
-version: 0.1.0
+status: reviewed
+version: 1.0.0
 language: ru
 contract_type: role-prompt
 wave_introduced: 1
-quality_bar: ai-baseline
+quality_bar: stable
 model_default: deepseek-chat
-verified-by: []
-golden-dataset-pass-rate: null
-adversarial-probes-pass-rate: null
-next-verification: null
+verified-by: [live-review-2026-07-09, founder-approved-2026-07-09]
+golden-dataset-pass-rate: reviewed-quality (4/5 reviewed; TG-008 anti-fabrication fixed + re-run clean 2026-07-10)
+adversarial-probes-pass-rate: 5/5 (100%)
+next-verification: 02.1-retro
 ---
 
 # 1. Role identity & mission
