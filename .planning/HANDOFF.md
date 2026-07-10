@@ -19,7 +19,7 @@
 ## Founder actions
 1. **Ack PR-2** (tripwire iam+contracts; brand-rename, oriion internal preserved) → merge.
 2. **Wave-1 formal closure** (всё за founder): vertical review draft→reviewed (DV-12/02 — уже promoted #110?), cost/risk review, подпись `gates/wave-1-to-2`.
-3. **Parked фазы (нужны креды):** 01.3b ЮKassa (RW-04) · 01.8b OAuth (RW-02) · 01.11 TG-Business (RW-05). Drop creds → «RW-0N ready» → unpark.
+3. **Parked фазы (нужны креды):** 01.3b ЮKassa (RW-04) · 01.11 TG-Business (RW-05). Drop creds → «RW-0N ready» → unpark. **01.8b OAuth — descoped** (auth email-only, RW-02 снята 2026-07-09).
 4. **Chips:** `task_dd666049` (PreToolUse hook — role tool-scope enforcement, SECURE-P2) · (rename chip `task_4e7f04db` — закрыт этим PR-2).
 
 ## Gate commands (no `make`; use subshells `(cd backend && …)` — armed premerge-hook брикует cwd вне root/backend)

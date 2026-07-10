@@ -25,7 +25,7 @@ Wave-1 must-множество (**01.9a+01.9b + 01.4-ui + 01.10 + 01.12**) — *
 `main` задеплоен, миграция `mcp_0002_connector_credentials` применена. Проверено на сервере: DLP-флаги ON; capability-gate режет `send_telegram`, пускает `telegram_read`; таблица connector_credentials живёт; маршруты `/memory`, `/dashboard`, `/onboarding` отдают 200; healthz ok.
 
 ### Долг / открытые риски
-Open DV (не-P1): DV-11 (connector live-smoke — нужны креды), DV-12/DV-02 (вертикали draft→reviewed — founder-review), DV-06 (SMTP live). Deferred-security (до включения autonomous send, ≥Wave-2): fail-open scoping→fail-closed, layer-B PII→layer-A ML. Parked: 01.3b/01.8b/01.11 (RUNWAY). Post-wave dev-infra: 01.8c.
+Open DV (не-P1): DV-11 (connector live-smoke — нужны креды), DV-12/DV-02 (вертикали draft→reviewed — founder-review), DV-06 (SMTP live). Deferred-security (до включения autonomous send, ≥Wave-2): fail-open scoping→fail-closed, layer-B PII→layer-A ML. Parked: 01.3b/01.11 (RUNWAY); 01.8b — descoped (auth email-only, RW-02 снята). Post-wave dev-infra: 01.8c.
 
 ## 2. Реализованные пользовательские сценарии (end-to-end)
 1. **Регистрация → первая ценность без инструкций:** пользователь регистрируется → авто-создаётся trial-ячейка + грант Trial 14д/500 → онбординг-визард (выбор пресета из 3) → первая задача → результат-артефакт на Dashboard. *(01.12 + 01.3; e2e-спека @live готова, server-routes verified)*
