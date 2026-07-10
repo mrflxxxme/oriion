@@ -93,6 +93,33 @@ def test_missing_frontmatter_flagged(tmp_path: Path) -> None:
     assert any("frontmatter" in v for v in violations)
 
 
+def test_unknown_tool_name_flagged(tmp_path: Path) -> None:
+    mod = _load()
+    agents = tmp_path / "agents"
+    _make_role(
+        agents,
+        "architect",
+        body_frontmatter="---\nname: architect\ndescription: x\ntools: Read, Bazh, Grep\nmodel: opus\n---\nbody\n",
+    )
+    violations = mod.find_violations(agents)
+    assert any("unknown Claude Code tool 'Bazh'" in v for v in violations)
+
+
+def test_scoped_role_gaps_flags_missing(tmp_path: Path) -> None:
+    mod = _load()
+    agents = tmp_path / "agents"
+    agents.mkdir(parents=True)
+    gaps = mod.scoped_role_gaps(agents)  # empty dir -> all 6 scoped roles missing
+    assert len(gaps) >= 6
+    assert any("reviewer-security" in g for g in gaps)
+
+
+def test_scoped_role_gaps_real_tree_clean() -> None:
+    """The live .claude/agents/ carries all 6 role_scope_hook-scoped roles + allowlists."""
+    mod = _load()
+    assert mod.scoped_role_gaps(REPO_ROOT / ".claude" / "agents") == []
+
+
 def test_real_tree_conforms() -> None:
     """The committed 11 spawn-entries must pass (guards ongoing conformance)."""
     res = subprocess.run(

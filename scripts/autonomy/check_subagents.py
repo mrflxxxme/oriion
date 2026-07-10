@@ -43,6 +43,43 @@ def _rel(path: Path) -> str:
         return path.as_posix()
 
 
+# Recognized Claude Code tool names a spawn-entry may grant in `tools:`. A token
+# outside this set is a typo or an invented tool — the subagent would silently get
+# the wrong (usually all) tools.
+_VALID_TOOLS = frozenset(
+    {
+        "Read",
+        "Write",
+        "Edit",
+        "MultiEdit",
+        "NotebookEdit",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Task",
+        "WebFetch",
+        "WebSearch",
+        "ToolSearch",
+        "TodoWrite",
+    }
+)
+
+# Read-only / gate roles whose fine-grained path + sub-command scope is CAPABILITY-
+# enforced by scripts/autonomy/role_scope_hook.py (PreToolUse). Kept in sync with that
+# hook's _WRITE_ALLOW keys; each MUST be spawnable + carry the tools-allowlist.md the
+# hook mirrors, else the hook enforces a dead role. (Handbook prose is not reliably
+# machine-parseable for an exact allowed-tool set — the hook owns scope enforcement;
+# here we only assert tool-name validity + that the scoped roles exist.)
+_SCOPED_ROLES = (
+    "reviewer-security",
+    "reviewer-backend",
+    "reviewer-frontend",
+    "verifier",
+    "architect",
+    "evaluator",
+)
+
+
 def parse_frontmatter(text: str) -> dict[str, str] | None:
     """Return the leading ``---`` frontmatter as a flat str->str map, or None.
 
@@ -84,6 +121,10 @@ def check_entry(entry_path: Path, agents_dir: Path) -> list[str]:
     if name and name != stem:
         problems.append(f"{rel}: frontmatter name '{name}' != file stem '{stem}'")
 
+    for tool in (t.strip() for t in fm.get("tools", "").split(",") if t.strip()):
+        if tool not in _VALID_TOOLS:
+            problems.append(f"{rel}: frontmatter tools has unknown Claude Code tool '{tool}'")
+
     handbook = agents_dir / stem
     if not (handbook / "system-prompt.md").is_file():
         problems.append(f"{rel}: handbook '{_rel(handbook)}/system-prompt.md' not found")
@@ -114,13 +155,32 @@ def find_violations(agents_dir: Path) -> list[str]:
     return violations
 
 
+def scoped_role_gaps(agents_dir: Path) -> list[str]:
+    """role_scope_hook enforces path/command scope for the read-only/gate roles — each
+    must be spawnable + carry the tools-allowlist.md the hook mirrors, else dead config.
+    Runs only against the real agents dir (not the tmp dirs find_violations is tested on).
+    """
+    gaps: list[str] = []
+    stems = {p.stem for p in agents_dir.glob("*.md")}
+    for role in _SCOPED_ROLES:
+        if role not in stems:
+            gaps.append(
+                f".claude/agents/{role}.md: role_scope_hook.py scopes '{role}' but it has no spawnable entry"
+            )
+        elif not (agents_dir / role / "tools-allowlist.md").is_file():
+            gaps.append(
+                f".claude/agents/{role}/tools-allowlist.md: missing — role_scope_hook.py mirrors it"
+            )
+    return gaps
+
+
 def main() -> int:
     agents_dir = _REPO_ROOT / _AGENTS_DIR_REL
     if not agents_dir.is_dir():
         print(f"ERROR: agents dir not found at {agents_dir}", file=sys.stderr)
         return 1
 
-    violations = find_violations(agents_dir)
+    violations = find_violations(agents_dir) + scoped_role_gaps(agents_dir)
     if violations:
         print("ADR-040 D8 subagent conformance FAILED:")
         for line in violations:
