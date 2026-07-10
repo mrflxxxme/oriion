@@ -1,5 +1,5 @@
 {
-  "_comment": "ADR-037 Block C - pre-merge tripwire hook (defense-in-depth over the runner's explicit classify step). FOUNDER ACTION: merge the `hooks` key below into .claude/settings.json (create the file if absent). Claude cannot self-install hook config - arming this is deliberately a founder-owned switch.",
+  "_comment": "FOUNDER ACTION: merge the `hooks` key below into .claude/settings.json (create the file if absent). Claude cannot self-install hook config — arming these is a deliberately founder-owned switch. Two PreToolUse hooks: (1) premerge_hook (ADR-037 Block C) — pre-merge tripwire defense-in-depth over the runner's classify step; (2) role_scope_hook (chip task_dd666049 / 01.8c SECURE-P2) — enforces each read-only/gate subagent's tools-allowlist.md path+mutation scope via the payload `agent_type` (fail-open for the main agent/implementers, fail-closed on a restricted role's Write scope). Both resolve their script path relative to cwd — run shell tools from the repo root (or a dir with the delegating shim); see docs/runbooks/role-scope-hook.md.",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,15 @@
           {
             "type": "command",
             "command": "python scripts/autonomy/premerge_hook.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/autonomy/role_scope_hook.py"
           }
         ]
       }
