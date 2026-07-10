@@ -8,13 +8,17 @@
 |---|---|---|
 | Pre-Wave-0 | ✅ Complete | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
 | Wave 0 (Foundation) | 🔄 **Closing** (build phases 00.1–00.7 ✅; architecture **live-validated locally**; remaining: **Phase 00.8 design restyling** (NEW per ADR-031) + founder staging 10× anchor run) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
-| Wave 1 (Core MVP) | 🟢 **Must-set код-полно + VPS-verified** (2026-07-09, `/autonomy:run`) — смержены 01.1-retro…01.8 + **must-множество: 01.9a DLP (#95) · 01.9b connectors (#99) · 01.4-ui memory panel (#94) · 01.10 telegram_creator (#100) · 01.12 dashboard+onboarding (#103)**. `main`=`ce83ed2`; задеплоено на VPS, DLP-ON/connector-migration/routes verified. **Формальное закрытие = founder** (вертикали draft→reviewed, cost/risk review, подпись `gates/wave-1-to-2`). Итоговая справка → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md). Parked: 01.3b/01.11 → [FOUNDER-RUNWAY](./FOUNDER-RUNWAY.md) (01.8b OAuth — **descoped**: auth email-only, RW-02 снята 2026-07-09); post-wave dev-infra: 01.8c | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор); Business-API → parked (RW-05); friend-валидация → W2 02.0 |
-| Wave 2 (Pixel + каталог) | ⏳ Pending | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent first-instances |
+| Wave 1 (Core MVP) | ✅ **ЗАКРЫТА — gate `wave-1-to-2` PASS, подписано 2026-07-10** — все 3 вычислимых порога MET (AC pass-rate ~1.0 · must-фазы merged · DEFERRED-VERIFICATION без открытых P1). Смержены 01.1-retro…01.8 + must-множество (01.9a DLP · 01.9b connectors · 01.4-ui · 01.10 telegram_creator · 01.12 dashboard+onboarding) + 01.8c dev-infra hardening + brand-rename teamly→«Профики». `main`=`85059a6` HEALTHY; задеплоено+VPS-verified. Итоговая справка → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md). Parked → Wave 2: 01.3b (RW-04)/01.11 (RW-05); 01.8b OAuth — **descoped** (auth email-only, RW-02 снята). | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор), оба `reviewed`; Business-API → parked (RW-05); friend-валидация → W2 02.0 |
+| Wave 2 (Pixel + каталог) | ⏳ **Next — планирование в отдельной сессии** (D6: PHASES-регенерация + seed-specs). Обязательный старт: 02.1-retro (гашение DV) + 02.0 friend-validation | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent hardening (2-й проход поверх reviewed) |
 | Wave 3 (Глубина) | ⏳ Pending | +ИП-Бух + СМБ-Sales vertical + Vertical Rituals + PARA Workspace |
 | Wave 4 (Масштаб) | ⏳ Pending | K8s + Partner programme + Telegram Stars billing |
 | Wave 5+ (Enterprise) | ⏳ Pending | On-premise + open marketplace |
 
 ## Текущая активная фаза
+
+**🏁 WAVE 1 (Core MVP) — ФОРМАЛЬНО ЗАКРЫТА (2026-07-10).** Гейт [`wave-1-to-2`](./gates/wave-1-to-2.md) подписан (`status: PASS`) по прямому поручению founder («Подпиши за меня Wave 1 — согласовано»). Все три вычислимых порога MET; обе вертикали `reviewed`; инфра-долг (01.8c) закрыт; main HEALTHY (`85059a6`), задеплоено+VPS-verified. **Активной фазы сейчас нет.** Следующий шаг — **планирование Wave 2 в отдельной сессии** (D6 сознательно отложен): обязательный старт 02.1-retro (гашение DV-01/03/10/11) + 02.0 friend-validation. Parked-фазы переносятся в Wave 2: 01.3b (RW-04) · 01.11 (RW-05). Итоговая справка волны → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md).
+
+<details><summary>История фаз Wave 1 (свёрнуто — волна закрыта)</summary>
 
 **Phase 01.8c — Autonomy / dev-infra hardening (ADR-040 D2/D3/D8/D9/D12) — ✅ PR-1 code-complete + gates green (2026-07-10, `/autonomy:run`, branch `claude/auto-01.8c-autonomy-hardening`)** — сервисная фаза, готовит контур автономии к Wave 2. **Decomposition:** PR-1 (эта) = нативные ролевые сабагенты (D8, 11× `.claude/agents/<role>.md` + `check_subagents.py`) · OpenAPI-snapshot `contracts/openapi.snapshot.json` (64 маршрута) + drift-CI (D2) · docs-freshness CI `check_docs_freshness.py` + `ci-autonomy.yml` (D9; поймал+починил stale-статус 01.6/01.7) · JOURNAL-архивация D12 (189→46KB, content-verified 46=46). Гейты: ruff/format/mypy **241**+3/bandit 0/unit **1160**/tooling 15; adversarial 3 линзы. Tripwire **public_api_contracts** → ack → **MERGED #109 `857e09d`**. **PR-2 `01.8c-rename` (D3) ✅ code-complete:** brand-rename **teamly→profiki / «Профики»** (OQ-09 решён 2026-07-10 = profiki; `oriion` оставлен внутренним codename — JWT/RLS/события/инфра не тронуты). 74 замены/29 файлов (Cyrillic UI + Latin code); uv.lock+snapshot regen; гейты green (unit **1162** + golden-smoke **7/7** ~$0.016); tripwire **auth_rbac_sessions**(iam)+**public_api_contracts**(prompts/snapshot) → ack-needed. Parked (нужны founder-креды, RUNWAY): 01.3b (RW-04) · 01.11 (RW-05); **01.8b OAuth — descoped** (auth email-only, RW-02 снята). Справка → [`PROJECT-STATE.md`](./PROJECT-STATE.md).
 
@@ -65,6 +69,8 @@
 **Оставшийся Wave-0 пункт:** founder staging 10× anchor run (gate D5 — `internal_demo_passed`) — Wave-0→Wave-1 gate, НЕ блокирует Phase 00.7. Runbook: `docs/runbooks/staging-bootstrap.md`.
 
 **Phase 00.6 PR-A (Stage A local infra)** — ✅ **Complete** ([PR #36](https://github.com/mrflxxxme/oriion/pull/36); 22 commits; AC-W1-11..15).
+
+</details>
 
 ## Phase history (Wave-0)
 

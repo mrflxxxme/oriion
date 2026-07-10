@@ -7,10 +7,11 @@
 
 ---
 
-## Текущий срез: Wave 1 (Core MVP) — must-set код-полно, задеплоено+verified на VPS
+## Текущий срез: Wave 1 (Core MVP) — ✅ ЗАКРЫТА (gate PASS, 2026-07-10)
 
+Гейт [`wave-1-to-2`](./gates/wave-1-to-2.md) подписан (`status: PASS`, 2026-07-10) по прямому поручению founder («Подпиши за меня Wave 1 — согласовано»). Все три вычислимых порога MET (AC pass-rate ~1.0 · must-фазы merged · DEFERRED-VERIFICATION без открытых P1). Обе вертикали `reviewed`; инфра-долг (01.8c) + brand-rename закрыты; `main` HEALTHY, задеплоено + VPS-verified.
 Полная справка волны → [`roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md`](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md).
-Формальное закрытие — за founder (обзор вертикалей draft→reviewed, cost/risk review, подпись гейта).
+**Next:** планирование Wave 2 — отдельная сессия (обязательный старт: 02.1-retro гашение DV + 02.0 friend-validation). Parked → Wave 2: 01.3b (RW-04) · 01.11 (RW-05); 01.8b OAuth — descoped.
 
 ---
 
