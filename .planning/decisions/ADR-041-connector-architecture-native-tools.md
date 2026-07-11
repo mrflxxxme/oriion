@@ -3,6 +3,8 @@
 - **Status:** Accepted (2026-07-09, `/autonomy:run` phase 01.9b)
 
 > **Amendment 2026-07-11 (founder-grill D-04/D-06, Wave-2 planning):** «Real MCP-protocol transport is DEFERRED to Wave-2» пересмотрено → **отложен до Wave 3**. Основание: единственный потребитель протокола — community-серверы (github/notion/slack/…), которые уведены в W3; WB-вертикаль (планировавшийся native-потребитель W2) удалена целиком (D-06). Wave 2 остаётся на native-tool паттерне этого ADR. `MCPClient`-stub + `mcp_connections` registry сохраняются как upgrade-шов.
+>
+> **Re-revision 2026-07-11 (grill-доп, D-26, суперсид D-04):** реальный MCP-протокол **возвращён в Wave 2 — замыкающая фаза [02.13](../roadmap/wave-2-pixel-catalog/phases/02.13-mcp-protocol.md)** (клиент + каталог + github-mcp/google-sheets-mcp; первый кандидат на перенос при затягивании, D-27). Решение этого ADR не отменяется: наши коннекторы (telegram/yandex-disk/imap-smtp) остаются native-tool callables; MCP-путь добавляется рядом для ЧУЖИХ серверов, под теми же швами (capability fail-closed + DLP + creds-store).
 - **Context refs:** ADR-013 (MCP + BYOK KMS), ADR-039 (security guardrails), ADR-040 D10 (DLP-before-connectors), grill 2026-07-03 (DECISIONS-LOG `01.9`: connectors are read+draft only)
 
 ## Context

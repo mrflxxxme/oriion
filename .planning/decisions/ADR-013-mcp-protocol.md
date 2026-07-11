@@ -3,6 +3,8 @@
 - **Status:** Accepted
 
 > **Amendment 2026-07-11 (founder-grill D-04, Wave-2 planning):** реализация настоящего MCP-протокола (ClientSession, транспорты, community-каталог) — **Wave 3**. Wave 0–2 фактическая архитектура — native-tool callables per [ADR-041](./ADR-041-connector-architecture-native-tools.md) (Wave-0 MCP-клиент — stub). Виденье «каталог интеграций поверх MCP» сохраняется как целевое; bitrix24/amocrm-серверы — вместе с СМБ-Sales вертикалью (W3), wb-partners — удалён вместе с WB-вертикалью (D-06).
+>
+> **Re-revision 2026-07-11 (grill-доп, D-26, суперсид D-04):** MCP-протокол **возвращён в Wave 2 замыкающей фазой [02.13](../roadmap/wave-2-pixel-catalog/phases/02.13-mcp-protocol.md)** (место освободилось после удаления WB): реальный клиент + каталог интеграций UI + первые community-серверы **github-mcp + google-sheets-mcp**. Наши коннекторы остаются native (ADR-041 не отменяется — MCP = второй путь для чужих серверов). Остальной community-набор + user-supplied серверы — W3. 02.13 — первый кандидат на перенос при затягивании волны (D-27).
 
 ## Decision
 

@@ -5,8 +5,8 @@
 ## Ключевые решения состава (grill 2026-07-11)
 
 - **WB-Селлер удалён целиком** (D-06): вертикаль, коннектор, герой, пресет — вне роадмапа; W0-заготовка `.planning/verticals/wb-seller/` — retired-архив. **Новых вертикалей в W2 нет** (D-07) — углубляем horizontal + 2 reviewed-вертикали; выбор следующей — на гейте W2→3 по данным 02.0/беты.
-- **Mini App → W3** (D-03) в связке с 01.11 Business API (обе гейтед RW-05/RW-03); approval-поверхность W2 — веб.
-- **Реальный MCP-протокол → W3** (D-04, amendment ADR-041/013): в W2 только native-tool паттерн 01.9b.
+- **Mini App возвращён в W2 финальной фазой 02.12** (grill-доп 2026-07-11, **D-25**, суперсид D-03): скоуп БЕЗ Business API (мобильный approval-фронт + задачи; initData-auth); 01.11 остаётся parked RW-05, DM-сценарии — апгрейдом.
+- **Реальный MCP-протокол возвращён замыкающей фазой 02.13** (**D-26**, суперсид D-04): клиент + каталог интеграций + community-серверы **github-mcp + google-sheets-mcp**; наши коннекторы остаются native (ADR-041). 02.13 — первый кандидат на перенос в W3 при затягивании волны (D-27).
 - **Новая фаза 02.2 tier-1 редизайн** (D-24): research-first пересборка IA/навигации/лейаутов + DS v0.3 — сразу после retro, всё последующее строится на ней.
 - **Approval-UI** (D-08): human-approved send (TG-пост + email), autonomous send выключен до W3+.
 - **Pixel** (D-09/D-10/D-20..23): полный opt-in скин-режим; ассеты — API-генерация + founder-курация; hand-drawn герои не гейтят волну.
@@ -29,6 +29,8 @@
 | 10 | **02.9** | RBAC: Admin + Viewer + приватные артефакты (гасит DV-07); Bot/Service → W3 | [02.9](./phases/02.9-rbac-extension.md) | ADR-014, ADR-038 | ⏳ |
 | 11 | **02.10** | Storage-quota enforcement: HARD-REJECT + алерт 90% (субстрат 01.5) | [02.10](./phases/02.10-storage-quotas.md) | ADR-012, ADR-008 | ⏳ |
 | 12 | **02.11** | Pyodide-runner для Analyst: код-артефакт + Run-кнопка (web worker) | [02.11](./phases/02.11-pyodide-runner.md) | ADR-020 | ⏳ |
+| 13 | **02.12** | **Telegram Mini App**: мобильный approval-фронт (reuse API 02.3) + задачи/артефакты + нотификации; initData-auth; БЕЗ Business API (01.11 parked RW-05) | [02.12](./phases/02.12-telegram-mini-app.md) | ADR-030 (revised) | ⏳ |
+| 14 | **02.13** | **MCP-протокол**: реальный клиент (stdio/streamable-http) + каталог интеграций + github-mcp + google-sheets-mcp; unknown-tool fail-closed; замыкающая, 1-й кандидат на перенос | [02.13](./phases/02.13-mcp-protocol.md) | ADR-013/041 (revised) | ⏳ |
 
 ## Founder-треки (параллельно, старт — неделя 1)
 
@@ -40,9 +42,9 @@
 | Telegram bot-token + тест-канал (~5 мин) | RW-03 | live-proof 02.3 + остаток DV-11 |
 | Рекрутинг друзей (2–3 сразу, 10–15 после 02.2) | — | метрики 02.0 |
 
-## Перенесено в Wave 3 (решения 2026-07-11)
+## Перенесено в Wave 3 (решения 2026-07-11, ревизия grill-доп D-25/D-26)
 
-Mini App (D-03, в связке с 01.11 Business API / RW-05) · реальный MCP-протокол + community-серверы (D-04) · следующая вертикаль (D-07, выбор по данным беты) · Bot/Service-роль (D-15) · autonomous send + layer-A ML DLP (D-08) · co-editing 02.9-old (RQ-20260701-001, триггер не наступил) · интерактивный ноутбук (D-14).
+01.11 Business API + DM-сценарии Mini App (RW-05, юрист) · community-MCP сверх github/google-sheets (notion/slack/gmail/gdrive — по спросу беты) + user-supplied MCP-серверы · следующая вертикаль (D-07, выбор по данным беты) · Bot/Service-роль (D-15) · autonomous send + layer-A ML DLP (D-08) · co-editing 02.9-old (RQ-20260701-001, триггер не наступил) · интерактивный ноутбук (D-14) · Telegram Stars (ADR-030).
 
 ## Acceptance gate to Wave 3
 

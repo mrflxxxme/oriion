@@ -1,14 +1,16 @@
 # Wave 2 — Public beta: tier-1 редизайн + цикл ценности + Pixel-скин + монетизация
 
-> **Revision 2026-07-11 (founder-grill, D-01..D-24):** волна пересобрана по итогам Wave 1. Удалено: WB-Селлер вертикаль (D-06; заготовка `.planning/verticals/wb-seller/` — retired-архив), Mini App (D-03 → W3 в связке с 01.11), реальный MCP-протокол (D-04 → W3). Добавлено: **tier-1 редизайн** (02.2, D-24), **Approval-UI + human-approved send** (02.3 — незакрытый хвост W1), friend-validation (02.0, перенос из гейта W1→2 per ADR-040 D5), 01.3b ЮKassa (carry-over, RW-04). Прежние ревизии 2026-05-15 / 2026-06-11 поглощены этой.
+> **Revision 2026-07-11 (founder-grill, D-01..D-24):** волна пересобрана по итогам Wave 1. Удалено: WB-Селлер вертикаль (D-06; заготовка `.planning/verticals/wb-seller/` — retired-архив). Добавлено: **tier-1 редизайн** (02.2, D-24), **Approval-UI + human-approved send** (02.3 — незакрытый хвост W1), friend-validation (02.0, перенос из гейта W1→2 per ADR-040 D5), 01.3b ЮKassa (carry-over, RW-04). Прежние ревизии 2026-05-15 / 2026-06-11 поглощены этой.
+>
+> **Revision-доп 2026-07-11 (grill-доп, D-25..D-28, суперсид D-03/D-04):** на освободившееся после WB место **возвращены финальными фазами** Mini App (02.12 — мобильный approval-фронт, БЕЗ Business API; 01.11 остаётся parked RW-05) и реальный MCP-протокол (02.13 — клиент + каталог + github-mcp/google-sheets-mcp; замыкающая, 1-й кандидат на перенос при затягивании). Гейт: +2 порога (`mini_app_live`, `mcp_live`); ориентир → 2026-09-21.
 
 ## Цель волны
 
-**Public beta.** Продукт на tier-1 дизайне (пересобранные IA/навигация + DS v0.3) открыт публичному трафику с профики.online; полный цикл ценности работает: агент готовит → человек подтверждает → уходит наружу (Telegram/email); обе вертикали сертифицированы полными golden-прогонами; Pixel Department живёт как opt-in скин с AI-generated архетипами; монетизация live (рекуррентная подписка + credit-паки через ЮKassa — по RW-04); Pyodide закрывает Analyst capability-gap.
+**Public beta.** Продукт на tier-1 дизайне (пересобранные IA/навигация + DS v0.3) открыт публичному трафику с профики.online; полный цикл ценности работает: агент готовит → человек подтверждает → уходит наружу (Telegram/email), в том числе **с телефона через Telegram Mini App**; обе вертикали сертифицированы полными golden-прогонами; Pixel Department живёт как opt-in скин с AI-generated архетипами; монетизация live (рекуррентная подписка + credit-паки через ЮKassa — по RW-04); Pyodide закрывает Analyst capability-gap; **каталог интеграций** с первыми community-MCP серверами (github, google-sheets) поверх реального MCP-протокола.
 
 ## Метрики
 
-**Hard-пороги гейта (вычислимые, D-17)** — см. [gates/wave-2-to-3.md](../../gates/wave-2-to-3.md): must-фазы merged · AC pass-rate · DV без открытых P1 · approval-flow live e2e · скин live с AI-бейзлайном · сертификация ≥75% × 2 вертикали · платёж протестирован (если RW-04 разблокирован; иначе перенос по протоколу RUNWAY №3).
+**Hard-пороги гейта (вычислимые, D-17 + D-28)** — см. [gates/wave-2-to-3.md](../../gates/wave-2-to-3.md): must-фазы merged · AC pass-rate · DV без открытых P1 · approval-flow live e2e · скин live с AI-бейзлайном · сертификация ≥75% × 2 вертикали · платёж протестирован (если RW-04 разблокирован; иначе перенос по протоколу RUNWAY №3) · **mini_app_live** (TMA: initData-auth + approve-флоу e2e) · **mcp_live** (1+ community-сервер, tool-call round-trip; при переносе 02.13 в W3 по D-27 — порог N/A).
 
 **Замеры к гейту (решение founder, не блокеры):** регистрации/нед из публичного трафика (ориентир 100) · TTFV медиана (ориентир ≤3 мин) · Trial→paid конверсия (ориентир ≥5%) · платящие (ориентир 50) · NPS friend-когорты · Pixel-скин: доля включивших + упоминания в фидбеке (kill-criteria R-11 читается с поправкой на opt-in).
 
@@ -28,13 +30,15 @@
 - 02.9 RBAC Admin/Viewer + приватные артефакты (DV-07)
 - 02.10 storage-quota enforcement (HARD-REJECT)
 - 02.11 Pyodide-runner (код-артефакт + Run)
+- 02.12 **Telegram Mini App**: мобильный approval-фронт + задачи/артефакты + нотификации (initData-auth; БЕЗ Business API — D-25)
+- 02.13 **MCP-протокол**: клиент + каталог интеграций + github-mcp + google-sheets-mcp (замыкающая; 1-й кандидат на перенос — D-27)
 
-**Вне волны (→ W3):** Mini App + 01.11 Business API · реальный MCP-протокол + community-серверы · следующая вертикаль (по данным беты) · Bot/Service-роль · autonomous send + layer-A ML · co-editing (y-websocket) · полная 2D-сцена офиса · интерактивный ноутбук.
+**Вне волны (→ W3):** 01.11 Business API + DM-сценарии Mini App (RW-05) · community-MCP сверх github/google-sheets + user-supplied серверы · следующая вертикаль (по данным беты) · Bot/Service-роль · autonomous send + layer-A ML · co-editing (y-websocket) · полная 2D-сцена офиса · интерактивный ноутбук · Telegram Stars.
 
 ## Срок и бюджет
 
-- **Ориентир:** ~8 недель → **2026-09-07** (D-18; ориентир, не жёсткий дедлайн — фактический темп зависит от ack/RW-разблокировок; редизайн 02.2 — крупнейшая фаза, риск сдвига учтён).
-- **Бюджет:** dev-team капы v4 без изменений — $50 soft / $75 hard в день (D-19). Live-golden суммарно по фазам ≈ $6–10 + image-gen $20–50 (RW-11).
+- **Ориентир:** ~10 недель → **2026-09-21** (D-18, ревизия D-28: +2 недели на возвращённые 02.12/02.13; ориентир, не жёсткий дедлайн — фактический темп зависит от ack/RW-разблокировок; редизайн 02.2 — крупнейшая фаза, риск сдвига учтён).
+- **Бюджет:** dev-team капы v4 без изменений — $50 soft / $75 hard в день (D-19). Live-golden суммарно по фазам ≈ $7–12 + image-gen $20–50 (RW-11).
 
 ## Риски
 
@@ -54,4 +58,6 @@
 - Платёжный цикл ЮKassa (тест→live по RW-04)
 - RBAC 4 роли + приватные артефакты; storage-квоты enforced
 - Pyodide-runner у Analyst во всех пресетах
+- Telegram Mini App live: approve/edit исходящих с телефона (метрика «≥N friends пользуются» — замер)
+- Каталог интеграций: native-коннекторы + github-mcp + google-sheets-mcp через реальный MCP-протокол
 - Friend-validation отчёт (воронка/TTFV/NPS) + gate-замеры для решения о W3

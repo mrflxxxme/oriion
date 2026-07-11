@@ -12,11 +12,11 @@ founder_signature: null
 
 hard_thresholds:
   must_phases_merged:
-    target: "02.1-retro, 02.0(dev), 02.2, 02.3, 02.4, 02.5, 02.6, 02.7, 02.8, 02.9, 02.10, 02.11 merged в main; main HEALTHY"
+    target: "02.1-retro, 02.0(dev), 02.2, 02.3, 02.4, 02.5, 02.6, 02.7, 02.8, 02.9, 02.10, 02.11, 02.12, 02.13 merged в main; main HEALTHY"
     actual: null
     passed: null
     evidence_url: null
-    description: "Все must-фазы очереди PHASES.md merged; 01.3b — merged ЛИБО перенесён в W3 по протоколу RUNWAY №3 при неразблокированном RW-04 (перенос не валит порог)."
+    description: "Все must-фазы очереди PHASES.md merged; 01.3b — merged ЛИБО перенесён в W3 по протоколу RUNWAY №3 при неразблокированном RW-04; 02.13 — merged ЛИБО документированный перенос в W3 per D-27 (1-й кандидат при затягивании). Оба переноса не валят порог."
   ac_pass_rate:
     target: 0.95
     actual: null
@@ -59,6 +59,18 @@ hard_thresholds:
     passed: null
     evidence_url: null
     description: "Продуктовое качество редизайна — founder-решение, но факт утверждения вычислим (подпись в ADR-042 + UI-SPEC)."
+  mini_app_live:
+    target: "TMA открывается из бота, initData-auth работает, полный approve-цикл с телефона e2e (draft → TMA approve → отправлено) на staging"
+    actual: null
+    passed: null
+    evidence_url: null
+    description: "Порог фазы 02.12 (D-25/D-28). Security review (initData-подделка/replay/deep-links) — обязательный evidence-гейт фазы. Business API-сценарии НЕ входят (01.11 parked RW-05)."
+  mcp_live:
+    target: "1+ community-MCP сервер (github-mcp или google-sheets-mcp) подключён из каталога, tool-call round-trip живой; unknown-tool fail-closed тест зелёный"
+    actual: null
+    passed: null
+    evidence_url: null
+    description: "Порог фазы 02.13 (D-26/D-28). Условный: при документированном переносе 02.13 в W3 (D-27, аналог протокола RUNWAY №3) порог помечается N/A — волна закрывается без него."
 
 measured_metrics:
   # Замеры к гейту — НЕ блокеры. Founder принимает решение о W3-фокусе на их основании.
@@ -105,7 +117,7 @@ metrics_snapshot:
 
 adr_delta:
   created: ["ADR-042 (tier-1 redesign, Proposed 2026-07-11)"]
-  revised: ["ADR-004", "ADR-007", "ADR-013", "ADR-021", "ADR-030", "ADR-041 (amendments 2026-07-11)"]
+  revised: ["ADR-004", "ADR-007", "ADR-013", "ADR-021", "ADR-030", "ADR-041 (amendments 2026-07-11; ADR-013/030/041 re-revised grill-доп D-25/D-26: Mini App=02.12, MCP=02.13 вместо W3)"]
   superseded: []
 
 risks_delta:
@@ -139,6 +151,8 @@ capacity_snapshot:
 6. **vertical_certification** — 30-task ≥75% × 2 + adversarial 10/10 SAFE (DV-13 закрыта).
 7. **payments_tested** — условный (RW-04): тест-shop цикл зелёный, либо документированный перенос.
 8. **redesign_approved** — ADR-042 Accepted + UI-SPEC подписан founder.
+9. **mini_app_live** — TMA: initData-auth + полный approve-цикл с телефона e2e (02.12, D-25/D-28).
+10. **mcp_live** — условный (D-27): 1+ community-сервер live round-trip + fail-closed тест, либо документированный перенос 02.13 в W3.
 
 ## Measured metrics (решение founder, не блокеры)
 
@@ -154,7 +168,7 @@ _(Founder заполняет при оценке.)_
 
 ## Strategic implications for Wave 3
 
-_(Founder заполняет: выбор следующей вертикали по D7-отчёту; Mini App + 01.11; MCP-протокол; autonomous send; co-editing триггер.)_
+_(Founder заполняет: выбор следующей вертикали по D7-отчёту; 01.11 Business API + DM-сценарии TMA (RW-05); community-MCP расширение + user-supplied серверы; autonomous send; co-editing триггер.)_
 
 ## Cost-budget review
 

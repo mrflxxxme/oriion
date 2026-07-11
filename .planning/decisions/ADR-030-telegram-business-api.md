@@ -3,6 +3,8 @@
 - **Status:** Proposed
 
 > **Revision 2026-07-11 (founder-grill D-03, Wave-2 planning):** факт W1: Business API-scope НЕ вошёл в 01.10 (вертикаль отгружена на Bot-API read+draft); Business API целиком = фаза **01.11, parked на RW-05** (юрист: consent-текст + РКН). **Mini App перенесён W2 → W3** в связке с 01.11 (Mini App надстраивается над Business API; без него его killer-сценарий «approve DM-replies» недостижим). Approval-поверхность W2 — веб (фаза 02.3). ADR остаётся Proposed до разблокировки RW-05.
+>
+> **Re-revision 2026-07-11 (grill-доп, D-25, суперсид D-03):** Mini App **возвращён в Wave 2 фазой [02.12](../roadmap/wave-2-pixel-catalog/phases/02.12-telegram-mini-app.md)** — с переопределённым скоупом БЕЗ Business API: мобильный approval-фронт очереди 02.3 (approve/edit TG-постов и писем с телефона) + задачи/артефакты + нотификации; auth через initData-обмен. Развязка с 01.11 снимает главное возражение переноса: killer-сценарий Mini App W2 = мобильный approve (самостоятельная ценность), а DM-replies добавятся апгрейдом при разблокировке RW-05 (01.11, W3 или раньше). Секция «Mini App контейнер ❌ (W2)» в таблице ниже читается через эту ревизию.
 - **Date:** 2026-05-15
 - **Deciders:** Founder, Tech Lead (architect AI-role)
 - **Supersedes:** N/A

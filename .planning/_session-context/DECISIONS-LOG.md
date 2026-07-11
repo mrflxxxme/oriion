@@ -288,3 +288,13 @@
 - D-23 Пиксель-тур: опциональный шаг onboarding-wizard; вливается с 02.7 (когда спрайты существуют)
 - D-24 НОВАЯ ФАЗА 02.2 tier-1 редизайн сразу после retro: фундаментальный UX-research трендов → пересборка IA/навигации/лейаутов + DS v0.3; founder готов уделять время (4 touchpoints: бриф → IA → bake-off → утверждение); ADR-042
 - Reversibility: продуктовые решения reversible новым grill-verdict; D-06 (удаление WB) — reversible (архив сохранён); D-24 (редизайн) — hard-to-reverse после материализации DS v0.3
+
+### 2026-07-11 | wave-2 planning (grill-доп) | product/founder-grill — D-25..D-28 СУПЕРСИД D-03/D-04
+
+> Founder: «раз убрали WB — вернём последними фазами Mini App и MCP-протокол». Дополнительное интервью 4 вопроса; все — по рекомендации.
+
+- D-25 Mini App ВОЗВРАЩЁН в W2 фазой 02.12 (суперсид D-03): скоуп БЕЗ Business API — мобильный approval-фронт (reuse API 02.3) + задачи/артефакты + нотификации; auth = initData-обмен; 01.11 остаётся parked RW-05, DM-сценарии — апгрейдом; security review обязателен
+- D-26 MCP-протокол ВОЗВРАЩЁН замыкающей фазой 02.13 (суперсид D-04): реальный клиент (stdio/streamable-http) + каталог интеграций UI + community-серверы **github-mcp + google-sheets-mcp** (notion/slack/gmail/gdrive → W3); наши коннекторы остаются native (ADR-041); unknown-tool fail-closed
+- D-27 Порядок финала: 02.12 Mini App → 02.13 MCP; 02.13 = ПЕРВЫЙ кандидат на документированный перенос в W3 при затягивании волны (аналог протокола RUNWAY №3)
+- D-28 Гейт: +2 hard-порога (mini_app_live, mcp_live — второй условный per D-27); ориентир волны 2026-09-07 → **2026-09-21** (+2 нед на возвращённые фазы)
+- Reversibility: reversible (перенос назад в W3 — штатный путь D-27)
