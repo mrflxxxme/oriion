@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 
+> **Amendment 2026-07-11 (founder-grill D-04, Wave-2 planning):** реализация настоящего MCP-протокола (ClientSession, транспорты, community-каталог) — **Wave 3**. Wave 0–2 фактическая архитектура — native-tool callables per [ADR-041](./ADR-041-connector-architecture-native-tools.md) (Wave-0 MCP-клиент — stub). Виденье «каталог интеграций поверх MCP» сохраняется как целевое; bitrix24/amocrm-серверы — вместе с СМБ-Sales вертикалью (W3), wb-partners — удалён вместе с WB-вертикалью (D-06).
+
 ## Decision
 
 **MCP (Model Context Protocol)** как universal connector layer с Wave 0. Кураторский каталог поверх MCP — для GUI-юзера выглядит как «список интеграций», под капотом — каждая = MCP-сервер.

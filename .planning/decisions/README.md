@@ -55,7 +55,8 @@
 | [ADR-012](./ADR-012-artifacts.md) | Артефакты: Yjs для документов, S3 для ассетов |
 | [ADR-025](./ADR-025-acceptance-gate-format.md) | Acceptance-gate format: Wave→Wave transitions с hard go/no-go thresholds |
 | [ADR-026](./ADR-026-vertical-expertise-pipeline.md) | Vertical-expertise pipeline: D-pattern + anti-hallucination protocol |
-| [ADR-030](./ADR-030-telegram-business-api.md) | Telegram Business API integration в telegram-mcp v0.2 (Wave 1); Mini App в W2, Stars billing в W3+ |
+| [ADR-030](./ADR-030-telegram-business-api.md) | Telegram Business API integration (revision 2026-07-11: Business API = 01.11 parked RW-05; **Mini App → W3** в связке с 01.11; Stars billing W3+) |
+| [ADR-042](./ADR-042-wave2-tier1-redesign.md) | **Wave-2 tier-1 редизайн** (Proposed): research-first пересборка IA/навигации + DS v0.3 + полная var-индирекция; bake-off + 4 founder-touchpoints; Accepted — по утверждению в фазе 02.2 (grill 2026-07-11, D-24) |
 
 ## Security & operations
 
@@ -68,7 +69,8 @@
 | [ADR-027](./ADR-027-solo-ai-git-pr-workflow.md) | Solo + AI Git/PR workflow: tier-table re-thought + atomic commits + failure handling (§5 ревизован [ADR-037](./ADR-037-autonomous-multiphase-runner.md) — полная автономия мёржа) |
 | [ADR-037](./ADR-037-autonomous-multiphase-runner.md) | Autonomous multi-phase runner + gate-authority merge: full-autonomy мёрж + узкая растяжка + evidence/CI-verify + auto-revert/fix-loop (ревизует ADR-027 §5, расширяет ADR-023 §8 + ADR-015) |
 | [ADR-039](./ADR-039-security-guardrails-context.md) | Security guardrails: детерминированный слой B (DLP RU-ПДн + injection-эвристики + capability-классификатор), детекторы-порты с B→A швом (Phase 01.6; enforcement → 01.9 per ADR-040 D10) |
-| [ADR-040](./ADR-040-execution-spec-contract.md) | Spec-contract автономного исполнения (founder-интервью 2026-07-07): DoR + seed-specs, OpenAPI-snapshot растяжка, DEFERRED-VERIFICATION + обязательные retro-фазы, FOUNDER-RUNWAY preflight, технические wave-гейты, cost-budget v3 ($20/$40), рабочее имя Oriion (расширяет ADR-037 D4/D6) |
+| [ADR-040](./ADR-040-execution-spec-contract.md) | Spec-contract автономного исполнения (founder-интервью 2026-07-07): DoR + seed-specs, OpenAPI-snapshot растяжка, DEFERRED-VERIFICATION + обязательные retro-фазы, FOUNDER-RUNWAY preflight, технические wave-гейты, cost-budget (v4: $50/$75 по gate-review), бренд «Профики» (ex-Oriion, решён 01.8c) (расширяет ADR-037 D4/D6) |
+| [ADR-041](./ADR-041-connector-architecture-native-tools.md) | Connector-архитектура: native-tool callables вместо MCP-протокола (01.9b); KMS creds-store + capability-gate + DLP-скрин исходящих; реальный MCP-протокол → W3 (amendment 2026-07-11, D-04) |
 
 ## Governance & policies
 

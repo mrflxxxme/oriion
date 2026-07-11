@@ -258,3 +258,33 @@
 - Decision: Python check: any phase spec-file whose slug is marked merged/complete in STATUS.md but still has 'Status: Pending' in its own spec = red; plus README 'текущая фаза' cross-checked vs STATUS.md active phase
 - Rationale: Directly implements D9 acceptance ('merged phase with Status Pending = red'); lightweight, stdlib-only, no external services.
 - Reversibility: reversible
+
+### 2026-07-11 | wave-2 planning | product/founder-grill (grill-2026-07-11)
+
+> Сессия планирования Wave 2 (ADR-040 D6): founder-grill 24 решения + фоновый аудит (backend/frontend/canon — все W1-гейты green, блокеров нет). Каждое решение — founder-verdict после анализа+рекомендации. Материализовано этой же сессией: PHASES.md + README W2 + 13 seed-specs + gate wave-2-to-3 rewrite + ADR-042 + amendments ADR-004/007/013/021/030/041 + RW-10/RW-11 + DV-13 + docs-sync канона.
+
+- D-01 Deliverable сессии: seed-specs + предрешённые форки (не полные спеки — JIT per ADR-040 D1)
+- D-02 Цель волны: public beta С монетизацией; 01.3b в треке parked-until-RW-04; RW-04 стартует неделя 1; «50 платящих» = замер, не гейт
+- D-03 Mini App → W3 (связка с 01.11 Business API, RW-05); approval-поверхность W2 = веб
+- D-04 MCP-протокол → W3; W2 = native-tools only (amendment ADR-041/013)
+- D-05 Порядок волны: цикл ценности → вертикали → упаковка → платежи → инфра-хвосты
+- D-06 WB-Селлер УДАЛЁН целиком (вертикаль+коннектор+герой+пресет+golden); verticals/wb-seller → retired-архив
+- D-07 Без новой вертикали в W2; выбор следующей — гейт W2→3 по данным 02.0/беты
+- D-08 Approval-UI: human-approved send TG-пост+email; fail-closed scoping в скоуп; layer-A ML deferred до autonomous-send (W3+); autonomous send OFF
+- D-09 Pixel-ассеты: API-генерация агентами + founder-курация (amendment ADR-021; ComfyUI/GPU-трек отменён)
+- D-10 Гейт волны по Pixel: скин live + 24 AI-архетипа; hand-drawn герои (2: Анастасия, Денис) — asset-апдейт ВНЕ гейта (R-14 снят с критического пути)
+- D-11 Платёжная модель: рекуррентная подписка ЮKassa + разовые credit-паки
+- D-12 Прод-домен: профики.online (корень = лендинги Astro, app. = приложение)
+- D-13 02.0 инструменты: событийная воронка из БД + in-app NPS-виджет (0-10 + текст); сторонняя аналитика — решение на гейте
+- D-14 Pyodide UX: код-артефакт + явная кнопка Run (не авто-исполнение; интерактивный ноутбук — W3-кандидат)
+- D-15 RBAC: Admin + Viewer + DV-07 enforcement; Bot/Service → W3
+- D-16 Auth: остаёмся custom JWT email-only; amendment ADR-007 (триггер пересмотра = enterprise SSO спрос); Logto-миграция снята с W2-3
+- D-17 Гейт W2→3: hard = вычислимые технические пороги; регистрации/TTFV/конверсия/платящие/NPS = замеры (решение founder)
+- D-18 Timebox: ~8 недель, ориентир 2026-09-07 (ориентир, не жёсткий дедлайн)
+- D-19 Бюджет: капы v4 без изменений ($50 soft / $75 hard/день)
+- D-20 Pixel-скин: ПОЛНЫЙ скин-режим UI (data-skin ось: радиусы/шрифты/акценты), не только аватары
+- D-21 Спрайты живут по live SSE-состояниям задач уже в W2 (idle/working/success; +thinking/error у героев)
+- D-22 Офис-вью: секция на странице ячейки + мини-виджет на Dashboard (без отдельного роута)
+- D-23 Пиксель-тур: опциональный шаг onboarding-wizard; вливается с 02.7 (когда спрайты существуют)
+- D-24 НОВАЯ ФАЗА 02.2 tier-1 редизайн сразу после retro: фундаментальный UX-research трендов → пересборка IA/навигации/лейаутов + DS v0.3; founder готов уделять время (4 touchpoints: бриф → IA → bake-off → утверждение); ADR-042
+- Reversibility: продуктовые решения reversible новым grill-verdict; D-06 (удаление WB) — reversible (архив сохранён); D-24 (редизайн) — hard-to-reverse после материализации DS v0.3

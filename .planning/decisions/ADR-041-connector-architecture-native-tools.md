@@ -1,6 +1,8 @@
 # ADR-041 — Connector architecture: native-tool callables (Wave-1), MCP-protocol deferred
 
 - **Status:** Accepted (2026-07-09, `/autonomy:run` phase 01.9b)
+
+> **Amendment 2026-07-11 (founder-grill D-04/D-06, Wave-2 planning):** «Real MCP-protocol transport is DEFERRED to Wave-2» пересмотрено → **отложен до Wave 3**. Основание: единственный потребитель протокола — community-серверы (github/notion/slack/…), которые уведены в W3; WB-вертикаль (планировавшийся native-потребитель W2) удалена целиком (D-06). Wave 2 остаётся на native-tool паттерне этого ADR. `MCPClient`-stub + `mcp_connections` registry сохраняются как upgrade-шов.
 - **Context refs:** ADR-013 (MCP + BYOK KMS), ADR-039 (security guardrails), ADR-040 D10 (DLP-before-connectors), grill 2026-07-03 (DECISIONS-LOG `01.9`: connectors are read+draft only)
 
 ## Context

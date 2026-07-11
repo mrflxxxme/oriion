@@ -1,6 +1,8 @@
 # ADR-030: Telegram Business API integration для AI-команд
 
 - **Status:** Proposed
+
+> **Revision 2026-07-11 (founder-grill D-03, Wave-2 planning):** факт W1: Business API-scope НЕ вошёл в 01.10 (вертикаль отгружена на Bot-API read+draft); Business API целиком = фаза **01.11, parked на RW-05** (юрист: consent-текст + РКН). **Mini App перенесён W2 → W3** в связке с 01.11 (Mini App надстраивается над Business API; без него его killer-сценарий «approve DM-replies» недостижим). Approval-поверхность W2 — веб (фаза 02.3). ADR остаётся Proposed до разблокировки RW-05.
 - **Date:** 2026-05-15
 - **Deciders:** Founder, Tech Lead (architect AI-role)
 - **Supersedes:** N/A

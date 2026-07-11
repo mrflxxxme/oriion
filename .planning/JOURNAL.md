@@ -4,6 +4,13 @@
 > [`dev-log/archive/JOURNAL-2026-05-to-06.md`](./dev-log/archive/JOURNAL-2026-05-to-06.md)
 > per ADR-040 D12. This rolling file keeps July-onward entries (append-only).
 
+## 2026-07-11 · hungry-nash-01feac · @claude-fable (Wave-2 planning grill + фоновый аудит — волна спланирована)
+
+- **Grill-сессия планирования Wave 2** (ADR-040 D6): 24 founder-решения D-01..D-24 → [DECISIONS-LOG](./_session-context/DECISIONS-LOG.md) `grill-2026-07-11`. Ключевые: **WB-Селлер удалён целиком** (D-06) и **без новой вертикали в W2** (D-07); **Mini App → W3** в связке с 01.11 (D-03); **MCP-протокол → W3** (D-04); **новая фаза 02.2 tier-1 редизайн** (research-first IA/навигация + DS v0.3, [ADR-042](./decisions/ADR-042-wave2-tier1-redesign.md), D-24); **Approval-UI + human-approved send** TG/email (D-08 — найден незакрытый хвост W1: approval-UI обещан 01.9b, но не построен); Pixel = полный opt-in скин-режим, ассеты через image-gen API + founder-курация, герои вне гейта (D-09/10/20-23); платежи = рекуррент+паки, RW-04 стартует неделя 1 (D-02/11); гейт W2→3 переписан на технические пороги + метрики-замеры (D-17).
+- **Фоновый аудит 3 агентами** (backend/frontend/canon): все W1-гейты green локально (ruff/format/mypy 241/bandit 0/**unit 1173**/frontend lint+tsc+**201 тестов**+cov 94%), **блокеров нет**. Findings → в 02.1-retro: `dispatch.py` 1073 строки (лимит 500), dormant `build_connector_tools`, 4 цикла импортов контекстов, 501-роутеры с устаревшими комментариями; frontend: литеральные radius/font в `@theme` (блокер скина), ×3 дубли `useCurrentCellId`, захардкоженный API_BASE. Canon-аудит: 13 дельт W2-placeholder-vs-реальность + docs-drift вторичных документов → **docs-sync выполнен этой же сессией** (12 файлов: PHASES/README W1, WAVE-1-SUMMARY, гейты 0→1/1→2, contracts READMEs, OPEN-QUESTIONS, PLACEHOLDERS, ADR-033→Accepted).
+- **Материализовано:** regenerated [PHASES.md](./roadmap/wave-2-pixel-catalog/PHASES.md) + [README](./roadmap/wave-2-pixel-catalog/README.md) волны + **13 seed-specs** (02.1-retro, 02.0, 02.2…02.11, 01.3b) + [gate wave-2-to-3](./gates/wave-2-to-3.md) rewrite + ADR-042 (Proposed) + amendments ADR-004/007/013/021/030/041 + RW-10 (художник)/RW-11 (image-gen ключ) + DV-13 (полная golden-сертификация) + wb-seller → retired-архив + STATUS.
+- Next: **`/autonomy:run 02.1-retro`**; founder-треки недели 1: RW-04 (ЮKassa старт), RW-10 (тендер), RW-03 (bot-token), 2–3 друга для 02.0-волны-1.
+
 ## 2026-07-02 · hungry-nash-01feac · @claude-opus (Autonomy Blocks D+E + full arming — automation complete)
 
 - Continues after **#76 (Block C) merged** (`704a395`). Founder: «выполни 2-4 и … достроим полную автоматизацию перед пилотом» — so this session (a) armed every founder-owned switch, (b) built Blocks D+E.

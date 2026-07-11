@@ -1,8 +1,8 @@
-<!-- SKELETON — Wave 0 stub (per ADR-024). Draft quality README; SQL/YAML files are placeholders. -->
+<!-- IMPLEMENTED (native-tools scope) — 01.9b per ADR-041. README below сохраняет исходный контракт; актуальная реализация — src/mcp/. -->
 
 # Bounded Context: `mcp`
 
-> **Status:** SKELETON (Wave 0 stub per ADR-024). Real DDL/API/events deferred to Milestone D, Wave 2.
+> **Status:** IMPLEMENTED (native-tools scope) — Phase 01.9b: `mcp.connector_credentials` (KMS creds-store, workspace-RLS) + 3 native-tool коннектора (telegram-bot / yandex-disk / imap-smtp) per [ADR-041](../../decisions/ADR-041-connector-architecture-native-tools.md). Реальный MCP-протокол транспорт (community-серверы) → Wave 3. Детали ниже — исходный skeleton-контракт (частично устарел, см. код).
 
 ## Purpose
 

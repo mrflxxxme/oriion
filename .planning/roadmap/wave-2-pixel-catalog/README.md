@@ -1,82 +1,57 @@
-# Wave 2 — Pixel Department + WB-vertical + Telegram Mini App (9 недель)
+# Wave 2 — Public beta: tier-1 редизайн + цикл ценности + Pixel-скин + монетизация
 
-> **Revision 2026-05-15:** Wave 2 scope reduced — ИП-Бухгалтерия + СМБ-Sales vertical-templates moved W2 → W3. Wave 2 теперь ships: +WB-Селлер vertical (graduated W0→W2) + Pixel + Pyodide + Telegram Mini App + первые **3 Master-Agent instances** (Marketing + Telegram + WB) + Master-Agent hardening pass. Timebox 8 → 9 weeks. See [Session-decision](../../JOURNAL.md).
-
-> **Revision 2026-06-11 (per [ADR-031](../../decisions/ADR-031-design-direction-restyling.md)):** Pixel Department reframed — пиксельные герои и офис ship-ятся как **опциональный «скин» (opt-in, off by default)** поверх строго профессионального nordic base UI (Phase 00.8). Скоуп ассетов не меняется; меняется позиционирование: primary visual brand = professional nordic, pixel = memorable opt-in feature.
+> **Revision 2026-07-11 (founder-grill, D-01..D-24):** волна пересобрана по итогам Wave 1. Удалено: WB-Селлер вертикаль (D-06; заготовка `.planning/verticals/wb-seller/` — retired-архив), Mini App (D-03 → W3 в связке с 01.11), реальный MCP-протокол (D-04 → W3). Добавлено: **tier-1 редизайн** (02.2, D-24), **Approval-UI + human-approved send** (02.3 — незакрытый хвост W1), friend-validation (02.0, перенос из гейта W1→2 per ADR-040 D5), 01.3b ЮKassa (carry-over, RW-04). Прежние ревизии 2026-05-15 / 2026-06-11 поглощены этой.
 
 ## Цель волны
 
-**Public beta релиз.** Pixel Department живёт (Native Canvas 2D) как опциональный skin/office-режим поверх профессионального nordic base UI (ADR-031), 4 templates в каталоге (1 horizontal + 3 vertical), Pyodide для Analyst-роли, MCP-каталог (vertical + community серверы), Telegram Mini App контейнер, полноценный onboarding с TTFV ≤3 мин.
+**Public beta.** Продукт на tier-1 дизайне (пересобранные IA/навигация + DS v0.3) открыт публичному трафику с профики.online; полный цикл ценности работает: агент готовит → человек подтверждает → уходит наружу (Telegram/email); обе вертикали сертифицированы полными golden-прогонами; Pixel Department живёт как opt-in скин с AI-generated архетипами; монетизация live (рекуррентная подписка + credit-паки через ЮKassa — по RW-04); Pyodide закрывает Analyst capability-gap.
 
-## Метрика успеха
+## Метрики
 
-- 100 регистраций/нед из публичного трафика
-- TTFV ≤3 мин (медиана)
-- Trial → paid конверсия ≥5%
-- **4 templates** в production (horizontal + Marketing-agency + Telegram-крейтор + WB-Селлер), у каждого vertical — golden dataset (30-50 задач) и hand-drawn vertical-герой
-- Master-Agent layer hardened на 3 vertical-instances; vertical-tier pricing rationale validated через A/B-test
-- Telegram Mini App live: ≥10 friends используют для approve/edit DM-replies
-- 50+ платящих клиентов
-- Pixel Department NPS: первые отзывы упоминают как secondary USP (opt-in feature; kill-criteria per R-11 читается с поправкой на долю включивших скин)
+**Hard-пороги гейта (вычислимые, D-17)** — см. [gates/wave-2-to-3.md](../../gates/wave-2-to-3.md): must-фазы merged · AC pass-rate · DV без открытых P1 · approval-flow live e2e · скин live с AI-бейзлайном · сертификация ≥75% × 2 вертикали · платёж протестирован (если RW-04 разблокирован; иначе перенос по протоколу RUNWAY №3).
 
-## Критерий перехода к Wave 3
-
-- Все phase'ы Wave 2 — Done
-- 50+ платящих
-- Метрики достигнуты
-- Marketing-канал отдаёт стабильно (Telegram-канал founder + 1 публикация на vc.ru / Хабре)
-- Retro + risks register update
+**Замеры к гейту (решение founder, не блокеры):** регистрации/нед из публичного трафика (ориентир 100) · TTFV медиана (ориентир ≤3 мин) · Trial→paid конверсия (ориентир ≥5%) · платящие (ориентир 50) · NPS friend-когорты · Pixel-скин: доля включивших + упоминания в фидбеке (kill-criteria R-11 читается с поправкой на opt-in).
 
 ## Scope
 
-**Must:**
-- Pixel Department **(опциональный skin/office-режим, off by default per ADR-031)**: Native HTML5 Canvas 2D + AI-generated baseline (24 archetypes) + 3 vertical-героев hand-drawn для W2 verticals (Marketing-agency «SMM-Анастасия», Telegram-крейтор «Крейтор-Денис», WB-Селлер «Селлер-Маркус») — ADR-004, ADR-021, ADR-031. Остальные 2 hand-drawn героя (Бухгалтер-Анна + Sales-Дмитрий) — Wave 3.
-- Расширение каталога: **+WB-Селлер vertical-template** (graduated W0→W2) — добавляется поверх 3 templates из Wave 1
-- **Master-Agent hardening pass** на 3 vertical-instances + новый WB-Master с deep prompt в `contracts/role-prompts/masters/wb-seller-master.md`
-- Pyodide WASM для Analyst-роли (ADR-020) — code execution в браузере; Analyst capability-gap из Wave 0 закрыт
-- **Telegram Mini App контейнер** per [ADR-030](../../decisions/ADR-030-telegram-business-api.md): inline-approve/edit DM-replies, schedule preview, content-approve workflow
-- MCP-серверы (Wave 2 set): **wb-partners-mcp** (наш, для WB vertical), bitrix24-mcp, amocrm-mcp (наши) + community github-mcp, notion-mcp, slack-mcp, gmail-mcp, google-drive-mcp, google-sheets-mcp
-- Полный onboarding: wizard (3 шага) + auto-spawn trial-cell + live demo + Pixel office tour + horizontal-vs-vertical routing UI
-- Admin + Viewer RBAC расширение
-- Golden datasets для 3 vertical-templates W2 (Marketing + Telegram + WB)
-- 2D-сцена офиса (минимум: карточки + pixelBob, полная сцена — Wave 3)
+**Must (очередь — [PHASES.md](./PHASES.md)):**
+- 02.1-retro (DV-гашение + хвосты W1 + распил dispatch.py + var-индирекция)
+- 02.0 friend-validation (телеметрия + NPS; друзья 2 волнами)
+- 02.2 **tier-1 редизайн**: UX-research трендов → IA/навигация/лейауты → DS v0.3 (ADR-042; founder-touchpoints: бриф → IA → bake-off → утверждение)
+- 02.3 **Approval-UI**: human-approved send TG-постов + email; autonomous send OFF до W3+
+- 02.4 golden-сертификация (30-task ≥75% × agency_marketing_ru + telegram_creator) + Master hardening
+- 02.5 onboarding-расширение (routing, live-demo, waitlist ИП-Бух/СМБ-Sales)
+- 02.6 Pixel: полный opt-in скин-режим + офис-витрина + live-состояния по SSE
+- 02.7 Pixel-ассеты: API-генерация 24 архетипов + founder-курация (+ пиксель-тур в онбординге); 2 hand-drawn героя (Анастасия, Денис) — asset-апдейт вне гейта (RW-10)
+- 02.8 marketing-лендинги (Astro, профики.online / app.профики.online)
+- 01.3b ЮKassa (рекуррент + паки; parked-until-RW-04)
+- 02.9 RBAC Admin/Viewer + приватные артефакты (DV-07)
+- 02.10 storage-quota enforcement (HARD-REJECT)
+- 02.11 Pyodide-runner (код-артефакт + Run)
 
-**Nice:**
-- ИП-Бухгалтерия / СМБ-Sales preview/teaser (показываются в каталоге как «Скоро» с waitlist signup)
-- Mobile-responsive (минимум обеспечиваем, fully — Wave 3)
-- Telegram-бот для нотификаций (без команд)
+**Вне волны (→ W3):** Mini App + 01.11 Business API · реальный MCP-протокол + community-серверы · следующая вертикаль (по данным беты) · Bot/Service-роль · autonomous send + layer-A ML · co-editing (y-websocket) · полная 2D-сцена офиса · интерактивный ноутбук.
 
-## Длительность и команда
+## Срок и бюджет
 
-- **Срок:** 9 недель (revision 2026-05-15: +1 нед vs prior 8 weeks — поглощает +WB-vertical и Telegram Mini App)
-- **Команда:** +Middle Backend, +Designer (UI/UX), +Senior Frontend (Vite+React+Canvas), Tech Lead, Senior Backend, DevOps 0.5
+- **Ориентир:** ~8 недель → **2026-09-07** (D-18; ориентир, не жёсткий дедлайн — фактический темп зависит от ack/RW-разблокировок; редизайн 02.2 — крупнейшая фаза, риск сдвига учтён).
+- **Бюджет:** dev-team капы v4 без изменений — $50 soft / $75 hard в день (D-19). Live-golden суммарно по фазам ≈ $6–10 + image-gen $20–50 (RW-11).
 
-## Phases
+## Риски
 
-См. [PHASES.md](./PHASES.md).
-
-> **⚠️ Phase-файлы Wave 2 — placeholder под прежнюю архитектуру.** Каждая phase регенерируется в начале Wave 2 на базе актуальных ADR + результатов Wave 1 retro.
-
-## Risks specific
-
-- **R-14** (Pixel-art bottleneck): pixel-artist для **3 vertical-героев W2** — найм через FL.ru / Хабр / Кворк ДО старта Phase 02.1 (Бухгалтер-Анна + Sales-Дмитрий — Wave 3 hire)
-- **R-11** (Pixel как secondary USP): NPS upticks от Pixel — мониторим; kill criteria: NPS <30 + 0 упоминаний за 4 мес
-- **R-12**: соблазн добавить MCP power-features / workflow-шаблоны — это Wave 3
-- **R-27, R-28** (Pyodide): version pinning + «desktop recommended» UX для heavy analysis
-- **R-05** (data leak, Mini App): Mini App работает внутри Telegram client → дополнительный attack surface; security review Mini App до production
-- **R-NEW (Master-Agent maturity):** 3 verticals shipping simultaneously means 3 vertical Masters need to be production-quality одновременно — risk concentration; mitigated через staggered rollout (Marketing first → Telegram → WB)
+- **R-12 (scope creep)** — редизайн 02.2 «глубокий» — границы зафиксированы seed-spec'ом (IA+DS+пересборка, БЕЗ ребрендинга имени/мобайла); соблазн MCP/power-фич — W3.
+- **R-14 (artist bottleneck)** — снят с критического пути: герои не гейтят волну (D-10); тендер стартует в неделю 1 (RW-10).
+- **R-11 (Pixel USP)** — kill-criteria с поправкой на opt-in долю; friend-фидбек 02.0 — ранний сигнал.
+- **R-27/R-28 (Pyodide)** — version pinning + desktop-recommended UX (в seed-spec).
+- **R-04/R-05** — активны как в W1 (caps, DLP ON, approval-flow adversarial-аудит).
+- **Новый:** зависимость гейта от RW-04 (внешний процесс) — купирована протоколом RUNWAY №3 (перенос в W3 при неразблокировке).
 
 ## Артефакты к концу волны
 
-- Public-доступный продукт на основном домене
-- 4 templates в production (horizontal + 3 vertical) с golden datasets для verticals
-- 3 hand-drawn vertical-героев + 24 AI-generated archetypes (ещё 2 hand-drawn — Wave 3)
-- 3 vertical Master-Agents (hardened после Wave 1 first-draft) + WB-Master (Wave 2 new)
-- Pixel Department live (opt-in skin)
-- Telegram Mini App live с inline-approve UX
-- MCP-каталог (9+ серверов) в UI, включая wb-partners-mcp
-- Pyodide-runner для Analyst во всех team-presets (Analyst capability-gap из Wave 0 закрыт)
-- Полный onboarding wizard + live demo + horizontal-vs-vertical routing
-- ~50 платящих, обратная связь обработана
-- Marketing-лендинги для horizontal-сегмента + 3 vertical-сегмента (через Astro)
-- Waitlist для ИП-Бух + СМБ-Sales (готовится к Wave 3)
+- Public-доступный продукт: лендинги на профики.online + приложение app.профики.online на DS v0.3
+- 3 темплейта в production (horizontal + 2 сертифицированные вертикали) + waitlist на следующие
+- Approval-очередь: живые отправки в Telegram/email через подтверждение
+- Pixel-скин live: 24 откурированных AI-архетипа, офис с live-состояниями; герои — по готовности художника
+- Платёжный цикл ЮKassa (тест→live по RW-04)
+- RBAC 4 роли + приватные артефакты; storage-квоты enforced
+- Pyodide-runner у Analyst во всех пресетах
+- Friend-validation отчёт (воронка/TTFV/NPS) + gate-замеры для решения о W3

@@ -7,7 +7,7 @@
 | # | Вопрос | Варианты | Дедлайн | Owner |
 |---|---|---|---|---|
 | OQ-02 | ООО vs ИП на УСН | ООО (для ЮKassa B2B, реестра ПО) / ИП на УСН (дешевле, проще) | До открытия ЮKassa | Founder |
-| OQ-03 | Юрист на retainer'е | Зарцын / ЕПАМ / Бранан Legal / разовые консультации | До Wave 1 (запуск trial) | Founder |
+| OQ-03 | Юрист на retainer'е | Зарцын / ЕПАМ / Бранан Legal / разовые консультации | ~~До Wave 1 (запуск trial)~~ **просрочен** (Wave 1 закрыта 2026-07-10 без юриста) → до W2 02.0 friend-validation / public beta; гейтит OQ-32/33 (01.11) | Founder |
 | OQ-04 | Уведомление РКН об операторе ПДн | Обязательно по закону | До prod-launch (submitted, dev unblocked) | Founder + юрист |
 | OQ-05 | Регистрация товарного знака | Роспатент, 6 мес процедура | До публичной беты (Wave 2) | Founder + патентный поверенный |
 
@@ -36,7 +36,7 @@
 
 | # | Вопрос | Варианты | Дедлайн | Owner |
 |---|---|---|---|---|
-| OQ-09 | Доменное имя и бренд | Направление зафиксировано 2026-06-11 ([ADR-031](./decisions/ADR-031-design-direction-restyling.md)): строго профессиональный nordic base, pixel-герои — опциональный скин. **Рабочее имя = «Oriion» во всём репо** (founder-интервью 2026-07-07, [ADR-040 D3](./decisions/ADR-040-execution-spec-contract.md); ренейм в коде — Phase 01.8c). Открытым остаётся ТОЛЬКО: финальное имя / домен / финальный бренд — при смене заменяется одной механической операцией | До публичной беты (Wave 2) | Founder + Marketing |
+| OQ-09 | Доменное имя и бренд | ✅ **Resolved 2026-07-10:** бренд = **«Профики»** (slug `profiki`), домен `профики.online` (staging: `staging.профики.online`); «oriion» остаётся внутренним codename (репо `mrflxxxme/oriion`). Ренейм в коде выполнен (01.8c PR-2, #111). Дизайн-направление — [ADR-031](./decisions/ADR-031-design-direction-restyling.md) (nordic base, pixel-герои — опциональный скин) | — (закрыт) | Founder + Marketing |
 
 ## Маркетинг (не блокирует MVP)
 
@@ -46,12 +46,12 @@
 | OQ-22 | Первые friends-клиенты per template | Список 30+ потенциальных (mix: generic SMB для horizontal + 5–8 agencies + 5–8 TG-creators) | До Wave 1 launch | Founder |
 | OQ-31 | **Позиционирование personal-vs-SMB** | «Твои личные ассистенты» расширяет ТЗ — теперь preset позиционируется и для personal-users. Уточнить landing-copy + ICP-сегментацию для horizontal vs B2B vertical (Solo-тариф уже поддерживает personal-mode per ADR-008). | До Wave 1 launch (landing copy) | Founder + Marketing |
 
-## Telegram Business API (Wave 1)
+## Telegram Business API (01.11 — перенесена в W2+, RW-05)
 
 | # | Вопрос | Варианты | Дедлайн | Owner |
 |---|---|---|---|---|
-| OQ-32 | **Business API privacy & consent UX detail** | Точные wording-и consent-screen-а + 152-ФЗ disclosure + Privacy Policy updates для Telegram Business integration per [ADR-030](./decisions/ADR-030-telegram-business-api.md) | До старта Phase 01.10 | Founder + юрист |
-| OQ-33 | **РКН-уведомление update — Business API as additional ПДн processing** | Подача обновления через ГосУслуги — Bot читает private DM-content → новые категории ПДн | До старта Phase 01.10 | Founder + юрист |
+| OQ-32 | **Business API privacy & consent UX detail** | Точные wording-и consent-screen-а + 152-ФЗ disclosure + Privacy Policy updates для Telegram Business integration per [ADR-030](./decisions/ADR-030-telegram-business-api.md) | Гейтит 01.11 (перенесена в W2+, RW-05) | Founder + юрист |
+| OQ-33 | **РКН-уведомление update — Business API as additional ПДн processing** | Подача обновления через ГосУслуги — Bot читает private DM-content → новые категории ПДн | Гейтит 01.11 (перенесена в W2+, RW-05) | Founder + юрист |
 
 ## Wave 2+ assets
 
@@ -60,12 +60,12 @@
 | OQ-25 | Pixel-artist для 5 vertical-героев | Freelance через FL.ru / Хабр / Кворк | До Wave 2 Phase 02.1 | Founder + Designer |
 | OQ-26 | PoC MCP-серверов для РФ-API | Spike-проекты для Bitrix24 / amoCRM / 1С / Эльба | До Wave 2 Phase 02.4 | Senior Backend |
 
-## Сводка по блокирующим Wave 0
+## Сводка (sync 2026-07-11: Wave 1 закрыта — gate wave-1-to-2 PASS 2026-07-10; Wave-1-дедлайны переезжают на W2)
 
-**Required до Phase 00.1:** _(none — founder-personal финансовые блокеры удалены per Session-2026-05-15; Phase 00.1 готов к старту)_
 **Required до prod-launch:** OQ-04 (final РКН confirmation; dev unblocked — РКН-уведомление submitted)
-**Required до Phase 01.10 (Wave 1):** OQ-32, OQ-33 (Business API privacy + РКН-уведомление update)
-**Required до Wave 1 launch:** OQ-22, OQ-31 (friends-list + horizontal-vs-B2B positioning)
-**Не блокирует Phase 00.1 (можно параллельно):** OQ-02, OQ-03, OQ-05, OQ-09, OQ-19, OQ-21, OQ-22, OQ-25, OQ-26
+**Гейтят 01.11 (Telegram Business API, W2+, RW-05):** OQ-32, OQ-33 (Business API privacy + РКН-уведомление update)
+**Required до W2 02.0 (friend-validation) / public beta:** OQ-22, OQ-31 (friends-list + positioning), OQ-03 (юрист), OQ-02 + OQ-19 (юр.лицо + ЮKassa — гейтят 01.3b, RW-04)
+**Не гейтят текущую работу (параллельно, W2+):** OQ-05, OQ-21, OQ-25, OQ-26
+**Resolved:** OQ-09 (бренд «Профики» / профики.online, 2026-07-10)
 **Closed `N/A` per P-INIT-5 (solo + 11 AI model):** OQ-13, OQ-14, OQ-15, OQ-16
 **Closed `out-of-scope` per Session-2026-05-15 (founder-personal finance):** OQ-17, OQ-18

@@ -2,18 +2,25 @@
 
 > Authoritative role prompts for the Wave-0 horizontal `productivity-core`
 > team (4 single-layer agents: Coordinator + Researcher + Writer + Analyst).
-> Status: **first-draft**, materialized during Phase 00.5 scope per
-> Session-2026-05-15 decision #11. Hardening pass scheduled for Phase 01.1
-> retro per AC14.
+> Status: **hardened, все роли ≥ v1.0.0** (Phase 01.1-retro hardening pass;
+> writer поднят до v1.1.1 с anti-fabrication правилами, 2026-07-10).
+> Плюс подкаталог `masters/` с vertical Master-промптами (см. ниже).
 
 ## Files
 
 | File | Role | Status |
 |---|---|---|
-| `coordinator.md` | Workflow orchestrator — decomposes user tasks, delegates to specialists, integrates outputs | first-draft |
-| `researcher.md` | Market & competitive intel — sourcing, structured note-taking, fact-checking | first-draft |
-| `writer.md` | Long-form prose / briefs / posts — voice control, format adherence | first-draft |
-| `analyst.md` | Data + structured synthesis — competitive matrices, KPI rollups | first-draft |
+| `coordinator.md` | Workflow orchestrator — decomposes user tasks, delegates to specialists, integrates outputs | ≥ v1.0.0 |
+| `researcher.md` | Market & competitive intel — sourcing, structured note-taking, fact-checking | ≥ v1.0.0 |
+| `writer.md` | Long-form prose / briefs / posts — voice control, format adherence | v1.1.1 (anti-fabrication) |
+| `analyst.md` | Data + structured synthesis — competitive matrices, KPI rollups | ≥ v1.0.0 |
+
+## `masters/` — vertical Master-prompts
+
+Подкаталог `masters/` содержит 2 master-промпта вертикалей — `agency_marketing_ru` и
+`telegram_creator`: status **reviewed**, version **1.0.1**, `quality_bar: stable`
+(live review-run + founder approve, 2026-07-10). Lifecycle `draft → reviewed → locked`
+per [ADR-026](../../decisions/ADR-026-vertical-expertise-pipeline.md).
 
 ## Structure (per Session-2026-05-15 #11)
 

@@ -1,13 +1,15 @@
 ﻿---
 title: "Vertical: WB-Seller (Wildberries Marketplace Seller)"
 vertical_slug: wb-seller
-status: deferred to Wave 2 (per Session-2026-05-15 reorg)
-last-updated: 2026-05-15
+status: RETIRED (founder-grill 2026-07-11, D-06 — селлер-вертикаль снята с роадмапа)
+last-updated: 2026-07-11
 version: 0.1.0
-milestone: legacy W0-targeting → Wave 2 alignment pending
+milestone: retired archive (ex-W0 scaffold)
 ---
 
 # Vertical: WB-Seller
+
+> **🗄️ RETIRED 2026-07-11 (founder-grill Wave-2 planning, D-06):** WB-Селлер вертикаль **удалена с роадмапа целиком** (вертикаль + wb-partners коннектор + герой Селлер-Маркус + пресет + golden-сертификация). Директория сохранена как архив: 30 golden-задач + 5 adversarial + prompts-скаффолд пригодны для переиспользования, если селлер-сегмент вернётся отдельным решением (новый grill-verdict / гейт W2→3). Ни одна фаза Wave 2 на эти материалы не ссылается.
 
 > **⚠️ Status revision 2026-05-15:** WB-Seller vertical-template moved from Wave 0 anchor → Wave 2 per [ADR-017 revision](../../decisions/ADR-017-vertical-templates.md) + Session-2026-05-15.
 >
