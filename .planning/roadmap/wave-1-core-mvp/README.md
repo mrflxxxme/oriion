@@ -8,6 +8,8 @@
 
 ## Метрика успеха
 
+> ⚠️ **Revision 2026-07-11:** критерии ниже — до-ревизионные (2026-05). Нормативный гейт закрытия волны — [gates/wave-1-to-2.md](../../gates/wave-1-to-2.md) (подписан **PASS 2026-07-10**, чисто технические пороги per ADR-040 D5). Friends-валидация → W2 02.0; ЮKassa → 01.3b (W2, RW-04); Business API → 01.11 (W2+, RW-05); OAuth (01.8b) — descoped, auth email-only.
+
 - 10-15 friends-клиентов поставили ≥3 задачи каждый
 - Task success rate ≥75%
 - **3 templates работают:** `productivity-core` (horizontal) + Маркетинг-агентство РФ + Telegram-крейтор (verticals с Master-Agent)

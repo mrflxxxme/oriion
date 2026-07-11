@@ -1,8 +1,8 @@
-<!-- SKELETON — Wave 0 stub (per ADR-024). Wave 0 inline contract for `credit_transactions` only; full DDL/API/events deferred to Milestone D, Wave 2-3. -->
+<!-- IMPLEMENTED — 01.3 billing-core. README below сохраняет исходный контракт; актуальная реализация — src/billing/. -->
 
 # Bounded Context: `billing`
 
-> **Status:** SKELETON (Wave 0 stub per ADR-024). Real DDL/API/events deferred to Milestone D, Wave 2-3.
+> **Status:** IMPLEMENTED — Phase 01.3 billing-core (T-кредиты ledger + Trial 14д/500 + Solo тариф + per-cell/per-day caps + BYOK + credit-rate API поверх Wave-0 `credit_transactions`). ЮKassa top-up → 01.3b (Wave 2, гейт RW-04). Детали ниже — исходный skeleton-контракт (частично устарел, см. код).
 >
 > **Wave 0 inline contract (2026-05-19):** `billing.credit_transactions` SKELETON DDL ships with Phase 00.4 — required for LLM cost ledger (RU-billing). Real `credit_balances`, `pricing_table`, `tariff_plans`, `subscriptions`, `invoices` land in Wave 2-3 when monetization opens.
 

@@ -1,5 +1,7 @@
 # Wave 1 (Core MVP) — итоговая справка о состоянии
 
+> Snapshot 2026-07-09 (до подписания гейта). 2026-07-10: gate wave-1-to-2 подписан **PASS** (#114, main=`1953fa5`); DV-02/DV-12 (вертикали reviewed) и DV-06 (SMTP live) — закрыты; §3 выполнен.
+
 > Wave state-summary per методология (`run.md` stop-conditions / [state-summary-template](../../_meta/state-summary-template.md)).
 > Составлена `/autonomy:run` 2026-07-09 по факту merge всех must-фаз. Формальное закрытие волны — за founder (см. §3).
 

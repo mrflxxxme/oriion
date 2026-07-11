@@ -42,13 +42,15 @@
 
 | Token | Назначение | Status | Note |
 |---|---|---|---|
-| `TBD_BRAND_NAME` | Бренд-имя продукта | ⏳ | для UI, marketing copy |
-| `TBD_BRAND_DOMAIN` | Основной домен (например, foo.ru) | ⏳ | для production |
-| `TBD_BRAND_DOMAIN_STAGING` | Staging-домен (например, staging.foo.ru) | ⏳ | для test environment |
+| `TBD_BRAND_NAME` | Бренд-имя продукта | ✅ | **«Профики»** (slug `profiki`; OQ-09 resolved 2026-07-10; «oriion» — внутренний codename) |
+| `TBD_BRAND_DOMAIN` | Основной домен (например, foo.ru) | ✅ | `профики.online` |
+| `TBD_BRAND_DOMAIN_STAGING` | Staging-домен (например, staging.foo.ru) | ✅ | `staging.профики.online` (Timeweb single-box) |
 | `TBD_BRAND_LOGO_URL` | URL логотипа в S3 | ⏳ | для emails, OG-image |
 | `TBD_TRADEMARK_NUMBER` | Номер товарного знака Роспатент | OQ-05 ⏳ | для оферты, copyright |
 
 ## Yandex Cloud (закрыто OQ-10, но identifier'ы зависят от регистрации)
+
+> **RW-06 снята (Wave 1):** деплой — Timeweb single-box (`staging.профики.online`), секреты — в git-ignored env + local-KMS; Lockbox/obs-стек сняты. YC/Lockbox — опциональный upgrade-path; identifier'ы ниже нужны только при нём.
 
 | Token | Назначение | Status |
 |---|---|---|
@@ -69,8 +71,8 @@
 
 | Token | Назначение | Status |
 |---|---|---|
-| `TBD_GITHUB_ORG` | GitHub organization name | ⏳ |
-| `TBD_GITHUB_REPO` | Main repo name (например, profiki-ru) | ⏳ |
+| `TBD_GITHUB_ORG` | GitHub organization name | ✅ (`mrflxxxme`) |
+| `TBD_GITHUB_REPO` | Main repo name (например, profiki-ru) | ✅ (`oriion` — внутренний codename) |
 | `TBD_GITLAB_SELFHOST_URL` | URL self-hosted GitLab mirror | ⏳ deferred Wave 1+ per Phase 00.1 trim (Session-2026-05-17) |
 | `TBD_GITLAB_REPO` | Mirror repo URL | ⏳ deferred Wave 1+ |
 
@@ -79,7 +81,7 @@
 | Token | Назначение | Status |
 |---|---|---|
 | `TBD_YUKASSA_SHOP_ID` | ShopId в ЮKassa | ⏳ |
-| `TBD_YUKASSA_SECRET_KEY` | Secret API key (в Lockbox) | ⏳ |
+| `TBD_YUKASSA_SECRET_KEY` | Secret API key (RW-06 снята: в git-ignored env + local-KMS; Lockbox — опциональный upgrade-path) | ⏳ |
 | `TBD_YUKASSA_WEBHOOK_SECRET` | Secret для webhook signature verification | ⏳ |
 | `TBD_YUKASSA_RETURN_URL` | URL возврата после оплаты | ⏳ |
 
@@ -87,8 +89,8 @@
 
 | Token | Назначение | Status | Note |
 |---|---|---|---|
-| `TBD_DEEPSEEK_API_KEY` | DeepSeek managed key (для managed-tier) | ⏳ | Зарегистрироваться на api.deepseek.com |
-| `TBD_YANDEX_GPT_API_KEY` | YandexGPT API key | ⏳ | Через Yandex Cloud SA |
+| `TBD_DEEPSEEK_API_KEY` | DeepSeek managed key (для managed-tier) | ✅ | Funded-ключ в каноне git-ignored `.env` (RW-08 ready) |
+| `TBD_YANDEX_GPT_API_KEY` | YandexGPT API key | ✅ | Funded-ключ в каноне git-ignored `.env` (RW-08 ready) |
 | `TBD_YANDEX_GPT_CATALOG_ID` | Yandex Cloud Catalog ID | ⏳ | = `TBD_YC_FOLDER_ID_PROD` обычно |
 | `TBD_GIGACHAT_AUTH_KEY` | GigaChat auth key (Сбер) | ⏳ | developers.sber.ru/gigachat |
 | `TBD_BRAVE_SEARCH_API_KEY` | Brave Search API key | ⏳ | для web_search built-in (mcp/tools/web_search.py) |
@@ -108,9 +110,9 @@
 | Token | Назначение | Status |
 |---|---|---|
 | `TBD_SMTP_HOST` | SMTP host | ✅ (smtp.yandex.ru) |
-| `TBD_SMTP_PORT` | SMTP port | ✅ (587 TLS) |
-| `TBD_SMTP_USER` | SMTP login (адрес типа noreply@TBD_BRAND_DOMAIN) | ⏳ (зависит от OQ-09 + Yandex 360 setup) |
-| `TBD_SMTP_PASSWORD` | App-password для SMTP | ⏳ (в Lockbox) |
+| `TBD_SMTP_PORT` | SMTP port | ✅ (465 implicit TLS — настроено, RW-01 ready; live-send 2026-07-09, DV-06 закрыт) |
+| `TBD_SMTP_USER` | SMTP login (адрес типа noreply@TBD_BRAND_DOMAIN) | ✅ (настроено, RW-01; значение в git-ignored `.env`) |
+| `TBD_SMTP_PASSWORD` | App-password для SMTP | ✅ (настроено, RW-01; в git-ignored `.env` — RW-06 снята, Lockbox не используется) |
 | `TBD_NOREPLY_EMAIL` | From-address для transactional emails | ⏳ |
 | `TBD_SUPPORT_EMAIL` | Support inbox | ⏳ |
 
@@ -125,10 +127,12 @@
 
 ## Observability
 
+> **RW-06 снята (Wave 1):** obs-стек снят с деплоя (Timeweb single-box); секреты — в git-ignored env + local-KMS. YC/Lockbox и полный obs-стек — опциональный upgrade-path.
+
 | Token | Назначение | Status |
 |---|---|---|
-| `TBD_SENTRY_DSN` | Sentry DSN для error tracking | ⏳ (self-hosted в Wave 0.6) |
-| `TBD_GRAFANA_ADMIN_PASSWORD` | Grafana admin password | ⏳ (в Lockbox) |
+| `TBD_SENTRY_DSN` | Sentry DSN для error tracking | ⏳ (RW-06 снята: опционально, upgrade-path) |
+| `TBD_GRAFANA_ADMIN_PASSWORD` | Grafana admin password | ⏳ (RW-06 снята: опционально; секреты в git-ignored env, не Lockbox) |
 
 ## Команда (solo founder + 11 AI per P-INIT-5)
 

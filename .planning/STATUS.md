@@ -8,15 +8,15 @@
 |---|---|---|
 | Pre-Wave-0 | ✅ Complete | Roadmap reorg per [Session-2026-05-15](./JOURNAL.md) |
 | Wave 0 (Foundation) | 🔄 **Closing** (build phases 00.1–00.7 ✅; architecture **live-validated locally**; remaining: **Phase 00.8 design restyling** (NEW per ADR-031) + founder staging 10× anchor run) | Horizontal `productivity-core` team — internal demo «Market & content brief» |
-| Wave 1 (Core MVP) | ✅ **ЗАКРЫТА — gate `wave-1-to-2` PASS, подписано 2026-07-10** — все 3 вычислимых порога MET (AC pass-rate ~1.0 · must-фазы merged · DEFERRED-VERIFICATION без открытых P1). Смержены 01.1-retro…01.8 + must-множество (01.9a DLP · 01.9b connectors · 01.4-ui · 01.10 telegram_creator · 01.12 dashboard+onboarding) + 01.8c dev-infra hardening + brand-rename teamly→«Профики». `main`=`85059a6` HEALTHY; задеплоено+VPS-verified. Итоговая справка → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md). Parked → Wave 2: 01.3b (RW-04)/01.11 (RW-05); 01.8b OAuth — **descoped** (auth email-only, RW-02 снята). | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор), оба `reviewed`; Business-API → parked (RW-05); friend-валидация → W2 02.0 |
-| Wave 2 (Pixel + каталог) | ⏳ **Next — планирование в отдельной сессии** (D6: PHASES-регенерация + seed-specs). Обязательный старт: 02.1-retro (гашение DV) + 02.0 friend-validation | +WB-Селлер vertical + Pixel + Pyodide + Mini App + Master-Agent hardening (2-й проход поверх reviewed) |
+| Wave 1 (Core MVP) | ✅ **ЗАКРЫТА — gate `wave-1-to-2` PASS, подписано 2026-07-10** — все 3 вычислимых порога MET (AC pass-rate ~1.0 · must-фазы merged · DEFERRED-VERIFICATION без открытых P1). Смержены 01.1-retro…01.8 + must-множество (01.9a DLP · 01.9b connectors · 01.4-ui · 01.10 telegram_creator · 01.12 dashboard+onboarding) + 01.8c dev-infra hardening + brand-rename teamly→«Профики». `main`=`1953fa5` HEALTHY; задеплоено+VPS-verified. Итоговая справка → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md). Parked → Wave 2: 01.3b (RW-04)/01.11 (RW-05→W3 c Mini App); 01.8b OAuth — **descoped** (auth email-only, RW-02 снята). | Horizontal + 2 vertical (Marketing-agency + Telegram-крейтор), оба `reviewed`; Business-API → parked (RW-05); friend-валидация → W2 02.0 |
+| Wave 2 (Public beta) | 🧭 **Спланирована 2026-07-11 (+grill-доп), исполнение не начато** (founder-grill: 28 решений → DECISIONS-LOG `grill-2026-07-11`; phase-index регенерирован + 15 seed-specs + gate переписан). Очередь: 02.1-retro → 02.0 → **02.2 tier-1 редизайн (ADR-042)** → 02.3 approval-UI → … → 02.11 Pyodide → **02.12 Mini App → 02.13 MCP-протокол** (D-25/D-26, суперсид D-03/D-04; 02.13 — 1-й кандидат на перенос); 01.3b — parked-слот (RW-04). **Удалено: WB-вертикаль (D-06).** Ориентир ~10 нед → 2026-09-21 | Public beta: tier-1 редизайн + полный цикл ценности (approval-UI send TG/email + TMA-approve с телефона) + сертификация 2 вертикалей + Pixel-скин (opt-in, 24 AI-архетипа) + лендинги профики.online + ЮKassa (по RW-04) + Pyodide + каталог интеграций (github/google-sheets MCP) |
 | Wave 3 (Глубина) | ⏳ Pending | +ИП-Бух + СМБ-Sales vertical + Vertical Rituals + PARA Workspace |
 | Wave 4 (Масштаб) | ⏳ Pending | K8s + Partner programme + Telegram Stars billing |
 | Wave 5+ (Enterprise) | ⏳ Pending | On-premise + open marketplace |
 
 ## Текущая активная фаза
 
-**🏁 WAVE 1 (Core MVP) — ФОРМАЛЬНО ЗАКРЫТА (2026-07-10).** Гейт [`wave-1-to-2`](./gates/wave-1-to-2.md) подписан (`status: PASS`) по прямому поручению founder («Подпиши за меня Wave 1 — согласовано»). Все три вычислимых порога MET; обе вертикали `reviewed`; инфра-долг (01.8c) закрыт; main HEALTHY (`85059a6`), задеплоено+VPS-verified. **Активной фазы сейчас нет.** Следующий шаг — **планирование Wave 2 в отдельной сессии** (D6 сознательно отложен): обязательный старт 02.1-retro (гашение DV-01/03/10/11) + 02.0 friend-validation. Parked-фазы переносятся в Wave 2: 01.3b (RW-04) · 01.11 (RW-05). Итоговая справка волны → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md).
+**📋 WAVE 2 — СПЛАНИРОВАНА (2026-07-11 + grill-доп), исполнение не начато.** Grill-сессия Wave-2 planning: 28 founder-решений (D-01..D-28 → [DECISIONS-LOG](./_session-context/DECISIONS-LOG.md) `grill-2026-07-11`; D-25/D-26 суперсид D-03/D-04 — Mini App и MCP-протокол возвращены финальными фазами 02.12/02.13 после удаления WB) + фоновый аудит (backend/frontend/canon: все W1-гейты green локально — ruff/mypy 241/bandit 0/unit 1173/frontend 201, блокеров нет). Материализовано: [PHASES.md](./roadmap/wave-2-pixel-catalog/PHASES.md) (15 фаз, очередь фиксирована) + seed-specs + [gate wave-2-to-3](./gates/wave-2-to-3.md) (переписан: 10 технических порогов + метрики-замеры) + ADR-042 (tier-1 редизайн) + amendments ADR-004/007/013/021/030/041 + RW-10/RW-11 + DV-13 + docs-sync канона. **Следующий шаг — `/autonomy:run 02.1-retro`.** **Founder-треки недели 1:** RW-04 старт (ЮKassa/юр.форма — D-02), RW-10 тендер художника, RW-11 image-gen ключ (к 02.7), RW-03 bot-token (к 02.3), рекрутинг 2–3 друзей (02.0 волна 1). Wave 1 закрыта 2026-07-10 (гейт PASS, main HEALTHY `1953fa5`); справка → [WAVE-1-SUMMARY](./roadmap/wave-1-core-mvp/WAVE-1-SUMMARY.md).
 
 <details><summary>История фаз Wave 1 (свёрнуто — волна закрыта)</summary>
 
@@ -122,7 +122,7 @@
 - Cache: Redis 7 + Dramatiq (orchestrator-dispatch swap к Dramatiq tracked AC-W1-16)
 - 2D: Native Canvas
 - Code-exec: Pyodide WASM (browser)
-- Auth: Custom JWT (W0–1) → Logto (W2–3) → Keycloak (Enterprise)
+- Auth: Custom JWT email-only (2FA TOTP + magic-link + sessions) — Logto-миграция снята (ADR-007 amendment 2026-07-11, D-16); пересмотр по enterprise-SSO спросу
 - LLM: DeepSeek V4-flash/V4-pro (ADR-018 amended in PR-B C6) + YandexGPT + GigaChat + BYOK
 - Cloud: Yandex Cloud ru-central-1
 - Observability (от Phase 00.6 PR-A): OpenTelemetry SDK + Prometheus 9-metric family + structlog OTel correlation + Loki + Tempo + Grafana 3 dashboards + Alertmanager 8 rules в 3 groups
@@ -137,7 +137,7 @@
 | 2026-05-26 | Wave 0 Phase 00.6 PR-B **in flight** | on track |
 | 2026-06-09 | Wave 0 complete → Internal demo (horizontal `productivity-core`) | unchanged (Phase 00.6 PR-B 10× demo run + Phase 00.7 frontend ship → full anchor flip) |
 | 2026-07-21 | Wave 1 complete → Pre-alpha с 10–15 friends (3 templates) | unchanged |
-| ~2026-09-22 | Wave 2 complete → Public beta (4 templates + Pixel + Mini App) | **+1 нед** vs prior 2026-09-15 |
+| ~2026-09-21 | Wave 2 complete → Public beta (3 templates + tier-1 редизайн + Pixel-скин + approval-send + Mini App + MCP-каталог) | ≈prior 2026-09-22 (grill 2026-07-11 D-18 давал -2 нед после удаления WB/Mini App/MCP; grill-доп D-28 вернул Mini App+MCP финальными фазами → +2 нед; ориентир, не дедлайн) |
 | ~2026-12-01 | Wave 3 complete → GA-release (6 templates + Rituals + PARA) | **+3 нед** vs prior 2026-11-10 |
 | ~2027-02-22 | Wave 4 complete → Scale + Partner | **+3 нед** vs prior 2027-02-02 |
 

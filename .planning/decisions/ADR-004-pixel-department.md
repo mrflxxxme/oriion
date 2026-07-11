@@ -4,6 +4,8 @@
 
 > **Revision 2026-06-11 (per [ADR-031](./ADR-031-design-direction-restyling.md)):** Pixel-герои и офис reframed как **опциональный «скин»/режим (opt-in, off by default)** поверх строго профессионального nordic base UI. Скоуп ассетов Wave 2 не меняется; marketing-positioning понижается с «defensible visual brand» до «memorable opt-in feature» — primary visual brand = professional nordic.
 
+> **Revision 2026-07-11 (founder-grill Wave-2 planning, D-06/D-09/D-10/D-20..23):** (1) **Селлер-Маркус удалён** вместе с WB-вертикалью; W2 hand-drawn герои = 2 (SMM-Анастасия, Крейтор-Денис); Бухгалтер-Анна + Sales-Дмитрий — W3. (2) Скин = **полный режим UI** (ось `data-skin` поверх DS v0.3 из [ADR-042](./ADR-042-wave2-tier1-redesign.md): радиусы/шрифты/акценты), не только аватары. (3) Live-состояния спрайтов по SSE-прогрессу задач — уже в W2. (4) Офис-вью = секция страницы ячейки + виджет Dashboard (не отдельный роут). (5) Asset-pipeline: API-генерация вместо локального SDXL (см. amendment [ADR-021](./ADR-021-ai-generated-pixel-pipeline.md)). (6) Гейт волны: скин + 24 AI-архетипа; hand-drawn герои — asset-апдейт вне гейта. Фазы: 02.6 (скин) + 02.7 (ассеты).
+
 ## Decision
 
 ### Технический стек

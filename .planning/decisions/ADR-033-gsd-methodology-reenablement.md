@@ -1,6 +1,6 @@
 # ADR-033: GSD methodology re-enablement — L1 субагенты сейчас, L2 orchestrator-bridge отложен
 
-- **Status:** Proposed (Phase 01.1 Track A, 2026-06-15)
+- **Status:** Accepted (de-facto in use since 01.1; status synced 2026-07-11) — исходно Proposed (Phase 01.1 Track A, 2026-06-15)
 
 ## Контекст
 

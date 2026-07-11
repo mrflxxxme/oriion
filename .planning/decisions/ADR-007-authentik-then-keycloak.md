@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 
+> **Amendment 2026-07-11 (founder-grill D-16, Wave-2 planning):** миграция на Logto в W2–3 **снята**. Auth упрощён до email-only (RW-02 снята, 01.8b descoped), кастомный стек вырос в полноценный (2FA TOTP + magic-link + session-management, 01.8) — миграция не даёт продуктовой ценности. Остаёмся на custom JWT через W2–W3; **триггер пересмотра — enterprise-спрос на SSO/SAML/OIDC** (тогда решение Logto-vs-Keycloak заново). OAuth-провайдеры (Yandex ID / VK ID) из «Wave 1 extensions» ниже — descoped тем же решением.
+
 ## Decision
 
 ### Wave 0-1: Custom JWT-auth на FastAPI

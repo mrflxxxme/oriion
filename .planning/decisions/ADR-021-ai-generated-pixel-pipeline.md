@@ -2,6 +2,8 @@
 
 - **Status:** Accepted
 
+> **Amendment 2026-07-11 (founder-grill D-09/D-06/D-10, Wave-2 planning):** производственный пайплайн 24 архетипов заменён: **вместо локального ComfyUI/SDXL+LoRA на GPU (~20ч человеческой работы) — генерация через image-gen API** (провайдер выбирается в 02.7 discuss по качеству пиксель-арта + лицензии; ключ = RW-11, ~$20–50), агенты генерят батчи + авто-postprocess (downscale/palette-quantize/sprite-sheet), **founder только курирует** (батч-review, ~1–2 ч). Лицензионный чек провайдера — обязательный шаг фазы. Hand-drawn героев в W2 — **2** (Анастасия, Денис; Селлер-Маркус удалён с WB-вертикалью, D-06), наём = RW-10, герои НЕ гейтят волну (D-10). Секции ComfyUI/Aseprite ниже — исторические. Деплой/versioning в Object Storage — без изменений.
+
 ## Decision
 
 ### AI-generated baseline (24 archetypes)

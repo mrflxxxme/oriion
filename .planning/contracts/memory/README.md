@@ -1,8 +1,8 @@
-<!-- SKELETON — Wave 1 deliverable (per ADR-024). Draft quality README; SQL/YAML files are placeholders. -->
+<!-- IMPLEMENTED — 01.4/01.4b. README below сохраняет исходный контракт; актуальная реализация — src/memory/. -->
 
 # Bounded Context: `memory`
 
-> **Status:** SKELETON (Wave 1 deliverable per ADR-024). Real DDL/API/events land in Milestone D, Wave 1 phase.
+> **Status:** IMPLEMENTED — Phase 01.4 (двухуровневая память cell+role, single `memory` schema + RLS, 256-dim Yandex asymmetric embeddings) + 01.4b (auto filter-agent + LLM summarizer). Реализация: `src/memory/`. Детали ниже — исходный skeleton-контракт (частично устарел, см. код).
 
 ## Purpose
 
