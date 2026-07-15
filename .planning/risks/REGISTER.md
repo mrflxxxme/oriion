@@ -78,7 +78,7 @@ R-NN. <Название>
   - `productivity-core` (horizontal, W0+): <30% trial users select horizontal vs vertical → проверка к Wave 2 public beta
   - Marketing-agency (W1+): <8% trial к Wave 3
   - Telegram-крейтор (W1+): <5% trial к Wave 3
-  - WB-Селлер (W2+): <10% trial к Wave 3
+  - ~~WB-Селлер (W2+)~~ — вертикаль удалена (D-06, 2026-07-11); критерий снят
   - ИП-Бухгалтерия (W3+): <3% trial к Wave 4
   - СМБ-Sales (W3+): <8% trial к Wave 4
 
@@ -230,7 +230,7 @@ R-NN. <Название>
 | **`productivity-core` (horizontal) как Wave 0 entry-USP** | ≥30% trial-юзеров завершают «Market & content brief» сценарий + ≥30% выбирают horizontal над vertical в каталоге к Wave 2 | <15% completion / <10% horizontal-share к Wave 2 | 4 мес после Wave 0 |
 | Маркетинг-агентство как Vertical-1 (W1 anchor) | 25%+ trial к Wave 2 | <8% к Wave 3 | 6 мес |
 | Telegram-крейтор как Vertical-2 (W1) | 20%+ trial к Wave 2 (boosted by Business API DM-management) | <5% к Wave 3 | 6 мес |
-| WB-Селлер как Vertical-3 (W2 anchor) | 25%+ trial из WB-вертикали к Wave 3 | <10% trial к Wave 3 | 4 мес после Wave 2 |
+| ~~WB-Селлер как Vertical-3 (W2 anchor)~~ | **Ставка снята** — вертикаль удалена решением D-06 (2026-07-11). W2 не берёт третью вертикаль (D-07): следующая выбирается на гейте W2→3 по данным 02.0/беты, а не назначается заранее | — | — |
 | ИП-Бухгалтерия как Vertical-4 (W3) | 10%+ trial к Wave 4 | <3% к Wave 4 | 9 мес |
 | СМБ-Sales как Vertical-5 (W3) | 15%+ trial к Wave 4 | <8% к Wave 4 | 9 мес |
 | **Master-Agent layer как vertical-pricing-rationale** | Vertical-tier conversion rate ≥1.5× horizontal-tier; cost-overhead absorbed by margin | Vertical-tier converts at same rate as horizontal (no premium-rationale) | 4 мес после Wave 1 |

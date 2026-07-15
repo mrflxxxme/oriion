@@ -33,7 +33,7 @@
 - **Golden datasets** для ИП-Бух + СМБ-Sales (30-50 задач each)
 - Vertical Rituals Catalog (per vertical-template, ADR-019) — Master-Agents становятся ritual-owners per [ADR-029](../../decisions/ADR-029-master-agent-vertical-templates.md) §«Wave 3 extension»
 - «Знания команды» (PARA Workspace) — Проекты / Сферы / Ресурсы / Архив; Master-Agents читают PARA как primary domain-memory per ADR-011 + ADR-029
-- Corporate MCP-серверы (наши): 1c-rest-mcp, kontur-elba-mcp, kontur-extern-mcp, tinkoff-business-mcp, **ozon-seller-mcp** (graduated с WB-Селлер vertical Wave 2 deferral)
+- Corporate MCP-серверы (наши): 1c-rest-mcp, kontur-elba-mcp, kontur-extern-mcp, tinkoff-business-mcp, **ozon-seller-mcp** (маркетплейс-направление; WB-Селлер удалён из роадмапа целиком — D-06, 2026-07-11 — так что это не «наследие отсрочки»: направление живёт или умирает по выбору вертикали на гейте W2→3 per D-07)
 - Расширение community MCP-каталога (20+ серверов)
 - Workflow-шаблоны (сохранение и переиспользование процессов через DAG)
 - Approval mode + полный immutable audit log (требуется ИП-Бух vertical — high-stakes)
