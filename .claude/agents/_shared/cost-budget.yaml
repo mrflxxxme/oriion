@@ -5,8 +5,8 @@
 # но не на числа (per P-AUDIT-1).
 # Reviewed at: every wave-N-to-N+1 gate transition.
 
-version: 4
-last_reviewed: 2026-07-09
+version: 5
+last_reviewed: 2026-07-15
 last_reviewed_by: founder
 review_trigger: wave-gate-transition
 restructure_rationale: |
@@ -54,9 +54,44 @@ dev_team:
       Sonnet ~10x cheaper than Opus. Trade-off: lower quality on architectural tasks.
       Never fall back: architect, planner, memory-curator, reviewer-security, backend-implementer, verifier (always Opus).
 
+live_golden:
+  description: |
+    Live-прогоны против РЕАЛЬНЫХ LLM/image-API, эмитящие evidence-артефакт (live-golden,
+    wiring-proof, adversarial live-run). НЕ dev_team (там внутренние токены Claude-агентов)
+    и НЕ user_production (там клиентский трафик). До v5 эта категория упоминалась в v4 как
+    «отдельная», но нигде не была определена — DoR п.8 отправлял агента сверяться с чужим
+    капом с устаревшим числом (см. WAVE-1-RETRO.md §B).
+  # v5 (grill 2026-07-15, D-31): конверт НА ВОЛНУ, а не $/день.
+  # Live-goldens — всплески по фазам (02.7 image-gen $20-50 за раз), дневной кап для них
+  # структурно не той формы: ложно сработает на всплеске и ничего не поймает на растяжке.
+  per_wave:
+    soft_cap_usd: 60
+    hard_cap_usd: 100
+    notes: |
+      Wave 2 стартовый конверт = сумма seed-деклараций фаз (~$25-60): 02.7 image-gen $20-50
+      доминирует; 02.4 golden $3-5; 02.5 ~$1; 02.11 ~$0.5; 02.13 ~$0.5-1; 02.1 ~$0.1-1.
+      Soft → раннер доводит фазу до чистого конца, паркует очередь + notify founder.
+      Hard → immediate stop.
+      Пересматривается на каждом wave-gate вместе с остальным файлом.
+  per_phase:
+    declared_in: "DoR п.8 спеки фазы"
+    notes: |
+      Фаза объявляет ожидаемую стоимость ДО execute; DoR-валидация сверяет её с ОСТАТКОМ
+      конверта волны (не с dev_team caps).
+  metering:
+    source: "evidence.cost_usd"
+    notes: |
+      В ОТЛИЧИЕ от dev_team — здесь метр РЕАЛЬНЫЙ и уже существует: evidence-схема несёт
+      cost_usd («LLM/infra spend to produce this evidence»). Фактический расход волны =
+      сумма cost_usd по evidence-артефактам её фаз. Не оценка — измерение.
+
 user_production:
   description: "User-cells executing tasks через LLM-gateway (real customer-facing AI calls). Activates after Wave 1 launch."
-  status: dormant_until_wave_1   # Wave 0 = internal demo only, no production user-traffic
+  # v5: Wave 1 закрыт 2026-07-10 → dormant-статус более не соответствует действительности.
+  # Капы ниже ВСЁ ЕЩЁ null, хотя v2-заметка требовала задать их «перед wave-1-to-2 gate».
+  # Гейт подписан PASS с null. null молча означает «без потолка» при оценке $5000-15000/мес.
+  # D-32: закрытие капов = founder-зависимость, БЛОКИРУЮЩАЯ фазу 02.0 (первый живой трафик).
+  status: caps_unset_BLOCKS_02.0   # per D-32 — до простановки капов 02.0 паркуется (ADR-040 D7)
   per_request:
     soft_cap_usd: null   # set when Wave 1 friend-loop activates
     hard_cap_usd: null
@@ -95,7 +130,7 @@ telemetry:
     - user_traffic_request_completed   # NEW v2
     - user_traffic_org_cap_breached    # NEW v2
   partition_by:
-    - cost_source   # dev_team | user_production
+    - cost_source   # dev_team | live_golden | user_production   (live_golden added v5, D-31)
     - role          # для dev_team breakdown
     - organization_id   # для user_production breakdown
 

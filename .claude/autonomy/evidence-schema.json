@@ -1,15 +1,30 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://profiki.online/schemas/autonomy-evidence.v1.json",
+  "$id": "https://profiki.online/schemas/autonomy-evidence.v2.json",
   "title": "Autonomy gate evidence artifact",
-  "description": "Per ADR-037 D3. Emitted by a local-only gate (live golden, Docker integration, adversarial audit) that GitHub CI cannot run. Committed to the PR branch under evidence/<gate>.json. The ci-evidence job asserts freshness (head_sha == PR head) + verdict == PASS for every gate the phase declares in evidence/manifest.json. Makes local gates un-fakeable at merge and doubles as founder's post-hoc audit trail.",
+  "description": "Per ADR-037 D3. Emitted by a local-only gate (live golden, Docker integration, adversarial audit, wiring proof) that GitHub CI cannot run. Committed to the PR branch under evidence/<gate>.json. The ci-evidence job asserts freshness (head_sha == PR head) + verdict == PASS for every gate the phase declares in evidence/manifest.json, AND that every evidence-verified AC of the phase is named in some PASS artifact's ac_ids. Makes local gates un-fakeable at merge and doubles as founder's post-hoc audit trail. v2 (D-31/D-34, grill-2026-07-15): +ac_ids (binds proof to the claim, not just to the gate), +kind (wiring proof vs quality proof). v1 bound evidence to a GATE only — so a phase could be all-green while an AC asserting runtime behaviour was never actually exercised. That is exactly how AC-W1-4 reached main as dead code: unit-green, CI-green, nothing calling it. See .planning/WAVE-1-RETRO.md §A.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "gate", "head_sha", "timestamp", "verdict"],
+  "required": ["schema_version", "gate", "head_sha", "timestamp", "verdict", "ac_ids"],
   "properties": {
     "schema_version": {
-      "const": 1,
+      "const": 2,
       "description": "Bump when the shape changes; verify_evidence.py pins this."
+    },
+    "ac_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^AC-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*$"
+      },
+      "description": "Which acceptance criteria THIS artifact discharges, by id, exactly as written in the phase spec's AC table. Covers every notation in canon: AC-02.6.3 (phase), AC-W1-4 (wave), AC-3.6 (01.2-era). verify_evidence.py cross-checks both ways: every id here must exist in the spec, and every evidence-verified AC in the spec must appear in some PASS artifact. A gate being green is not proof that a given claim was tested — this field is what makes it proof."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["wiring", "quality"],
+      "description": "wiring = the real path was exercised end-to-end (the feature is reachable and runs; ~$0.1, MANDATORY for any AC asserting runtime behaviour — a unit test cannot discharge it, dead code passes units trivially). quality = the behaviour is good enough (full golden dataset, adversarial audit; expensive, gated on control value per ADR-040 D11). Wave-1 evidence: both of the wave's costliest defects (AC-W1-4 dead relay, broken Dramatiq worker path) were caught ONLY by exercising the path — neither needed an expensive golden."
     },
     "gate": {
       "type": "string",
