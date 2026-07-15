@@ -67,11 +67,12 @@ def evidence_repo(tmp_path: Path) -> tuple[Path, str]:
     (evidence_dir / "docker_integration.json").write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "gate": "docker_integration",
                 "head_sha": gate_sha,
                 "timestamp": "2026-07-03T00:00:00Z",
                 "verdict": "PASS",
+                "ac_ids": ["AC-02.1.1"],
             }
         ),
         encoding="utf-8",
@@ -87,6 +88,78 @@ def test_evidence_only_tail_is_fresh(evidence_repo: tuple[Path, str]) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "evidence-only tail" in result.stdout
+
+
+def _rewrite_evidence(repo: Path, **overrides: object) -> None:
+    """Rewrite the docker_integration artifact, applying ``overrides`` to it."""
+    path = repo / "evidence" / "docker_integration.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.update(overrides)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_evidence_without_ac_ids_is_rejected(evidence_repo: tuple[Path, str]) -> None:
+    """Per D-34: a green gate is not proof that a given claim was tested.
+
+    v1 bound evidence to the gate alone — which is how AC-W1-4 reached main as
+    dead code (unit-green, CI-green, nothing calling it).
+    """
+    repo, _ = evidence_repo
+    path = repo / "evidence" / "docker_integration.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    del payload["ac_ids"]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    _commit_all(repo, "docs(evidence): gate artifacts")
+
+    result = _run_verifier(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "ac_ids" in result.stdout
+
+
+def test_evidence_with_empty_ac_ids_is_rejected(evidence_repo: tuple[Path, str]) -> None:
+    repo, _ = evidence_repo
+    _rewrite_evidence(repo, ac_ids=[])
+    _commit_all(repo, "docs(evidence): gate artifacts")
+
+    result = _run_verifier(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "non-empty list" in result.stdout
+
+
+def test_evidence_with_malformed_ac_id_is_rejected(evidence_repo: tuple[Path, str]) -> None:
+    repo, _ = evidence_repo
+    _rewrite_evidence(repo, ac_ids=["definitely-wired-trust-me"])
+    _commit_all(repo, "docs(evidence): gate artifacts")
+
+    result = _run_verifier(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "not a valid AC id" in result.stdout
+
+
+def test_every_canon_ac_notation_is_accepted(evidence_repo: tuple[Path, str]) -> None:
+    """AC-02.1.3 (phase), AC-W1-4 (wave), AC-3.6 (01.2-era) all live in canon."""
+    repo, _ = evidence_repo
+    _rewrite_evidence(repo, ac_ids=["AC-02.1.3", "AC-W1-4", "AC-3.6"])
+    _commit_all(repo, "docs(evidence): gate artifacts")
+
+    result = _run_verifier(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "AC-02.1.3, AC-W1-4, AC-3.6" in result.stdout
+
+
+def test_duplicate_ac_ids_are_rejected(evidence_repo: tuple[Path, str]) -> None:
+    repo, _ = evidence_repo
+    _rewrite_evidence(repo, ac_ids=["AC-02.1.1", "AC-02.1.1"])
+    _commit_all(repo, "docs(evidence): gate artifacts")
+
+    result = _run_verifier(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "duplicates" in result.stdout
 
 
 def test_code_commit_after_gate_stales_evidence(
@@ -170,11 +243,12 @@ def _write_evidence(repo: Path, gates: list[str], head_sha: str) -> None:
         (ev / f"{gate}.json").write_text(
             json.dumps(
                 {
-                    "schema_version": 1,
+                    "schema_version": 2,
                     "gate": gate,
                     "head_sha": head_sha,
                     "timestamp": "2026-07-09T00:00:00Z",
                     "verdict": "PASS",
+                    "ac_ids": ["AC-02.1.1"],
                 }
             ),
             encoding="utf-8",

@@ -26,9 +26,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-_REQUIRED_FIELDS = ("schema_version", "gate", "head_sha", "timestamp", "verdict")
+# Covers every AC notation in canon: AC-02.1.3 (phase), AC-W1-4 / AC-W1-11 (wave), AC-3.6 (01.2).
+_AC_ID_RE = re.compile(r"^AC-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*$")
+_REQUIRED_FIELDS = ("schema_version", "gate", "head_sha", "timestamp", "verdict", "ac_ids")
 
 
 def _git_head_sha() -> str | None:
@@ -147,6 +149,26 @@ def _validate_evidence(payload: Any, gate: str, expected_sha: str) -> list[str]:
         )
     if payload["verdict"] != "PASS":
         problems.append(f"verdict is {payload['verdict']!r}, not PASS")
+    problems.extend(_validate_ac_ids(payload.get("ac_ids"), gate))
+    return problems
+
+
+def _validate_ac_ids(ac_ids: Any, gate: str) -> list[str]:
+    """Per D-34: an artifact must name the claims it discharges, not just its gate.
+
+    A green gate is not proof that a given AC was tested — v1 bound evidence to
+    the gate alone, which is how AC-W1-4 reached main as dead code (unit-green,
+    CI-green, nothing calling it).
+    """
+    if not isinstance(ac_ids, list) or not ac_ids:
+        return ["ac_ids must be a non-empty list of AC ids this artifact discharges (D-34)"]
+    problems = [
+        f"ac_ids entry {ac!r} is not a valid AC id (expected e.g. AC-02.6.3)"
+        for ac in ac_ids
+        if not (isinstance(ac, str) and _AC_ID_RE.match(ac))
+    ]
+    if len(set(ac_ids)) != len(ac_ids):
+        problems.append(f"ac_ids for '{gate}' contains duplicates")
     return problems
 
 
@@ -248,7 +270,10 @@ def main(argv: list[str] | None = None) -> int:
         else:
             cost = payload.get("cost_usd")
             cost_str = f" (${cost})" if cost is not None else ""
-            print(f"  [OK]   {gate}: PASS{cost_str}")
+            kind = payload.get("kind")
+            kind_str = f" [{kind}]" if kind else ""
+            acs = ", ".join(payload["ac_ids"])
+            print(f"  [OK]   {gate}: PASS{kind_str}{cost_str} -> {acs}")
 
     if failures:
         print(f"[ci-evidence] FAIL: {failures} gate(s) missing/stale/failed -merge blocked.")
