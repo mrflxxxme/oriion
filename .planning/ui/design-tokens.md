@@ -249,17 +249,27 @@ Royal Blue (`#2563eb`) насыщен/тёмен, поэтому ведёт се
 
 ### 10.3 Dark-first reasoning
 
-- Target audience: developers, AI-team operators, WB-Seller power-users.
-- Use cases include evening/night shifts (WB analytics check before bed, agent oversight в нерабочие часы).
+> Обоснование пересмотрено 2026-07-15: прежняя формулировка опиралась на «WB-Seller power-users» — сегмент **удалён целиком** решением D-06 (вертикаль, коннектор, герой, пресет, golden). Аудитория ниже — фактическая для W2 (горизонталь `productivity-core` + `agency_marketing_ru` + `telegram_creator`).
+
+- Target audience: SMB-операторы и personal-пользователи AI-команд, маркетинговые агентства, TG-креаторы; developers/AI-team operators.
+- Use cases include evening/night shifts (контент-подготовка и agent oversight в нерабочие часы).
 - OLED-friendly: `--bg-primary` = `#0f172a` (~5% luminance) экономит battery on AMOLED laptops/phones.
 - Light mode supported but optional — toggle через user preference (saved per ADR-001 user settings).
 
-### 10.4 Future evolution (Wave 2)
+### 10.4 Evolution — что гарантируется, а что нет (Wave 2)
 
-- **Interim step (Phase 00.8, Wave 0 — per ADR-031):** v0.2.0 restyling к professional-nordic — глубже тёмный фон + приглушённый тёплый акцент (терракота vs muted amber, bake-off внутри фазы). Только значения токенов.
-- Brand palette (после 00.8 — possibly Oriion-orange) может измениться post-OQ-09 resolution.
-- **Structural tokens stay** — spacing, radius, type scale, shadow recipes — не меняются.
-- Semantic mappings (`--bg-primary`, `--text-primary`) могут перенаправляться на новые brand tokens без необходимости touch every component.
+> **Переписано 2026-07-15** (grill D-30). Прежняя формулировка обещала «**structural tokens stay** — spacing, radius, type scale, shadow recipes — не меняются» и тем самым **запрещала** ось `data-skin` из [D-20](../_session-context/DECISIONS-LOG.md), которую требуют спеки 02.1-retro / 02.2 / 02.6. Два контракта противоречили друг другу: агент, читающий этот файл, получал не тот ответ, что агент, читающий спеку фазы. Литералы в `frontend/src/styles/index.css` — материализация именно этого обещания, а не отдельный баг. См. [WAVE-1-RETRO.md §B](../WAVE-1-RETRO.md).
+
+**Гарантируется — имена и структура, НЕ значения.** Это и был исходный интент (см. последний булит: «без необходимости touch every component»); прочтение «значения никогда не меняются» было побочным и ошибочным.
+
+- **Имена/структура токенов стабильны:** набор `--radius-*` / `--text-*` / `--space-*` / `--font-*` и их семантические маппинги (`--bg-page`, `--text-primary`, …) — контракт для компонентов. Компоненты потребляют **семантические токены**, никогда — сырые значения.
+- **Значения варьируются по осям.** Осей две, ортогональных:
+  - `data-theme` — `light` / `dark` (существует с v0.2);
+  - `data-skin` — опциональный скин-режим (D-20), **вводится в 02.6 поверх DS v0.3**; варьирует радиусы/шрифты/акценты.
+  - Матрица `theme × skin` целиком обязана держать **WCAG AA**, не только дефолтная комбинация.
+- **Механика:** каждый themeable-токен в `@theme` разрешается через `var()`. Литералы запрещены — грep-гейт стоит в AC 02.2, субстрат готовится в 02.1-retro.
+- **Ось скина ≠ эстетика скина.** Этот файл фиксирует, что ось *разрешима*; чем она наполнена — решает редизайн (02.2, [ADR-042](../decisions/ADR-042-wave2-tier1-redesign.md)) и 02.6.
+- Palette v0.3 определяется на bake-off внутри 02.2. Бренд **«Профики»** зафиксирован (OQ-09 закрыт 2026-07-10) — ребрендинг имени/лого вне скоупа.
 
 ---
 
@@ -268,7 +278,8 @@ Royal Blue (`#2563eb`) насыщен/тёмен, поэтому ведёт се
 - **DECISION-4** — Nordic Warm palette source: `.planning/decisions/ADR-028-policies-registry.md` §5.1
 - **ADR-001** — Frontend stack (Vite + React 19 + TanStack + shadcn + Tailwind v4)
 - **ADR-026** — Vertical expertise (UI surface across verticals must share design language)
-- **OQ-09** — Brand identity unresolved (Wave 2 — final palette TBD)
+- **OQ-09** — Brand identity **RESOLVED 2026-07-10**: бренд «Профики» / профики.online (`oriion` — только внутренний коднейм). Palette v0.3 — bake-off внутри 02.2, не блокируется брендом.
+- **ADR-042** — Wave-2 tier-1 редизайн (DS v0.3): направление и bake-off
 - **Phase 00.7 deliverable** — CSS variables materialization → `frontend/src/styles/tokens.css`
 - **Phase 00.7 deliverable** — Tailwind v4 theme config → `frontend/tailwind.config.ts`
 
